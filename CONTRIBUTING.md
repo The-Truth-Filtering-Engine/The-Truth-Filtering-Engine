@@ -7,14 +7,14 @@
 
 ```
 
-[SCRUM-번호]-feature/간단한설명
-[SCRUM-번호]-fix/간단한설명
+"[SCRUM-번호]-feature/간단한설명"
+"[SCRUM-번호]-fix/간단한설명"
 
 ```
 
 - 예시:
-- [SCRUM-번호]-feature/login-api
-- [SCRUM-번호]-feature/crash-on-start
+  - "[SCRUM-번호]-feature/login-api"
+  - "[SCRUM-번호]-feature/crash-on-start"
 
 ---
 
@@ -29,13 +29,13 @@
 ```
 
 - 타입 종류:
-- feat: 기능 추가
-- fix: 버그 수정
-- refactor: 코드 리팩토링
-- docs: 문서 수정
+  - feat: 기능 추가
+  - fix: 버그 수정
+  - refactor: 코드 리팩토링
+  - docs: 문서 수정
 
 - 예시:
-- feat: 로그인 API 추가
+  - feat: 로그인 API 추가
 
 ---
 
@@ -62,8 +62,8 @@
 
 - 모든 PR은 **Squash Merge**로 병합한다.
 - 이유:
-- 커밋 히스토리 단순화
-- 이슈 단위로 기록 관리
+  - 커밋 히스토리 단순화
+  - 이슈 단위로 기록 관리
 
 ---
 
