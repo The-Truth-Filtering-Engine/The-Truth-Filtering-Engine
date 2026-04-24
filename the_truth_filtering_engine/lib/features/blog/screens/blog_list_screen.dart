@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/blog_review.dart';
-import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../map/widgets/common_widgets.dart';
 import 'blog_webview_screen.dart';
 
 class BlogListScreen extends StatefulWidget {
   final ShopInfo shopInfo;
   final List<BlogReview> blogs;
-  const BlogListScreen({
-    super.key, required this.shopInfo, required this.blogs});
+  const BlogListScreen(
+      {super.key, required this.shopInfo, required this.blogs});
   @override
   State<BlogListScreen> createState() => _BlogListScreenState();
 }
@@ -29,16 +29,18 @@ class _BlogListScreenState extends State<BlogListScreen>
     super.dispose();
   }
 
-  List<BlogReview> get _sortedByReal =>
-    [...widget.blogs]..sort((a, b) => a.adProbability.compareTo(b.adProbability));
+  List<BlogReview> get _sortedByReal => [...widget.blogs]
+    ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
   List<BlogReview> get _sortedByDate =>
-    [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
+      [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
 
   void _openWebview(BlogReview blog) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => BlogWebviewScreen(blog: blog),
-    ));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BlogWebviewScreen(blog: blog),
+        ));
   }
 
   @override
@@ -71,8 +73,8 @@ class _BlogListScreenState extends State<BlogListScreen>
                           Text(shop.name, style: AppText.title()),
                           const SizedBox(height: 3),
                           Text(
-                            '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
-                            style: AppText.caption()),
+                              '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
+                              style: AppText.caption()),
                         ],
                       ),
                     ),
@@ -107,14 +109,15 @@ class _BlogListScreenState extends State<BlogListScreen>
                       borderRadius: BorderRadius.circular(6),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(.06),
-                          blurRadius: 4, offset: const Offset(0, 1)),
+                            color: Colors.black.withOpacity(.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1)),
                       ],
                     ),
                     labelColor: AppColors.primary500,
                     unselectedLabelColor: AppColors.textSecondary,
-                    labelStyle: AppText.caption()
-                      .copyWith(fontWeight: FontWeight.w500,
+                    labelStyle: AppText.caption().copyWith(
+                        fontWeight: FontWeight.w500,
                         color: AppColors.primary500),
                     unselectedLabelStyle: AppText.caption(),
                     dividerColor: Colors.transparent,
@@ -135,8 +138,8 @@ class _BlogListScreenState extends State<BlogListScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _BlogList(blogs: _sortedByReal,  onTap: _openWebview),
-                _BlogList(blogs: _sortedByDate,  onTap: _openWebview),
+                _BlogList(blogs: _sortedByReal, onTap: _openWebview),
+                _BlogList(blogs: _sortedByDate, onTap: _openWebview),
               ],
             ),
           ),
@@ -157,7 +160,7 @@ class _BlogList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: blogs.length,
       itemBuilder: (_, i) =>
-        BlogCard(blog: blogs[i], onTap: () => onTap(blogs[i])),
+          BlogCard(blog: blogs[i], onTap: () => onTap(blogs[i])),
     );
   }
 }
