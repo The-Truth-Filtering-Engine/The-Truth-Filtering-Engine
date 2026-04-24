@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/blog_review.dart';
-import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../map/widgets/common_widgets.dart';
 
 class BlogWebviewScreen extends StatelessWidget {
   final BlogReview blog;
   const BlogWebviewScreen({super.key, required this.blog});
 
   bool get _showWarning =>
-    blog.status == ReviewStatus.ad || blog.status == ReviewStatus.suspicious;
+      blog.status == ReviewStatus.ad || blog.status == ReviewStatus.suspicious;
 
   Color get _progColor {
     if (blog.adProbability > 60) return AppColors.danger400;
@@ -50,7 +50,6 @@ class BlogWebviewScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── URL 바 ──
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -63,18 +62,19 @@ class BlogWebviewScreen extends StatelessWidget {
                 children: [
                   Icon(
                     blog.status == ReviewStatus.ad
-                      ? Icons.gpp_bad_outlined
-                      : Icons.lock_outline_rounded,
+                        ? Icons.gpp_bad_outlined
+                        : Icons.lock_outline_rounded,
                     size: 14,
                     color: blog.status == ReviewStatus.ad
-                      ? AppColors.danger700 : AppColors.success700,
+                        ? AppColors.danger700
+                        : AppColors.success700,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       blog.url,
-                      style: AppText.caption().copyWith(
-                        color: AppColors.textSecondary),
+                      style: AppText.caption()
+                          .copyWith(color: AppColors.textSecondary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -82,15 +82,16 @@ class BlogWebviewScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 2),
+                          horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.danger50,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text('광고 감지',
-                        style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w500,
-                          color: AppColors.danger700)),
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.danger700)),
                     ),
                   ],
                 ],
@@ -116,29 +117,29 @@ class BlogWebviewScreen extends StatelessWidget {
                     if (blog.isSponsored) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                            horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: AppColors.primary50,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text('📢  이 포스팅은 업체로부터 원고료를 제공받았습니다',
-                          style: TextStyle(
-                            fontSize: 10, color: AppColors.primary500)),
+                            style: TextStyle(
+                                fontSize: 10, color: AppColors.primary500)),
                       ),
                       const SizedBox(height: 10),
                     ],
 
                     // 제목
                     Text(blog.title,
-                      style: AppText.title().copyWith(height: 1.4)),
+                        style: AppText.title().copyWith(height: 1.4)),
                     const SizedBox(height: 8),
 
                     // 메타
                     Row(
                       children: [
                         Text(blog.author,
-                          style: AppText.caption()
-                            .copyWith(color: AppColors.primary500)),
+                            style: AppText.caption()
+                                .copyWith(color: AppColors.primary500)),
                         const SizedBox(width: 10),
                         Text(blog.date, style: AppText.caption()),
                         const SizedBox(width: 8),
@@ -156,9 +157,10 @@ class BlogWebviewScreen extends StatelessWidget {
                       children: [
                         Text('광고 확률', style: AppText.caption()),
                         Text('${blog.adProbability}%',
-                          style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w500,
-                            color: _progTextColor)),
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: _progTextColor)),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -203,10 +205,10 @@ class BlogWebviewScreen extends StatelessWidget {
                     label: const Text('다른 리뷰 보기'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
-                      side: const BorderSide(
-                        color: AppColors.border, width: 0.5),
+                      side:
+                          const BorderSide(color: AppColors.border, width: 0.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
@@ -218,7 +220,7 @@ class BlogWebviewScreen extends StatelessWidget {
                     icon: const Icon(Icons.open_in_new_rounded, size: 16),
                     label: const Text('원문 보기'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12)),
                   ),
                 ),
               ],

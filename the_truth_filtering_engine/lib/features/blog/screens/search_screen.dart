@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/blog_review.dart';
-import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../map/widgets/common_widgets.dart';
 import 'blog_list_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -15,13 +15,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _goToList(String query) {
     if (query.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('가게명 또는 링크를 입력해 주세요.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('가게명 또는 링크를 입력해 주세요.')));
       return;
     }
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => BlogListScreen(shopInfo: dummyShop, blogs: dummyBlogs),
-    ));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              BlogListScreen(shopInfo: dummyShop, blogs: dummyBlogs),
+        ));
   }
 
   @override
@@ -49,7 +52,8 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Column(
                 children: [
                   Container(
-                    width: 60, height: 60,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
                       color: AppColors.primary50,
                       borderRadius: BorderRadius.circular(16),
@@ -81,7 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
               decoration: const InputDecoration(
                 hintText: '예: 오모테나시 스시 / https://map.naver.com/...',
                 prefixIcon: Icon(Icons.search_rounded,
-                  color: AppColors.textHint, size: 20),
+                    color: AppColors.textHint, size: 20),
               ),
             ),
 
@@ -98,30 +102,31 @@ class _SearchScreenState extends State<SearchScreen> {
 
             // ── 최근 검색 칩 ──
             Wrap(
-              spacing: 8, runSpacing: 8,
+              spacing: 8,
+              runSpacing: 8,
               children: recentSearches.asMap().entries.map((e) {
                 final isFirst = e.key == 0;
                 return GestureDetector(
                   onTap: () => _goToList(e.value),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isFirst
-                        ? AppColors.primary50 : AppColors.bg,
+                      color: isFirst ? AppColors.primary50 : AppColors.bg,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isFirst
-                          ? AppColors.primary200 : AppColors.border,
-                        width: 0.5),
+                          color:
+                              isFirst ? AppColors.primary200 : AppColors.border,
+                          width: 0.5),
                     ),
                     child: Text(e.value,
-                      style: AppText.caption().copyWith(
-                        color: isFirst
-                          ? AppColors.primary500 : AppColors.textSecondary,
-                        fontWeight: isFirst
-                          ? FontWeight.w500 : FontWeight.w400,
-                      )),
+                        style: AppText.caption().copyWith(
+                          color: isFirst
+                              ? AppColors.primary500
+                              : AppColors.textSecondary,
+                          fontWeight:
+                              isFirst ? FontWeight.w500 : FontWeight.w400,
+                        )),
                   ),
                 );
               }).toList(),
@@ -134,24 +139,26 @@ class _SearchScreenState extends State<SearchScreen> {
 
             // ── 최근 분석 결과 카드 ──
             GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) =>
-                  BlogListScreen(shopInfo: dummyShop, blogs: dummyBlogs),
-              )),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        BlogListScreen(shopInfo: dummyShop, blogs: dummyBlogs),
+                  )),
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Row(
                     children: [
                       Container(
-                        width: 44, height: 44,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           color: AppColors.primary50,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Center(
-                          child: Text('🍣',
-                            style: TextStyle(fontSize: 20)),
+                          child: Text('🍣', style: TextStyle(fontSize: 20)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -161,24 +168,23 @@ class _SearchScreenState extends State<SearchScreen> {
                           children: [
                             Text(dummyShop.name, style: AppText.subtitle()),
                             const SizedBox(height: 2),
-                            Text(
-                              '${dummyShop.category} · 분석 완료',
-                              style: AppText.caption()),
+                            Text('${dummyShop.category} · 분석 완료',
+                                style: AppText.caption()),
                           ],
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: AppColors.success50,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          'TRUTH ${dummyShop.trustScore}',
-                          style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w500,
-                            color: AppColors.success700)),
+                        child: Text('TRUTH ${dummyShop.trustScore}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.success700)),
                       ),
                     ],
                   ),
