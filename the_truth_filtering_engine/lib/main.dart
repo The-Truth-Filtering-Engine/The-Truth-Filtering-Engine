@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
-import 'theme/app_theme.dart';
-import 'screens/search_screen.dart';
-import 'widgets/common_widgets.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'features/1-1. map/screens/map_screen.dart';
+import 'features/1-2. restaurant_detail/screens/blog_list_screen';
+import 'features/1-2. restaurant_detail/screens/blog_webview_screen';
+import 'core/theme/app_colors.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NaverMapSdk.instance.initialize(
+    clientId: 'YOUR_NAVER_MAP_CLIENT_ID',
+  );
+  runApp(const ProviderScope(child: MyApp()));
+}
 
 void main() {
   runApp(const MyApp());
@@ -33,13 +44,13 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MapScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class MapScreen extends StatefulWidget {
+  const MapScreen({super.key, required this.title});
 
   // This widget is the home page of your application. It is stateful, meaning
   // that it has a State object (defined below) that contains fields that affect
@@ -53,10 +64,10 @@ class MyHomePage extends StatefulWidget {
   final String title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     
