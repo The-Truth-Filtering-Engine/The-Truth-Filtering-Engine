@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/blog_review.dart';
+import '../../1-2.restaurant_detail/models/blog_review.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../map/widgets/common_widgets.dart';
 

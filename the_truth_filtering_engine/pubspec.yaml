@@ -1,20 +1,21 @@
-name: truth_mouth
-description: 진실의 입 - AI 광고 필터링 맛집 리뷰 앱
-publish_to: 'none'
+﻿name: truth_mouth
+description: 吏꾩떎????- AI 愿묎퀬 ?꾪꽣留?留쏆쭛 由щ럭 ??
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.2.0                  # API 통신
-  url_launcher: ^6.2.5          # 외부 링크 열기 (블로그 원문)
-  webview_flutter: ^4.7.0       # 블로그 웹뷰
-  percent_indicator: ^4.2.3     # Trust 원형 차트
-  shared_preferences: ^2.2.2    # 최근 검색 저장
-  google_fonts: ^6.2.1          # Pretendard 대체 폰트
+  http: ^1.2.0
+  url_launcher: ^6.2.5
+  webview_flutter: ^4.7.0
+  percent_indicator: ^4.2.3
+  shared_preferences: ^2.2.2
+  google_fonts: ^6.2.1
+  flutter_naver_map: ^1.2.4
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   flutter_riverpod: ^2.5.1
