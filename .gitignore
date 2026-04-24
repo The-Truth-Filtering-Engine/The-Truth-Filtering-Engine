@@ -1,8 +1,0 @@
-.agents/
-.claude/
-.codex/
-AGENTS.md
-CLAUDE.md
-__pycache__/
-*.pyc
-graphify-out/
