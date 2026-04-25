@@ -10,6 +10,7 @@ import '../widgets/map_control_buttons.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
 import '../widgets/truth_score_marker.dart';
+import '../../1-2_restaurant_detail/screens/restaurant_detail_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -33,23 +34,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       backgroundColor: AppColors.mapTeal,
       body: Stack(
         children: [
-          // ── flutter_map ───────────────────────────────────────
+
+          // ── flutter_map ──────────────────────────
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _initialCenter,
               initialZoom: _initialZoom,
               onTap: (_, __) {
+                // 지도 빈 곳 탭 → 바텀시트 닫기
                 ref.read(selectedRestaurantProvider.notifier).state = null;
               },
             ),
             children: [
-              // OpenStreetMap 타일
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.truth_map',
               ),
-              // 마커 레이어
               MarkerLayer(
                 markers: restaurants.map((restaurant) {
                   return Marker(
@@ -66,19 +67,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ],
           ),
 
-          // ── 상단 검색바 ──────────────────────────────────────
+          // ── 상단 검색바 ──────────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: MapSearchBar(
-                onTap: () {
-                  // TODO: 검색 화면으로 이동
-                },
-              ),
+              child: MapSearchBar(onTap: () {}),
             ),
           ),
 
-          // ── 우측 컨트롤 버튼 ─────────────────────────────────
+          // ── 우측 컨트롤 버튼 ─────────────────────
           Positioned(
             right: 16,
             bottom: selectedRestaurant != null ? 230 : 100,
@@ -88,41 +85,58 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ref.read(showLayerMenuProvider.notifier).state =
                     !ref.read(showLayerMenuProvider);
               },
-              onZoomIn: () {
-                _mapController.move(
-                  _mapController.camera.center,
-                  _mapController.camera.zoom + 1,
-                );
-              },
-              onZoomOut: () {
-                _mapController.move(
-                  _mapController.camera.center,
-                  _mapController.camera.zoom - 1,
-                );
-              },
+              onZoomIn: () => _mapController.move(
+                _mapController.camera.center,
+                _mapController.camera.zoom + 1,
+              ),
+              onZoomOut: () => _mapController.move(
+                _mapController.camera.center,
+                _mapController.camera.zoom - 1,
+              ),
             ),
           ),
 
-          // ── 바텀시트 ─────────────────────────────────────────
+          // ── 바텀시트 (마커 탭 시 표시) ───────────
           if (selectedRestaurant != null)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
+              left: 0, right: 0, bottom: 0,
               child: AnimatedSlide(
                 offset: Offset.zero,
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutCubic,
                 child: RestaurantBottomSheet(
                   restaurant: selectedRestaurant,
+
+                  // ✅ 상세 화면으로 이동
                   onDetailTap: () {
-                    // TODO: 상세 화면으로 이동
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RestaurantDetailScreen(
+                          restaurant: selectedRestaurant,
+                        ),
+                      ),
+                    );
                   },
+
+                  // ✅ 북마크 (추후 연동)
                   onBookmarkTap: () {
-                    // TODO: 북마크 처리
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('북마크 기능은 준비 중이에요'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
                   },
+
+                  // ✅ 공유 (추후 연동)
                   onShareTap: () {
-                    // TODO: 공유 처리
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('공유 기능은 준비 중이에요'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
                   },
                 ),
               ),
@@ -132,6 +146,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
+  // 마커 탭 → 해당 식당 선택 + 카메라 이동
   void _onMarkerTapped(RestaurantModel restaurant) {
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
     _mapController.move(
@@ -140,8 +155,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
+  // 현재 위치로 이동 (추후 GPS 연동)
   void _moveToCurrentLocation() {
-    // TODO: 실제 GPS 연동
     _mapController.move(_initialCenter, 15);
   }
 }
