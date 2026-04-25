@@ -10,6 +10,7 @@ import '../widgets/map_control_buttons.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
 import '../widgets/truth_score_marker.dart';
+import '../../1-2_restaurant_detail/screens/search_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -72,7 +73,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: MapSearchBar(
                 onTap: () {
-                  // TODO: 검색 화면으로 이동
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SearchScreen(),
+                    ),
+                  );
                 },
               ),
             ),
