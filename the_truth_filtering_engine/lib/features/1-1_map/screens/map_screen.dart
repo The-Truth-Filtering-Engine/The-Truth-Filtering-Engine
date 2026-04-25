@@ -10,9 +10,9 @@ import '../widgets/map_control_buttons.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
 import '../widgets/truth_score_marker.dart';
-import '../../1-2_restaurant_detail/screens/restaurant_detail_screen.dart';
+import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
-class MapScreen extends ConsumerStatefulWidget {
+class MapScreen extends ConsumerStatefulWidget { 
   const MapScreen({super.key});
 
   @override
@@ -73,12 +73,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: MapSearchBar(
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SearchScreen(),
-                    ),
-                  );
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (_) => const SearchScreen(),
+                  //   ),
+                  // );
                 },
               ),
             ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../1-2_restaurant_detail/providers/blog_review.dart';
+import '../../1-3_restaurant_detail/providers/blog_review.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../1-1_map/widgets/common_widgets.dart';
 import 'blog_list_screen.dart';

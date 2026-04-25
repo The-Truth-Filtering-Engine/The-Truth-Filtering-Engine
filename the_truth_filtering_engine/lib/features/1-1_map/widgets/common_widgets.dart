@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../1-2_restaurant_detail/providers/blog_review.dart';
+import '../../1-3_restaurant_detail/providers/blog_review.dart';
 import '../../../core/theme/app_theme.dart';
 
 // ── 앱바 로고 ─────────────────────────────────
