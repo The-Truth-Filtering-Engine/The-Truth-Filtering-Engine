@@ -71,7 +71,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: MapSearchBar(onTap: () {}),
+              child: MapSearchBar(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SearchScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
 
