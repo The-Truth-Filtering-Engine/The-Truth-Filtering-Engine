@@ -34,7 +34,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       backgroundColor: AppColors.mapTeal,
       body: Stack(
         children: [
-
           // ── flutter_map ──────────────────────────
           FlutterMap(
             mapController: _mapController,
@@ -73,12 +72,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: MapSearchBar(
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SearchScreen(),
-                    ),
-                  );
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (_) => const SearchScreen(),
+                  //   ),
+                  // );
                 },
               ),
             ),
@@ -108,7 +107,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           // ── 바텀시트 (마커 탭 시 표시) ───────────
           if (selectedRestaurant != null)
             Positioned(
-              left: 0, right: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: AnimatedSlide(
                 offset: Offset.zero,
                 duration: const Duration(milliseconds: 280),
