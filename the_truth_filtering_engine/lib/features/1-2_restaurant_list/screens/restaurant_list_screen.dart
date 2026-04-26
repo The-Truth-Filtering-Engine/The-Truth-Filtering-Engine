@@ -97,59 +97,75 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         // 위치 권한/획득 실패 시 일반 검색으로 대비(fallback)
       }
 
-      String url = 'https://dapi.kakao.com/v2/local/search/keyword.json'
-          '?query=${Uri.encodeComponent(trimmed)}'
-          '&category_group_code=FD6,CE7'
-          '&size=15';
+      const categoryCodes = ['FD6', 'CE7'];
+      final mergedDocuments = <Map<String, dynamic>>[];
 
-      if (lat != null && lng != null) {
-        url += '&sort=distance';
-        url += '&x=$lng&y=$lat&radius=5000';
-      }
+      for (final categoryCode in categoryCodes) {
+        String url = 'https://dapi.kakao.com/v2/local/search/keyword.json'
+            '?query=${Uri.encodeComponent(trimmed)}'
+            '&category_group_code=$categoryCode'
+            '&size=15';
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
-      );
+        if (lat != null && lng != null) {
+          url += '&sort=distance';
+          url += '&x=$lng&y=$lat&radius=5000';
+        }
 
-      if (response.statusCode == 200) {
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
+        );
+
+        if (response.statusCode != 200) {
+          final errorInfo = _extractKakaoError(response);
+          if (!mounted) return;
+          setState(() {
+            _errorMessage = '검색 API 에러 (${response.statusCode})'
+                '${errorInfo.isNotEmpty ? '\n$errorInfo' : ''}';
+            _isLoading = false;
+          });
+          return;
+        }
+
         final data = jsonDecode(response.body);
         final documents = (data['documents'] as List?) ?? [];
-
-        if (!mounted) return;
-        setState(() {
-          _results =
-              documents.cast<Map?>().where((item) => item != null).map((doc) {
-            final map = doc!;
-            return RestaurantModel(
-              id: map['id']?.toString() ?? '',
-              name: map['place_name']?.toString() ?? '',
-              category: _parseCategory(map['category_name']?.toString() ?? ''),
-              address: (map['road_address_name']?.toString()?.isNotEmpty == true
-                          ? map['road_address_name']
-                          : map['address_name'])
-                      ?.toString() ??
-                  '',
-              latitude: double.tryParse(map['y']?.toString() ?? '0') ?? 0,
-              longitude: double.tryParse(map['x']?.toString() ?? '0') ?? 0,
-              truthScore: _mockTruthScore(map['id']?.toString() ?? ''),
-              distance: int.tryParse(map['distance']?.toString() ?? '0') ?? 0,
-              phone: map['phone']?.toString(),
-              placeUrl: map['place_url']?.toString(),
-              reviewSummary: map['place_name']?.toString() ?? '검색 결과',
-            );
-          }).toList();
-          _isLoading = false;
-        });
-      } else {
-        final errorInfo = _extractKakaoError(response);
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = '검색 API 에러 (${response.statusCode})'
-              '${errorInfo.isNotEmpty ? '\n$errorInfo' : ''}';
-          _isLoading = false;
-        });
+        for (final item in documents) {
+          if (item is Map) {
+            mergedDocuments.add(item.cast<String, dynamic>());
+          }
+        }
       }
+
+      final uniqueById = <String, Map<String, dynamic>>{};
+      for (final doc in mergedDocuments) {
+        final id = doc['id']?.toString() ?? '';
+        if (id.isEmpty || uniqueById.containsKey(id)) continue;
+        uniqueById[id] = doc.cast<String, dynamic>();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _results = uniqueById.values.map((map) {
+          return RestaurantModel(
+            id: map['id']?.toString() ?? '',
+            name: map['place_name']?.toString() ?? '',
+            category: _parseCategory(map['category_name']?.toString() ?? ''),
+            address: (map['road_address_name']?.toString()?.isNotEmpty == true
+                        ? map['road_address_name']
+                        : map['address_name'])
+                    ?.toString() ??
+                '',
+            latitude: double.tryParse(map['y']?.toString() ?? '0') ?? 0,
+            longitude: double.tryParse(map['x']?.toString() ?? '0') ?? 0,
+            truthScore: _mockTruthScore(map['id']?.toString() ?? ''),
+            distance: int.tryParse(map['distance']?.toString() ?? '0') ?? 0,
+            phone: map['phone']?.toString(),
+            placeUrl: map['place_url']?.toString(),
+            reviewSummary: map['place_name']?.toString() ?? '검색 결과',
+          );
+        }).toList();
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
