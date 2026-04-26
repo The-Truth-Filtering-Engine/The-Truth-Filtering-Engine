@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/1-1_map/screens/map_screen.dart';
+import 'features/1-1_map/screens/bookmark_screen.dart';
 
 void main() {
   runApp(
@@ -38,7 +39,7 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _screens = const [
     MapScreen(),
-    _PlaceholderScreen(icon: Icons.history_rounded,       label: '기록'),
+    BookmarkScreen(),
     _PlaceholderScreen(icon: Icons.auto_awesome_outlined, label: 'AI 추천'),
     _PlaceholderScreen(icon: Icons.settings_outlined,     label: '설정'),
   ];
@@ -134,9 +135,9 @@ class _MainShellState extends State<MainShell> {
               label: '탐색',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              activeIcon: Icon(Icons.history_rounded),
-              label: '기록',
+              icon: Icon(Icons.bookmark_border_rounded),
+              activeIcon: Icon(Icons.bookmark_rounded),
+              label: '북마크',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),

@@ -11,6 +11,34 @@ final restaurantListProvider = Provider<List<RestaurantModel>>((ref) {
 final selectedRestaurantProvider =
     StateProvider<RestaurantModel?>((ref) => null);
 
+// 북마크 목록
+final bookmarkRestaurantsProvider =
+    StateNotifierProvider<BookmarkRestaurantsNotifier, List<RestaurantModel>>(
+  (ref) => BookmarkRestaurantsNotifier(),
+);
+
+// 북마크 추가/삭제
+class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
+  BookmarkRestaurantsNotifier() : super(const []);
+
+  void toggle(RestaurantModel restaurant) {
+    final index = state.indexWhere((item) => item.id == restaurant.id);
+    if (index >= 0) {
+      state = [
+        ...state.sublist(0, index),
+        ...state.sublist(index + 1),
+      ];
+      return;
+    }
+
+    state = [...state, restaurant];
+  }
+
+  void remove(RestaurantModel restaurant) {
+    state = state.where((item) => item.id != restaurant.id).toList();
+  }
+}
+
 // 지도 레이어 표시 여부
 final showLayerMenuProvider = StateProvider<bool>((ref) => false);
 

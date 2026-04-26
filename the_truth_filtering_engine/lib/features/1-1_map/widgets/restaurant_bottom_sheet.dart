@@ -9,6 +9,7 @@ class RestaurantBottomSheet extends StatelessWidget {
   final VoidCallback? onDetailTap;
   final VoidCallback? onBookmarkTap;
   final VoidCallback? onShareTap;
+  final bool isBookmarked;
 
   const RestaurantBottomSheet({
     super.key,
@@ -16,6 +17,7 @@ class RestaurantBottomSheet extends StatelessWidget {
     this.onDetailTap,
     this.onBookmarkTap,
     this.onShareTap,
+    this.isBookmarked = false,
   });
 
   @override
@@ -164,8 +166,15 @@ class RestaurantBottomSheet extends StatelessWidget {
 
                     // 북마크 버튼
                     _IconActionButton(
-                      icon: Icons.bookmark_border,
+                      icon:
+                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                       onTap: onBookmarkTap,
+                      iconColor: isBookmarked
+                          ? Colors.white
+                          : AppColors.primary,
+                      backgroundColor: isBookmarked
+                          ? AppColors.primary
+                          : AppColors.sheetQuoteBackground,
                     ),
                     const SizedBox(width: 10),
 
@@ -190,8 +199,15 @@ class RestaurantBottomSheet extends StatelessWidget {
 class _IconActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
+  final Color iconColor;
+  final Color backgroundColor;
 
-  const _IconActionButton({required this.icon, this.onTap});
+  const _IconActionButton({
+    required this.icon,
+    this.onTap,
+    this.iconColor = AppColors.primary,
+    this.backgroundColor = AppColors.sheetQuoteBackground,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -201,10 +217,10 @@ class _IconActionButton extends StatelessWidget {
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: AppColors.sheetQuoteBackground,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, size: 22, color: AppColors.primary),
+        child: Icon(icon, size: 22, color: iconColor),
       ),
     );
   }
