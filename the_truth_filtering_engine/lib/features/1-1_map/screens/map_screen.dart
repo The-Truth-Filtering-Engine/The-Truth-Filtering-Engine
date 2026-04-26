@@ -99,11 +99,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
     final currentLocation = ref.watch(currentLocationProvider);
+    final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
     final mapMode = _currentMapMode();
     final displayRestaurants = _reduceRestaurantOverdraw(
       restaurants: _viewportRestaurants,
       zoom: _latestMapZoom,
     );
+    final isSelectedBookmarked = selectedRestaurant != null &&
+        bookmarkedRestaurants.any((item) => item.id == selectedRestaurant.id);
 
         return Scaffold(
       backgroundColor: AppColors.mapTeal,
@@ -265,6 +268,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 curve: Curves.easeOutCubic,
                 child: RestaurantBottomSheet(
                   restaurant: selectedRestaurant,
+                  isBookmarked: isSelectedBookmarked,
                   onDetailTap: () {
                     Navigator.push(
                       context,
@@ -276,10 +280,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     );
                   },
                   onBookmarkTap: () {
+                    final previous = ref.read(bookmarkRestaurantsProvider);
+                    final alreadyBookmarked =
+                        previous.any((item) => item.id == selectedRestaurant.id);
+                    ref
+                        .read(bookmarkRestaurantsProvider.notifier)
+                        .toggle(selectedRestaurant);
+
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('북마크 저장은 준비 중입니다'),
-                        duration: Duration(seconds: 1),
+                      SnackBar(
+                        content: Text(
+                          alreadyBookmarked
+                              ? '북마크에서 해제되었습니다'
+                              : '북마크에 저장했습니다',
+                        ),
+                        duration: const Duration(seconds: 1),
                       ),
                     );
                   },
