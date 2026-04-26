@@ -12,7 +12,15 @@ const _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
 
 class RestaurantListScreen extends StatefulWidget {
   final String query;
-  const RestaurantListScreen({super.key, required this.query});
+  final double? initialLatitude;
+  final double? initialLongitude;
+
+  const RestaurantListScreen({
+    super.key,
+    required this.query,
+    this.initialLatitude,
+    this.initialLongitude,
+  });
 
   @override
   State<RestaurantListScreen> createState() => _RestaurantListScreenState();
@@ -77,26 +85,30 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
       double? lng;
 
       try {
-        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-          }
+        lat = widget.initialLatitude;
+        lng = widget.initialLongitude;
 
-          if (permission == LocationPermission.whileInUse ||
-              permission == LocationPermission.always) {
-            final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.high,
-            );
-            lat = position.latitude;
-            lng = position.longitude;
+        if (lat == null || lng == null) {
+          final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (serviceEnabled) {
+            LocationPermission permission = await Geolocator.checkPermission();
+            if (permission == LocationPermission.denied) {
+              permission = await Geolocator.requestPermission();
+            }
+
+            if (permission == LocationPermission.whileInUse ||
+                permission == LocationPermission.always) {
+              final position = await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.high,
+              );
+              lat = position.latitude;
+              lng = position.longitude;
+            }
           }
         }
       } catch (_) {
         // 위치 권한/획득 실패 시 일반 검색으로 대비(fallback)
       }
-
       const categoryCodes = ['FD6', 'CE7'];
       final mergedDocuments = <Map<String, dynamic>>[];
 
