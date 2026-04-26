@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -283,12 +284,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     );
                   },
                   onShareTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('공유는 준비 중입니다'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                    _shareRestaurant(selectedRestaurant, context);
                   },
                 ),
               ),
@@ -306,6 +302,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _latestMapCenter = camera.center;
     _latestMapZoom = camera.zoom;
     _isMapReady = true;
+  }
+
+  Future<void> _shareRestaurant(
+    RestaurantModel restaurant,
+    BuildContext context,
+  ) async {
+    final link = restaurant.placeUrl?.trim();
+    if (link == null || link.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('공유 가능한 링크가 없습니다'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('링크가 복사되었습니다'),
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
   void _zoomMap(double delta) {
