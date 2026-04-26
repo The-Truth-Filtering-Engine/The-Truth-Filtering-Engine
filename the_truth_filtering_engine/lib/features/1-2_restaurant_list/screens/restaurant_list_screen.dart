@@ -169,6 +169,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         final errorType = body['errorType'];
         final errorDescription = body['error_description'];
         final docHint = _kakaoCodeHint(code);
+        final validationHint = _extractKakaoValidationHint(body['details']);
         final serviceDisabledHint = _kakaoServiceHint(
           statusCode: response.statusCode,
           code: code,
@@ -179,21 +180,22 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         );
 
         final serviceSuffix = serviceDisabledHint != null ? ' / $serviceDisabledHint' : '';
+        final detailSuffix = validationHint != null ? ' / $validationHint' : '';
 
         if (code != null && msg != null) {
           final docSuffix = docHint != null ? ' / $docHint' : '';
-          return 'code=$code msg=$msg$docSuffix$serviceSuffix';
+          return 'code=$code msg=$msg$docSuffix$serviceSuffix$detailSuffix';
         }
         if (message != null) {
           final docSuffix = docHint != null ? ' / $docHint' : '';
-          return '${message.toString()}$docSuffix$serviceSuffix';
+          return '${message.toString()}$docSuffix$serviceSuffix$detailSuffix';
         }
         if (serviceDisabledHint != null) {
           return serviceDisabledHint;
         }
         if (body['errorType'] != null) {
           final typeText = '${body['errorType']} ${body['error_description'] ?? ''}';
-          return '$typeText$serviceSuffix';
+          return '$typeText$serviceSuffix$detailSuffix';
         }
       }
     } catch (_) {}
@@ -202,6 +204,39 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
             response.reasonPhrase?.toLowerCase().contains('forbidden') == true ? ' (FORBIDDEN)' : ''
           }'
         : '';
+  }
+
+  String? _extractKakaoValidationHint(dynamic details) {
+    if (details == null) return null;
+    final List<dynamic> list = details is List< dynamic> ? details : [details];
+
+    for (final item in list) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final parts = <String>[];
+
+      final field = item['field'];
+      final error = item['error'];
+      final reason = item['reason'];
+      final value = item['value'];
+
+      if (field != null && field.toString().isNotEmpty) {
+        parts.add('field=${field.toString()}');
+      }
+      if (error != null && error.toString().isNotEmpty) {
+        parts.add('error=${error.toString()}');
+      }
+      if (reason != null && reason.toString().isNotEmpty) {
+        parts.add('reason=${reason.toString()}');
+      }
+      if (value != null && value.toString().isNotEmpty) {
+        parts.add('value=${value.toString()}');
+      }
+
+      if (parts.isNotEmpty) return parts.join(', ');
+    }
+
+    return null;
   }
 
   String? _kakaoCodeHint(dynamic code) {
