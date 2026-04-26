@@ -1,6 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -24,10 +29,30 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  final Distance _distance = const Distance();
+  Timer? _viewportSearchTimer;
+  int _viewportSearchReqId = 0;
+
   int _mapModeIndex = 3;
+
+  static const String _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
+  static const int _maxMapRestaurants = 30;
+  static const int _categoryRequestSize = 15;
+  static const Duration _viewportDebounce = Duration(milliseconds: 600);
+  static const int _refreshDistanceMeters = 150;
+  static const double _refreshZoomDelta = 0.2;
+  static const List<String> _viewportCategoryCodes = ['FD6', 'CE7'];
 
   static const _initialCenter = LatLng(37.5245, 127.0370);
   static const _initialZoom = 14.0;
+
+  List<RestaurantModel>? _viewportRestaurants;
+  String? _viewportSearchError;
+  LatLng? _lastSearchedCenter;
+  double? _lastSearchedZoom;
+  LatLng _latestMapCenter = _initialCenter;
+  double _latestMapZoom = _initialZoom;
+  bool _isMapReady = false;
 
   static final _mapTileModes = [
     _MapTileMode(
@@ -64,16 +89,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   void dispose() {
+    _viewportSearchTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final restaurants = ref.watch(restaurantListProvider);
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
     final currentLocation = ref.watch(currentLocationProvider);
     final mapMode = _currentMapMode();
+    final displayRestaurants = _reduceRestaurantOverdraw(
+      restaurants: _viewportRestaurants,
+      zoom: _latestMapZoom,
+    );
 
         return Scaffold(
       backgroundColor: AppColors.mapTeal,
@@ -88,6 +117,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               onTap: (_, __) {
                 ref.read(selectedRestaurantProvider.notifier).state = null;
               },
+              onPositionChanged: (camera, hasGesture) {
+                _updateLatestMapCamera(camera);
+                _onViewportChanged(camera, hasGesture: hasGesture);
+              },
+              onMapEvent: (event) {
+                _updateLatestMapCamera(event.camera);
+                _onMapEvent(event);
+              },
             ),
             children: [
               TileLayer(
@@ -97,7 +134,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
               MarkerLayer(
                 markers: [
-                  ...restaurants.map((restaurant) {
+                  ...displayRestaurants.map((restaurant) {
                     return Marker(
                       point: LatLng(restaurant.latitude, restaurant.longitude),
                       width: 80,
@@ -141,6 +178,34 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ],
           ),
 
+          if (_viewportSearchError != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              top: 84,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.75),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _viewportSearchError!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -183,14 +248,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               onLayerTap: () {
                 _cycleMapMode();
               },
-              onZoomIn: () => _mapController.move(
-                _mapController.camera.center,
-                _mapController.camera.zoom + 1,
-              ),
-              onZoomOut: () => _mapController.move(
-                _mapController.camera.center,
-                _mapController.camera.zoom - 1,
-              ),
+              onZoomIn: () => _zoomMap(1),
+              onZoomOut: () => _zoomMap(-1),
             ),
           ),
 
@@ -247,8 +306,335 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _moveToCurrentLocation() {
-    _syncCurrentLocationToProvider();
+  void _updateLatestMapCamera(MapCamera camera) {
+    _latestMapCenter = camera.center;
+    _latestMapZoom = camera.zoom;
+    _isMapReady = true;
+  }
+
+  void _zoomMap(double delta) {
+    if (!_isMapReady) return;
+    _mapController.move(
+      _latestMapCenter,
+      _latestMapZoom + delta,
+    );
+  }
+
+  void _onMapEvent(MapEvent event) {
+    if (event is MapEventMoveEnd ||
+        event is MapEventDoubleTapZoomEnd ||
+        event is MapEventFlingAnimationEnd ||
+        event is MapEventRotateEnd ||
+        event is MapEventNonRotatedSizeChange) {
+      _onViewportChanged(event.camera, hasGesture: false, force: true);
+    }
+  }
+
+  void _onViewportChanged(
+    MapCamera camera, {
+    required bool hasGesture,
+    bool force = false,
+  }) {
+    if (hasGesture && !force) return;
+    if (camera.nonRotatedSize.x <= 0 || camera.nonRotatedSize.y <= 0) return;
+    if (!force && !_shouldRefreshViewport(camera.center, camera.zoom)) return;
+
+    final radiusMeters = _calculateViewportRadius(
+      camera.visibleBounds,
+      camera.center,
+    );
+    if (radiusMeters <= 0) return;
+
+    _viewportSearchTimer?.cancel();
+    _viewportSearchTimer = Timer(_viewportDebounce, () {
+      if (!mounted) return;
+      _searchViewportRestaurants(
+        center: camera.center,
+        zoom: camera.zoom,
+        radiusMeters: radiusMeters,
+      );
+    });
+  }
+
+  bool _shouldRefreshViewport(LatLng center, double zoom) {
+    if (_lastSearchedCenter == null || _lastSearchedZoom == null) return true;
+
+    final movedMeters = _distance.as(
+      LengthUnit.Meter,
+      center,
+      _lastSearchedCenter!,
+    );
+    final zoomDelta = (zoom - _lastSearchedZoom!).abs();
+
+    return movedMeters >= _refreshDistanceMeters || zoomDelta >= _refreshZoomDelta;
+  }
+
+  int _calculateViewportRadius(LatLngBounds bounds, LatLng center) {
+    final northEast = bounds.northEast;
+    final southWest = bounds.southWest;
+    final northWest = LatLng(northEast.latitude, southWest.longitude);
+    final southEast = LatLng(southWest.latitude, northEast.longitude);
+
+    final candidates = [
+      _distance.as(LengthUnit.Meter, center, northWest),
+      _distance.as(LengthUnit.Meter, center, southEast),
+      _distance.as(LengthUnit.Meter, center, northEast),
+      _distance.as(LengthUnit.Meter, center, southWest),
+    ];
+
+    var maxDistance = 0.0;
+    for (final distance in candidates) {
+      if (distance > maxDistance) maxDistance = distance;
+    }
+
+    final radius = maxDistance.floor().toInt();
+    if (radius <= 0) return 0;
+
+    if (radius > 20000) return 20000;
+    if (radius < 100) return 100;
+    return radius;
+  }
+
+  Future<void> _searchViewportRestaurants({
+    required LatLng center,
+    required double zoom,
+    required int radiusMeters,
+  }) async {
+    final requestId = ++_viewportSearchReqId;
+    if (!mounted) return;
+
+    setState(() {
+      _viewportSearchError = null;
+    });
+
+    try {
+      final documents = <Map<String, dynamic>>[];
+
+      for (final categoryCode in _viewportCategoryCodes) {
+        final uri = Uri.https(
+          'dapi.kakao.com',
+          '/v2/local/search/category.json',
+          {
+            'category_group_code': categoryCode,
+            'x': center.longitude.toString(),
+            'y': center.latitude.toString(),
+            'radius': radiusMeters.toString(),
+            'size': _categoryRequestSize.toString(),
+            'sort': 'distance',
+          },
+        );
+
+        final response = await http.get(
+          uri,
+          headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
+        );
+
+        if (response.statusCode != 200) {
+          final error = _extractKakaoError(response);
+          if (!mounted || requestId != _viewportSearchReqId) return;
+          setState(() {
+            _viewportSearchError = '카카오 검색 API 에러 (${response.statusCode})'
+                '${error.isNotEmpty ? ' / $error' : ''}';
+          });
+          return;
+        }
+
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody is! Map<String, dynamic>) continue;
+
+        final rawDocuments = (decodedBody['documents'] as List?) ?? [];
+        for (final document in rawDocuments) {
+          if (document is Map) {
+            documents.add(document.cast<String, dynamic>());
+          }
+        }
+      }
+
+      final byId = <String, RestaurantModel>{};
+      for (final item in documents) {
+        final id = item['id']?.toString() ?? '';
+        if (id.isEmpty || byId.containsKey(id)) continue;
+
+        byId[id] = RestaurantModel(
+          id: id,
+          name: item['place_name']?.toString() ?? '',
+          category: _parseCategory(item),
+          address: (item['road_address_name']?.toString() ?? '').isNotEmpty
+                  ? item['road_address_name'].toString()
+                  : item['address_name']?.toString() ?? '',
+          truthScore: _mockTrustScore(id),
+          distance: int.tryParse(item['distance']?.toString() ?? '0') ?? 0,
+          phone: item['phone']?.toString(),
+          placeUrl: item['place_url']?.toString(),
+          reviewSummary: item['place_name']?.toString() ?? '검색 결과',
+          imageUrl: item['image_url']?.toString(),
+          latitude: double.tryParse(item['y']?.toString() ?? '0') ?? center.latitude,
+          longitude: double.tryParse(item['x']?.toString() ?? '0') ?? center.longitude,
+        );
+      }
+
+      final nextRestaurants = byId.values.toList()
+        ..sort((a, b) => a.distance.compareTo(b.distance));
+
+      final resultRestaurants = nextRestaurants.take(_maxMapRestaurants).toList();
+
+      if (!mounted || requestId != _viewportSearchReqId) return;
+      final selectedRestaurant = ref.read(selectedRestaurantProvider);
+      if (selectedRestaurant != null &&
+          resultRestaurants.every((r) => r.id != selectedRestaurant.id)) {
+        ref.read(selectedRestaurantProvider.notifier).state = null;
+      }
+
+      setState(() {
+        _viewportRestaurants = resultRestaurants;
+        _viewportSearchError = null;
+        _lastSearchedCenter = center;
+        _lastSearchedZoom = zoom;
+      });
+    } catch (_) {
+      if (!mounted || requestId != _viewportSearchReqId) return;
+      setState(() {
+        _viewportSearchError = '네트워크 에러가 발생했습니다';
+      });
+    }
+  }
+
+  String _parseCategory(Map<String, dynamic> item) {
+    final categoryName = item['category_name']?.toString() ?? '';
+    final parts = categoryName.split(' > ');
+    if (parts.length >= 2) return parts[1];
+    return categoryName.isNotEmpty ? categoryName : '음식점';
+  }
+
+  int _mockTrustScore(String id) {
+    final hash = id.hashCode.abs() % 40;
+    return 60 + hash;
+  }
+
+  String _extractKakaoError(http.Response response) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final code = body['code'];
+        final msg = body['msg'];
+        final message = body['message'];
+        final details = body['details'];
+        final extra = <String>[];
+        final validation = _extractKakaoValidationHint(details);
+        if (validation != null && validation.isNotEmpty) {
+          extra.add(validation);
+        }
+
+        if (code != null && msg != null) {
+          return 'code=$code msg=$msg${extra.isNotEmpty ? ' / ${extra.join(', ')}' : ''}';
+        }
+        if (message != null) {
+          return '$message${extra.isNotEmpty ? ' / ${extra.join(', ')}' : ''}';
+        }
+      }
+    } catch (_) {}
+
+    return response.reasonPhrase?.isNotEmpty == true
+        ? '${response.reasonPhrase}'
+        : '요청 처리 중 오류가 발생했습니다';
+  }
+
+  String? _extractKakaoValidationHint(dynamic details) {
+    if (details == null) return null;
+    final List<dynamic> list = details is List<dynamic> ? details : [details];
+
+    for (final item in list) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final parts = <String>[];
+
+      final field = item['field'];
+      final error = item['error'];
+      final reason = item['reason'];
+
+      if (field != null && field.toString().isNotEmpty) {
+        parts.add('field=${field.toString()}');
+      }
+      if (error != null && error.toString().isNotEmpty) {
+        parts.add('error=${error.toString()}');
+      }
+      if (reason != null && reason.toString().isNotEmpty) {
+        parts.add('reason=${reason.toString()}');
+      }
+
+      if (parts.isNotEmpty) return parts.join(', ');
+    }
+
+    return null;
+  }
+
+  List<RestaurantModel> _reduceRestaurantOverdraw({
+    required List<RestaurantModel>? restaurants,
+    required double zoom,
+  }) {
+    final source = restaurants ?? const <RestaurantModel>[];
+    if (source.isEmpty) return const [];
+
+    final maxMarkers = _maxMapMarkersByZoom(zoom);
+    if (source.length <= maxMarkers) return List.of(source);
+
+    final minCellMeters = _markerCellSizeMeters(zoom);
+    if (minCellMeters <= 0) return source.take(maxMarkers).toList();
+
+    final selected = <RestaurantModel>[];
+    final usedCells = <String>{};
+
+    for (final restaurant in source) {
+      if (selected.length >= maxMarkers) break;
+
+      final key = _restaurantCellKey(
+        lat: restaurant.latitude,
+        lng: restaurant.longitude,
+        cellMeters: minCellMeters,
+      );
+      if (usedCells.contains(key)) continue;
+
+      usedCells.add(key);
+      selected.add(restaurant);
+    }
+
+    return selected;
+  }
+
+  int _maxMapMarkersByZoom(double zoom) {
+    if (zoom <= 11.9) return 8;
+    if (zoom <= 12.9) return 12;
+    if (zoom <= 13.9) return 18;
+    return _maxMapRestaurants;
+  }
+
+  double _markerCellSizeMeters(double zoom) {
+    if (zoom <= 11.9) return 1400;
+    if (zoom <= 12.9) return 800;
+    if (zoom <= 13.9) return 450;
+    if (zoom <= 14.9) return 180;
+    return 80;
+  }
+
+  String _restaurantCellKey({
+    required double lat,
+    required double lng,
+    required double cellMeters,
+  }) {
+    final latCellDeg = cellMeters / 111320;
+    final lngCellDeg = cellMeters /
+        math.max(
+          1.0,
+          111320 * math.cos(lat * math.pi / 180).abs(),
+        );
+
+    if (latCellDeg <= 0 || lngCellDeg <= 0) {
+      return '${lat.toStringAsFixed(6)}:${lng.toStringAsFixed(6)}';
+    }
+
+    final latIndex = (lat / latCellDeg).floor();
+    final lngIndex = (lng / lngCellDeg).floor();
+    return '$latIndex:$lngIndex';
   }
 
   void _cycleMapMode() {
@@ -257,6 +643,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() {
       _mapModeIndex = (_mapModeIndex + 1) % _mapTileModes.length;
     });
+  }
+
+  void _moveToCurrentLocation() {
+    _syncCurrentLocationToProvider();
   }
 
   _MapTileMode _currentMapMode() {
@@ -307,3 +697,4 @@ class _MapTileMode {
     required this.subdomains,
   });
 }
+
