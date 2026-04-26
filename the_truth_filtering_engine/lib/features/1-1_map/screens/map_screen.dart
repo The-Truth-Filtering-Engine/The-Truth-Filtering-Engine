@@ -42,6 +42,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       backgroundColor: AppColors.mapTeal,
       body: Stack(
         children: [
+          // ── flutter_map ──────────────────────────
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
