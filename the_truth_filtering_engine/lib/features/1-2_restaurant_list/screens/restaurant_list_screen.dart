@@ -8,11 +8,19 @@ import '../../../core/theme/app_theme.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
-const _kakaoApiKey = '038c8ee8e4d135f7d056fea43c9d7e23';
+const _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
 
 class RestaurantListScreen extends StatefulWidget {
   final String query;
-  const RestaurantListScreen({super.key, required this.query});
+  final double? initialLatitude;
+  final double? initialLongitude;
+
+  const RestaurantListScreen({
+    super.key,
+    required this.query,
+    this.initialLatitude,
+    this.initialLongitude,
+  });
 
   @override
   State<RestaurantListScreen> createState() => _RestaurantListScreenState();
@@ -77,83 +85,99 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
       double? lng;
 
       try {
-        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-          }
+        lat = widget.initialLatitude;
+        lng = widget.initialLongitude;
 
-          if (permission == LocationPermission.whileInUse ||
-              permission == LocationPermission.always) {
-            final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.high,
-            );
-            lat = position.latitude;
-            lng = position.longitude;
+        if (lat == null || lng == null) {
+          final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (serviceEnabled) {
+            LocationPermission permission = await Geolocator.checkPermission();
+            if (permission == LocationPermission.denied) {
+              permission = await Geolocator.requestPermission();
+            }
+
+            if (permission == LocationPermission.whileInUse ||
+                permission == LocationPermission.always) {
+              final position = await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.high,
+              );
+              lat = position.latitude;
+              lng = position.longitude;
+            }
           }
         }
       } catch (_) {
         // 위치 권한/획득 실패 시 일반 검색으로 대비(fallback)
       }
+      const categoryCodes = ['FD6', 'CE7'];
+      final mergedDocuments = <Map<String, dynamic>>[];
 
-      String url =
-          'https://dapi.kakao.com/v2/local/search/keyword.json'
-          '?query=${Uri.encodeComponent(trimmed)}'
-          '&category_group_code=FD6,CE7'
-          '&size=15';
+      for (final categoryCode in categoryCodes) {
+        String url = 'https://dapi.kakao.com/v2/local/search/keyword.json'
+            '?query=${Uri.encodeComponent(trimmed)}'
+            '&category_group_code=$categoryCode'
+            '&size=15';
 
-      if (lat != null && lng != null) {
-        url += '&sort=distance';
-        url += '&x=$lng&y=$lat&radius=5000';
-      }
+        if (lat != null && lng != null) {
+          url += '&sort=distance';
+          url += '&x=$lng&y=$lat&radius=5000';
+        }
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
-      );
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
+        );
 
-      if (response.statusCode == 200) {
+        if (response.statusCode != 200) {
+          final errorInfo = _extractKakaoError(response);
+          if (!mounted) return;
+          setState(() {
+            _errorMessage = '검색 API 에러 (${response.statusCode})'
+                '${errorInfo.isNotEmpty ? '\n$errorInfo' : ''}';
+            _isLoading = false;
+          });
+          return;
+        }
+
         final data = jsonDecode(response.body);
         final documents = (data['documents'] as List?) ?? [];
-
-        if (!mounted) return;
-        setState(() {
-          _results = documents
-              .cast<Map?>()
-              .where((item) => item != null)
-              .map((doc) {
-                final map = doc!;
-                return RestaurantModel(
-                  id: map['id']?.toString() ?? '',
-                  name: map['place_name']?.toString() ?? '',
-                  category: _parseCategory(map['category_name']?.toString() ?? ''),
-                  address: (map['road_address_name']?.toString()?.isNotEmpty == true
-                          ? map['road_address_name']
-                          : map['address_name'])
-                      ?.toString() ??
-                      '',
-                  latitude: double.tryParse(map['y']?.toString() ?? '0') ?? 0,
-                  longitude: double.tryParse(map['x']?.toString() ?? '0') ?? 0,
-                  truthScore: _mockTruthScore(map['id']?.toString() ?? ''),
-                  distance: int.tryParse(map['distance']?.toString() ?? '0') ?? 0,
-                  phone: map['phone']?.toString(),
-                  placeUrl: map['place_url']?.toString(),
-                  reviewSummary: map['place_name']?.toString() ?? '검색 결과',
-                );
-              })
-              .toList();
-          _isLoading = false;
-        });
-      } else {
-        final errorInfo = _extractKakaoError(response);
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = '검색 API 에러 (${response.statusCode})'
-              '${errorInfo.isNotEmpty ? '\n$errorInfo' : ''}';
-          _isLoading = false;
-        });
+        for (final item in documents) {
+          if (item is Map) {
+            mergedDocuments.add(item.cast<String, dynamic>());
+          }
+        }
       }
+
+      final uniqueById = <String, Map<String, dynamic>>{};
+      for (final doc in mergedDocuments) {
+        final id = doc['id']?.toString() ?? '';
+        if (id.isEmpty || uniqueById.containsKey(id)) continue;
+        uniqueById[id] = doc.cast<String, dynamic>();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _results = uniqueById.values.map((map) {
+          return RestaurantModel(
+            id: map['id']?.toString() ?? '',
+            name: map['place_name']?.toString() ?? '',
+            category: _parseCategory(map['category_name']?.toString() ?? ''),
+            address: (map['road_address_name']?.toString()?.isNotEmpty == true
+                        ? map['road_address_name']
+                        : map['address_name'])
+                    ?.toString() ??
+                '',
+            latitude: double.tryParse(map['y']?.toString() ?? '0') ?? 0,
+            longitude: double.tryParse(map['x']?.toString() ?? '0') ?? 0,
+            truthScore: _mockTruthScore(map['id']?.toString() ?? ''),
+            distance: int.tryParse(map['distance']?.toString() ?? '0') ?? 0,
+            phone: map['phone']?.toString(),
+            placeUrl: map['place_url']?.toString(),
+            reviewSummary: map['place_name']?.toString() ?? '검색 결과',
+          );
+        }).toList();
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -170,26 +194,82 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         final code = body['code'];
         final msg = body['msg'];
         final message = body['message'];
+        final errorType = body['errorType'];
+        final errorDescription = body['error_description'];
         final docHint = _kakaoCodeHint(code);
+        final validationHint = _extractKakaoValidationHint(body['details']);
+        final serviceDisabledHint = _kakaoServiceHint(
+          statusCode: response.statusCode,
+          code: code,
+          message: msg?.toString(),
+          messageAlt: message?.toString(),
+          errorType: errorType?.toString(),
+          errorDescription: errorDescription?.toString(),
+        );
+
+        final serviceSuffix = serviceDisabledHint != null ? ' / $serviceDisabledHint' : '';
+        final detailSuffix = validationHint != null ? ' / $validationHint' : '';
+
         if (code != null && msg != null) {
-          final suffix = docHint != null ? ' / $docHint' : '';
-          return 'code=$code msg=$msg$suffix';
+          final docSuffix = docHint != null ? ' / $docHint' : '';
+          return 'code=$code msg=$msg$docSuffix$serviceSuffix$detailSuffix';
         }
         if (message != null) {
-          final suffix = docHint != null ? ' / $docHint' : '';
-          return '${message.toString()}$suffix';
+          final docSuffix = docHint != null ? ' / $docHint' : '';
+          return '${message.toString()}$docSuffix$serviceSuffix$detailSuffix';
+        }
+        if (serviceDisabledHint != null) {
+          return serviceDisabledHint;
         }
         if (body['errorType'] != null) {
-          return '${body['errorType']} ${body['error_description'] ?? ''}';
+          final typeText = '${body['errorType']} ${body['error_description'] ?? ''}';
+          return '$typeText$serviceSuffix$detailSuffix';
         }
       }
     } catch (_) {}
-    return '';
+    return response.reasonPhrase?.isNotEmpty == true
+        ? '${response.reasonPhrase}${
+            response.reasonPhrase?.toLowerCase().contains('forbidden') == true ? ' (FORBIDDEN)' : ''
+          }'
+        : '';
+  }
+
+  String? _extractKakaoValidationHint(dynamic details) {
+    if (details == null) return null;
+    final List<dynamic> list = details is List< dynamic> ? details : [details];
+
+    for (final item in list) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final parts = <String>[];
+
+      final field = item['field'];
+      final error = item['error'];
+      final reason = item['reason'];
+      final value = item['value'];
+
+      if (field != null && field.toString().isNotEmpty) {
+        parts.add('field=${field.toString()}');
+      }
+      if (error != null && error.toString().isNotEmpty) {
+        parts.add('error=${error.toString()}');
+      }
+      if (reason != null && reason.toString().isNotEmpty) {
+        parts.add('reason=${reason.toString()}');
+      }
+      if (value != null && value.toString().isNotEmpty) {
+        parts.add('value=${value.toString()}');
+      }
+
+      if (parts.isNotEmpty) return parts.join(', ');
+    }
+
+    return null;
   }
 
   String? _kakaoCodeHint(dynamic code) {
     if (code == -3 || code == '-3') {
-      return 'Local API 미승인 또는 사용 권한 확인 필요';
+      return 'Local API 미승인 또는 사용 권한 확인 필요 / OPEN_MAP_AND_LOCAL service 비활성화 가능성';
     }
     if (code == -5 || code == '-5') {
       return '요청한 API 사용 권한이 없습니다';
@@ -197,6 +277,42 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
     if (code == -401 || code == '-401') {
       return 'Authentication error: check Kakao API key and permissions.';
     }
+    return null;
+  }
+
+  String? _kakaoServiceHint({
+    required int statusCode,
+    required dynamic code,
+    String? message,
+    String? messageAlt,
+    String? errorType,
+    String? errorDescription,
+  }) {
+    if (statusCode != 403) return null;
+
+    final lowerCode = code?.toString();
+    final fields = <String>[
+      if (errorType != null) errorType,
+      if (message != null) message,
+      if (messageAlt != null) messageAlt,
+      if (errorDescription != null) errorDescription,
+    ];
+
+    final lowerText = fields.join(' ').toLowerCase();
+    if (lowerCode == '-3' || lowerCode == '-5') {
+      return 'OPEN_MAP_AND_LOCAL service가 앱에서 비활성화되어 있습니다. '
+          '카카오 디벨로퍼스 앱 설정에서 카카오맵(Local) API 사용을 확인하세요.';
+    }
+
+    if (lowerText.contains('open_map_and_local') ||
+        lowerText.contains('open map and local') ||
+        lowerText.contains('disabled') ||
+        lowerText.contains('not authorized') ||
+        lowerText.contains('notauthorizederror')) {
+      return 'OPEN_MAP_AND_LOCAL service가 앱에서 비활성화되어 있습니다. '
+          '카카오 디벨로퍼스 앱 설정에서 카카오맵(Local) API 사용을 확인하세요.';
+    }
+
     return null;
   }
 
@@ -287,7 +403,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                 onPressed: () => _submitSearch(_queryController.text),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                 tooltip: 'Search',
+                tooltip: 'Search',
               ),
             ],
           ),
@@ -528,7 +644,8 @@ class _RestaurantCard extends StatelessWidget {
                         restaurant.distance > 0
                             ? '${restaurant.distance}m'
                             : restaurant.address,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textHint),
                       ),
                     ],
                   ),
@@ -648,5 +765,3 @@ class _CardSkeletonState extends State<_CardSkeleton>
     );
   }
 }
-
-

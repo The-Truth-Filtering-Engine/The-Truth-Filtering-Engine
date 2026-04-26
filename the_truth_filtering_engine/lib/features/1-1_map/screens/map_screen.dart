@@ -2,6 +2,7 @@
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../models/restaurant_model.dart';
@@ -23,9 +24,43 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  int _mapModeIndex = 3;
 
   static const _initialCenter = LatLng(37.5245, 127.0370);
   static const _initialZoom = 14.0;
+
+  static final _mapTileModes = [
+    _MapTileMode(
+      label: 'Carto Light',
+      urlTemplate:
+          'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      subdomains: ['a', 'b', 'c', 'd'],
+    ),
+    _MapTileMode(
+      label: 'Carto Dark',
+      urlTemplate:
+          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      subdomains: ['a', 'b', 'c', 'd'],
+    ),
+    _MapTileMode(
+      label: 'OpenTopoMap',
+      urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+      subdomains: ['a', 'b', 'c'],
+    ),
+    _MapTileMode(
+      label: 'OpenStreetMap Standard',
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      subdomains: [],
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncCurrentLocationToProvider();
+    });
+  }
 
   @override
   void dispose() {
@@ -37,8 +72,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final restaurants = ref.watch(restaurantListProvider);
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
+    final currentLocation = ref.watch(currentLocationProvider);
+    final mapMode = _currentMapMode();
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: AppColors.mapTeal,
       body: Stack(
         children: [
@@ -54,21 +91,52 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: mapMode.urlTemplate,
+                subdomains: mapMode.subdomains,
                 userAgentPackageName: 'com.example.truth_map',
               ),
               MarkerLayer(
-                markers: restaurants.map((restaurant) {
-                  return Marker(
-                    point: LatLng(restaurant.latitude, restaurant.longitude),
-                    width: 80,
-                    height: 50,
-                    child: TruthScoreMarker(
-                      restaurant: restaurant,
-                      onTap: () => _onMarkerTapped(restaurant),
+                markers: [
+                  ...restaurants.map((restaurant) {
+                    return Marker(
+                      point: LatLng(restaurant.latitude, restaurant.longitude),
+                      width: 80,
+                      height: 50,
+                      child: TruthScoreMarker(
+                        restaurant: restaurant,
+                        onTap: () => _onMarkerTapped(restaurant),
+                      ),
+                    );
+                  }),
+                  if (currentLocation != null)
+                    Marker(
+                      point: currentLocation,
+                      width: 30,
+                      height: 30,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: const BoxDecoration(
+                              color: Color(0x3323A0FF),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                }).toList(),
+                ].toList(),
               ),
             ],
           ),
@@ -91,10 +159,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     return;
                   }
 
+                  final currentLocation = ref.read(currentLocationProvider);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => RestaurantListScreen(query: query),
+                      builder: (_) => RestaurantListScreen(
+                        query: query,
+                        initialLatitude: currentLocation?.latitude,
+                        initialLongitude: currentLocation?.longitude,
+                      ),
                     ),
                   );
                 },
@@ -108,8 +181,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             child: MapControlButtons(
               onLocationTap: _moveToCurrentLocation,
               onLayerTap: () {
-                ref.read(showLayerMenuProvider.notifier).state =
-                    !ref.read(showLayerMenuProvider);
+                _cycleMapMode();
               },
               onZoomIn: () => _mapController.move(
                 _mapController.camera.center,
@@ -176,6 +248,62 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _moveToCurrentLocation() {
-    _mapController.move(_initialCenter, 15);
+    _syncCurrentLocationToProvider();
   }
+
+  void _cycleMapMode() {
+    if (_mapTileModes.isEmpty) return;
+
+    setState(() {
+      _mapModeIndex = (_mapModeIndex + 1) % _mapTileModes.length;
+    });
+  }
+
+  _MapTileMode _currentMapMode() {
+    if (_mapTileModes.isEmpty) {
+      return const _MapTileMode(
+        label: 'OpenStreetMap Standard',
+        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        subdomains: [],
+      );
+    }
+
+    final normalizedIndex = _mapModeIndex % _mapTileModes.length;
+    return _mapTileModes[normalizedIndex];
+  }
+
+  Future<void> _syncCurrentLocationToProvider() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      final location = LatLng(position.latitude, position.longitude);
+      ref.read(currentLocationProvider.notifier).state = location;
+      _mapController.move(location, _initialZoom);
+    } catch (_) {}
+  }
+}
+
+class _MapTileMode {
+  final String label;
+  final String urlTemplate;
+  final List<String> subdomains;
+
+  const _MapTileMode({
+    required this.label,
+    required this.urlTemplate,
+    required this.subdomains,
+  });
 }
