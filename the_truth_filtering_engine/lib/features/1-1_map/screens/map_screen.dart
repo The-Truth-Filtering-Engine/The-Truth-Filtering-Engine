@@ -137,8 +137,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ...displayRestaurants.map((restaurant) {
                     return Marker(
                       point: LatLng(restaurant.latitude, restaurant.longitude),
-                      width: 80,
-                      height: 50,
+                      width: 36,
+                      height: 36,
                       child: TruthScoreMarker(
                         restaurant: restaurant,
                         onTap: () => _onMarkerTapped(restaurant),
@@ -300,10 +300,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _onMarkerTapped(RestaurantModel restaurant) {
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
-    _mapController.move(
-      LatLng(restaurant.latitude, restaurant.longitude),
-      15,
-    );
   }
 
   void _updateLatestMapCamera(MapCamera camera) {

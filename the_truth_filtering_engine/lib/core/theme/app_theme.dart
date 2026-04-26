@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ── 색상 팔레트 ──────────────────────────────
 class AppColors {
@@ -36,25 +35,68 @@ class AppColors {
 
 // ── 텍스트 스타일 ────────────────────────────
 class AppText {
-  static TextStyle display() => GoogleFonts.notoSansKr(
-    fontSize: 22, fontWeight: FontWeight.w500, color: AppColors.textPrimary);
+  static const _baseFontFamily = 'Malgun Gothic';
+  static const _fontFallbacks = <String>[
+    'Apple SD Gothic Neo',
+    'Malgun Gothic',
+    'Apple SD 산돌고딕 Neo',
+    'Nanum Gothic',
+    'Segoe UI',
+    'Noto Sans KR',
+    'Arial',
+    'Helvetica',
+    'sans-serif',
+  ];
 
-  static TextStyle title() => GoogleFonts.notoSansKr(
-    fontSize: 17, fontWeight: FontWeight.w500, color: AppColors.textPrimary);
+  static TextStyle display() => const TextStyle(
+        fontFamily: _baseFontFamily,
+        fontFamilyFallback: _fontFallbacks,
+        fontSize: 22,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textPrimary,
+      );
 
-  static TextStyle subtitle() => GoogleFonts.notoSansKr(
-    fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary);
+  static TextStyle title() => const TextStyle(
+        fontFamily: _baseFontFamily,
+        fontFamilyFallback: _fontFallbacks,
+        fontSize: 17,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textPrimary,
+      );
 
-  static TextStyle body() => GoogleFonts.notoSansKr(
-    fontSize: 13, fontWeight: FontWeight.w400, color: AppColors.textPrimary,
-    height: 1.6);
+  static TextStyle subtitle() => const TextStyle(
+        fontFamily: _baseFontFamily,
+        fontFamilyFallback: _fontFallbacks,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textPrimary,
+      );
 
-  static TextStyle caption() => GoogleFonts.notoSansKr(
-    fontSize: 11, fontWeight: FontWeight.w400, color: AppColors.textSecondary);
+  static TextStyle body() => const TextStyle(
+        fontFamily: _baseFontFamily,
+        fontFamilyFallback: _fontFallbacks,
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        color: AppColors.textPrimary,
+        height: 1.6,
+      );
 
-  static TextStyle label() => GoogleFonts.notoSansKr(
-    fontSize: 9, fontWeight: FontWeight.w500, color: AppColors.textHint,
-    letterSpacing: 0.4);
+  static TextStyle caption() => const TextStyle(
+        fontFamily: _baseFontFamily,
+        fontFamilyFallback: _fontFallbacks,
+        fontSize: 11,
+        fontWeight: FontWeight.w400,
+        color: AppColors.textSecondary,
+      );
+
+  static TextStyle label() => const TextStyle(
+        fontFamily: _baseFontFamily,
+        fontFamilyFallback: _fontFallbacks,
+        fontSize: 9,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textHint,
+        letterSpacing: 0.4,
+      );
 }
 
 // ── 테마 ─────────────────────────────────────
@@ -62,6 +104,16 @@ class AppTheme {
   static ThemeData get light => ThemeData(
     useMaterial3: true,
     scaffoldBackgroundColor: AppColors.bg,
+    fontFamily: AppText._baseFontFamily,
+    fontFamilyFallback: AppText._fontFallbacks,
+    textTheme: ThemeData.light().textTheme.apply(
+      fontFamily: AppText._baseFontFamily,
+      fontFamilyFallback: AppText._fontFallbacks,
+    ),
+    primaryTextTheme: ThemeData.light().textTheme.apply(
+      fontFamily: AppText._baseFontFamily,
+      fontFamilyFallback: AppText._fontFallbacks,
+    ),
     colorScheme: ColorScheme.light(
       primary: AppColors.primary500,
       surface: AppColors.surface,
