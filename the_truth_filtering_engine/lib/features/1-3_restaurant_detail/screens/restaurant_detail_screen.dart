@@ -14,13 +14,13 @@ class RestaurantDetailScreen extends StatelessWidget {
   // 레스토랑 ID에 맞는 ShopInfo + 블로그 리스트 반환
   // 실제 연동 시 API로 교체
   ShopInfo get _shopInfo => ShopInfo(
-    name: restaurant.name,
-    category: '${restaurant.category} · ${restaurant.address}',
-    trustScore: restaurant.truthScore,
-    adRatio: 100 - restaurant.truthScore,
-    realRatio: restaurant.truthScore,
-    totalReviews: dummyBlogs.length,
-  );
+        name: restaurant.name,
+        category: '${restaurant.category} · ${restaurant.address}',
+        trustScore: restaurant.truthScore,
+        adRatio: 100 - restaurant.truthScore,
+        realRatio: restaurant.truthScore,
+        totalReviews: dummyBlogs.length,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -30,12 +30,40 @@ class RestaurantDetailScreen extends StatelessWidget {
         backgroundColor: AppColors.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: AppColors.primary),
+              size: 18, color: AppColors.primary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(restaurant.name,
-          style: AppTextStyles.restaurantName.copyWith(fontSize: 16)),
+        leadingWidth: 40,
+        title: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.home_outlined,
+                  size: 20, color: AppColors.primary),
+              onPressed: () =>
+                  Navigator.popUntil(context, (route) => route.isFirst),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
         centerTitle: true,
+        // 식당 이름을 중앙에 유지
+        flexibleSpace: Center(
+          child: Text(restaurant.name,
+              style: AppTextStyles.restaurantName.copyWith(fontSize: 16)),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined,
+                size: 20, color: AppColors.primary),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_outline_rounded,
+                size: 20, color: AppColors.primary),
+            onPressed: () {},
+          ),
+        ],
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
@@ -46,7 +74,6 @@ class RestaurantDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── 이미지 영역 ──
             Container(
               height: 220,
@@ -60,10 +87,11 @@ class RestaurantDetailScreen extends StatelessWidget {
                   ),
                   // 98% Verified 뱃지
                   Positioned(
-                    top: 14, left: 14,
+                    top: 14,
+                    left: 14,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1D9E75),
                         borderRadius: BorderRadius.circular(20),
@@ -96,16 +124,16 @@ class RestaurantDetailScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(restaurant.name,
-                              style: AppTextStyles.restaurantName),
+                                style: AppTextStyles.restaurantName),
                             const SizedBox(height: 4),
                             Row(
                               children: [
                                 const Icon(Icons.location_on_outlined,
-                                  size: 13, color: Color(0xFF888888)),
+                                    size: 13, color: Color(0xFF888888)),
                                 const SizedBox(width: 2),
                                 Text(
-                                  '${restaurant.address} · ${restaurant.category}',
-                                  style: AppTextStyles.restaurantMeta),
+                                    '${restaurant.address} · ${restaurant.category}',
+                                    style: AppTextStyles.restaurantMeta),
                               ],
                             ),
                           ],
@@ -124,7 +152,8 @@ class RestaurantDetailScreen extends StatelessWidget {
                       _ActionItem(icon: Icons.phone_outlined, label: 'Call'),
                       _ActionItem(icon: Icons.bookmark_outline, label: 'Save'),
                       _ActionItem(icon: Icons.near_me_outlined, label: 'Route'),
-                      _ActionItem(icon: Icons.ios_share_outlined, label: 'Share'),
+                      _ActionItem(
+                          icon: Icons.ios_share_outlined, label: 'Share'),
                     ],
                   ),
                 ],
@@ -142,7 +171,8 @@ class RestaurantDetailScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF7F7FA),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE4E4EC), width: 0.5),
+                  border:
+                      Border.all(color: const Color(0xFFE4E4EC), width: 0.5),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,39 +180,44 @@ class RestaurantDetailScreen extends StatelessWidget {
                     Row(
                       children: [
                         const Icon(Icons.auto_awesome,
-                          size: 15, color: Color(0xFF2B54E8)),
+                            size: 15, color: Color(0xFF2B54E8)),
                         const SizedBox(width: 6),
                         const Text('AI 진실 분석',
-                          style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600,
-                            color: Color(0xFF2E2E4E))),
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF2E2E4E))),
                       ],
                     ),
                     const SizedBox(height: 2),
                     const Text('실제 방문자 리뷰 기반의 신뢰도',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF9090A8))),
+                        style:
+                            TextStyle(fontSize: 11, color: Color(0xFF9090A8))),
                     const SizedBox(height: 14),
                     Row(
                       children: [
                         // Trust 원형
                         Container(
-                          width: 56, height: 56,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: _trustColor(restaurant.truthScore),
-                              width: 5),
+                                color: _trustColor(restaurant.truthScore),
+                                width: 5),
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text('${restaurant.truthScore}%',
-                                style: TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600,
-                                  color: _trustTextColor(restaurant.truthScore))),
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _trustTextColor(
+                                          restaurant.truthScore))),
                               const Text('TRUST',
-                                style: TextStyle(
-                                  fontSize: 7, color: Color(0xFFA0A0C0))),
+                                  style: TextStyle(
+                                      fontSize: 7, color: Color(0xFFA0A0C0))),
                             ],
                           ),
                         ),
@@ -239,10 +274,10 @@ class RestaurantDetailScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.rate_review_outlined,
-                        color: Colors.white, size: 18),
+                          color: Colors.white, size: 18),
                       const SizedBox(width: 8),
                       Text('블로그 리뷰 ${dummyBlogs.length}개 보기',
-                        style: AppTextStyles.primaryButton),
+                          style: AppTextStyles.primaryButton),
                     ],
                   ),
                 ),
@@ -280,7 +315,8 @@ class _ActionItem extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 44, height: 44,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: const Color(0xFFEEF0FF),
             borderRadius: BorderRadius.circular(22),
@@ -289,8 +325,7 @@ class _ActionItem extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(label,
-          style: const TextStyle(
-            fontSize: 11, color: Color(0xFF6060A0))),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF6060A0))),
       ],
     );
   }
@@ -301,7 +336,8 @@ class _StatBar extends StatelessWidget {
   final String label;
   final int value;
   final Color color;
-  const _StatBar({required this.label, required this.value, required this.color});
+  const _StatBar(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -312,10 +348,10 @@ class _StatBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF9090A8))),
+                style: const TextStyle(fontSize: 10, color: Color(0xFF9090A8))),
             Text('$value%',
-              style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w500, color: color)),
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w500, color: color)),
           ],
         ),
         const SizedBox(height: 3),
@@ -345,6 +381,7 @@ class _WoodGrainPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y + 6), paint);
     }
   }
+
   @override
   bool shouldRepaint(_WoodGrainPainter old) => false;
 }
