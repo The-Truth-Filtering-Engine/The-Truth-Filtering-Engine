@@ -24,7 +24,52 @@ class BlogReview {
     required this.adProbability,
     required this.isSponsored,
   });
+
+  // ── FastAPI /search 응답 단건 파싱 ──────────────────────────────────────
+  factory BlogReview.fromApi(Map<String, dynamic> json) {
+    final llmPred = json['is_ad_llm_pred'] as int? ?? -1;
+
+    // adProbability: 광고(1) → 90, 일반(0) → 10, 미판별(-1) → 50
+    final int adProb = switch (llmPred) {
+      1 => 90,
+      0 => 10,
+      _ => 50,
+    };
+
+    final ReviewStatus status = switch (llmPred) {
+      1 => ReviewStatus.ad,
+      0 => ReviewStatus.real,
+      _ => ReviewStatus.suspicious,
+    };
+
+    final String description = json['review_description'] as String? ?? '';
+
+    return BlogReview(
+      id: json['id'] as int? ?? 0,
+      title: json['review_title'] as String? ?? '(제목 없음)',
+      author: json['review_bloggername'] as String? ?? '알 수 없음',
+      date: _formatDate(json['review_postdate'] as String? ?? ''),
+      preview: description.length > 80
+          ? '"${description.substring(0, 80)}..."'
+          : '"$description"',
+      content: description,
+      url: json['review_url'] as String? ?? '',
+      status: status,
+      adProbability: adProb,
+      isSponsored: llmPred == 1,
+    );
+  }
 }
+
+/// YYYYMMDD → YYYY.MM.DD 변환. 그 외 형식은 그대로 반환.
+String _formatDate(String raw) {
+  if (raw.length == 8) {
+    return '${raw.substring(0, 4)}.${raw.substring(4, 6)}.${raw.substring(6, 8)}';
+  }
+  return raw;
+}
+
+// ── ShopInfo ────────────────────────────────────────────────────────────────
 
 class ShopInfo {
   final String name;
@@ -42,9 +87,33 @@ class ShopInfo {
     required this.realRatio,
     required this.totalReviews,
   });
+
+  /// API 응답 전체(reviews 배열 포함)로 ShopInfo 생성
+  factory ShopInfo.fromApiResponse({
+    required String name,
+    required String category,
+    required List<BlogReview> reviews,
+  }) {
+    final total = reviews.length;
+    final adCount = reviews.where((r) => r.status == ReviewStatus.ad).length;
+    final realCount = total - adCount;
+
+    final int adRatio = total == 0 ? 0 : (adCount / total * 100).round();
+    final int realRatio = total == 0 ? 0 : (realCount / total * 100).round();
+
+    return ShopInfo(
+      name: name,
+      category: category,
+      trustScore: realRatio,
+      adRatio: adRatio,
+      realRatio: realRatio,
+      totalReviews: total,
+    );
+  }
 }
 
-// ── 더미 데이터 ───────────────────────────────
+// ── 더미 데이터 (개발/테스트용 유지) ────────────────────────────────────────
+
 final dummyShop = ShopInfo(
   name: '오모테나시 스시',
   category: '일식 · 서울 강남구',

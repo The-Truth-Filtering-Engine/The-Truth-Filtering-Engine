@@ -9,10 +9,13 @@ router = APIRouter()
 async def search(query: str):
     # Step 1: 캐시 확인
     cached = await get_cached_reviews(query)
+    print(f"[DEBUG] cached count: {len(cached) if cached else 0}")
     if cached:
+        print("[DEBUG] → Supabase 캐시 hit")
         summary = await summarize_reviews(cached)
         return {"source": "cache", "reviews": cached, "summary": summary}
 
+    print("[DEBUG] → 캐시 없음, Naver API 호출")  # ← 여기 추가
     # Step 2: Naver API로 블로그 수집
     blogs = await fetch_blog_previews(query)
 

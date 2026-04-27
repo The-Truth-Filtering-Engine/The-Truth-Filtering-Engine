@@ -1,7 +1,13 @@
-import httpx, os
+import httpx, os, re
+from html import unescape
 
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
+
+def _clean(text: str) -> str:
+    text = re.sub(r"<[^>]+>", "", text)  # <b>, </b> 등 HTML 태그 제거
+    text = unescape(text)                 # &quot; &amp; 등 HTML 엔티티 디코딩
+    return text.strip()
 
 async def fetch_blog_previews(query: str) -> list[dict]:
     url = "https://openapi.naver.com/v1/search/blog.json"
@@ -17,11 +23,11 @@ async def fetch_blog_previews(query: str) -> list[dict]:
 
     return [
         {
-            "title": item["title"],
-            "description": item["description"],
-            "link": item["link"],
+            "title":       _clean(item["title"]),
+            "description": _clean(item["description"]),
+            "link":        item["link"],
             "bloggername": item["bloggername"],
-            "postdate": item["postdate"],
+            "postdate":    item["postdate"],
         }
         for item in items
     ]
