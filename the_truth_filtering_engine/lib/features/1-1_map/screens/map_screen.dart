@@ -37,7 +37,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _mapModeIndex = 3;
 
   static const String _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
-  static const int _maxMapRestaurants = 30;
+  static const int _maxMapRestaurants = 50;
   static const int _categoryRequestSize = 15;
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
@@ -445,7 +445,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           'lat': center.latitude.toString(),
           'lng': center.longitude.toString(),
           'radius': radiusMeters.toString(),
-          'display': '20',
+          'display': '50',
         },
       );
 
@@ -536,18 +536,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   int _maxMapMarkersByZoom(double zoom) {
-    if (zoom <= 11.9) return 8;
-    if (zoom <= 12.9) return 12;
-    if (zoom <= 13.9) return 18;
+    if (zoom <= 11.9) return 15;
+    if (zoom <= 12.9) return 25;
+    if (zoom <= 13.9) return 40;
     return _maxMapRestaurants;
   }
 
   double _markerCellSizeMeters(double zoom) {
-    if (zoom <= 11.9) return 1400;
-    if (zoom <= 12.9) return 800;
-    if (zoom <= 13.9) return 450;
-    if (zoom <= 14.9) return 180;
-    return 80;
+    if (zoom <= 11.9) return 800;
+    if (zoom <= 12.9) return 400;
+    if (zoom <= 13.9) return 200;
+    if (zoom <= 14.9) return 100;
+    return 40;
   }
 
   String _restaurantCellKey({
