@@ -10,16 +10,10 @@ class AppBarLogo extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: AppColors.primary900,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Center(
-            child: CircleAvatar(radius: 4, backgroundColor: Colors.white),
-          ),
+        Image.asset(
+          'assets/logo.png',
+          width: 32,
+          height: 32,
         ),
         const SizedBox(width: 7),
         Text('진실의 입',

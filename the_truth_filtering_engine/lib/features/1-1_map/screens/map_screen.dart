@@ -20,7 +20,7 @@ import '../widgets/truth_score_marker.dart';
 import '../../1-2_restaurant_list/screens/restaurant_list_screen.dart';
 import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
-class MapScreen extends ConsumerStatefulWidget { 
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
@@ -108,7 +108,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final isSelectedBookmarked = selectedRestaurant != null &&
         bookmarkedRestaurants.any((item) => item.id == selectedRestaurant.id);
 
-        return Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.mapTeal,
       body: Stack(
         children: [
@@ -281,8 +281,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   },
                   onBookmarkTap: () {
                     final previous = ref.read(bookmarkRestaurantsProvider);
-                    final alreadyBookmarked =
-                        previous.any((item) => item.id == selectedRestaurant.id);
+                    final alreadyBookmarked = previous
+                        .any((item) => item.id == selectedRestaurant.id);
                     ref
                         .read(bookmarkRestaurantsProvider.notifier)
                         .toggle(selectedRestaurant);
@@ -290,9 +290,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          alreadyBookmarked
-                              ? '북마크에서 해제되었습니다'
-                              : '북마크에 저장했습니다',
+                          alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다',
                         ),
                         duration: const Duration(seconds: 1),
                       ),
@@ -399,7 +397,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
     final zoomDelta = (zoom - _lastSearchedZoom!).abs();
 
-    return movedMeters >= _refreshDistanceMeters || zoomDelta >= _refreshZoomDelta;
+    return movedMeters >= _refreshDistanceMeters ||
+        zoomDelta >= _refreshZoomDelta;
   }
 
   int _calculateViewportRadius(LatLngBounds bounds, LatLng center) {
@@ -493,23 +492,26 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           name: item['place_name']?.toString() ?? '',
           category: _parseCategory(item),
           address: (item['road_address_name']?.toString() ?? '').isNotEmpty
-                  ? item['road_address_name'].toString()
-                  : item['address_name']?.toString() ?? '',
+              ? item['road_address_name'].toString()
+              : item['address_name']?.toString() ?? '',
           truthScore: _mockTrustScore(id),
           distance: int.tryParse(item['distance']?.toString() ?? '0') ?? 0,
           phone: item['phone']?.toString(),
           placeUrl: item['place_url']?.toString(),
           reviewSummary: item['place_name']?.toString() ?? '검색 결과',
           imageUrl: item['image_url']?.toString(),
-          latitude: double.tryParse(item['y']?.toString() ?? '0') ?? center.latitude,
-          longitude: double.tryParse(item['x']?.toString() ?? '0') ?? center.longitude,
+          latitude:
+              double.tryParse(item['y']?.toString() ?? '0') ?? center.latitude,
+          longitude:
+              double.tryParse(item['x']?.toString() ?? '0') ?? center.longitude,
         );
       }
 
       final nextRestaurants = byId.values.toList()
         ..sort((a, b) => a.distance.compareTo(b.distance));
 
-      final resultRestaurants = nextRestaurants.take(_maxMapRestaurants).toList();
+      final resultRestaurants =
+          nextRestaurants.take(_maxMapRestaurants).toList();
 
       if (!mounted || requestId != _viewportSearchReqId) return;
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
@@ -730,4 +732,3 @@ class _MapTileMode {
     required this.subdomains,
   });
 }
-
