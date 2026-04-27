@@ -717,41 +717,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _mapController.move(location, _initialZoom);
     } catch (_) {}
   }
-
-  Future<void> _syncCurrentLocationToProvider() async {
-    try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission != LocationPermission.whileInUse &&
-          permission != LocationPermission.always) {
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      final location = LatLng(position.latitude, position.longitude);
-      ref.read(currentLocationProvider.notifier).state = location;
-      _mapController.move(location, _initialZoom);
-    } catch (_) {}
-  }
-}
-
-class _MapTileMode {
-  final String label;
-  final String urlTemplate;
-  final List<String> subdomains;
-
-  const _MapTileMode({
-    required this.label,
-    required this.urlTemplate,
-    required this.subdomains,
-  });
 }
 
 class _MapTileMode {
