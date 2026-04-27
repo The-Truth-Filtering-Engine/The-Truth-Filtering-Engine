@@ -41,13 +41,12 @@ class _MainShellState extends State<MainShell> {
     MapScreen(),
     BookmarkScreen(),
     _PlaceholderScreen(icon: Icons.auto_awesome_outlined, label: 'AI 추천'),
-    _PlaceholderScreen(icon: Icons.settings_outlined,     label: '설정'),
+    _PlaceholderScreen(icon: Icons.settings_outlined, label: '설정'),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       // ── 추가된 공통 앱바 ───────────────────────
       appBar: AppBar(
         backgroundColor: AppColors.surface,
@@ -58,18 +57,10 @@ class _MainShellState extends State<MainShell> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 24, height: 24,
-              decoration: BoxDecoration(
-                color: AppColors.primary900,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Center(
-                child: CircleAvatar(
-                  radius: 5,
-                  backgroundColor: Colors.white,
-                ),
-              ),
+            Image.asset(
+              'assets/logo.png',
+              width: 32,
+              height: 32,
             ),
             const SizedBox(width: 8),
             const Text(
@@ -125,8 +116,8 @@ class _MainShellState extends State<MainShell> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
-          selectedLabelStyle: const TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w500),
+          selectedLabelStyle:
+              const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
           items: const [
             BottomNavigationBarItem(
@@ -171,11 +162,11 @@ class _PlaceholderScreen extends StatelessWidget {
           Icon(icon, size: 48, color: AppColors.textHint),
           const SizedBox(height: 12),
           Text('$label 화면',
-            style: const TextStyle(
-              fontSize: 15, color: AppColors.textSecondary)),
+              style: const TextStyle(
+                  fontSize: 15, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           const Text('준비 중이에요',
-            style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+              style: TextStyle(fontSize: 12, color: AppColors.textHint)),
         ],
       ),
     );

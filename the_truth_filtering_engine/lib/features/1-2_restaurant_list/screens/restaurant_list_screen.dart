@@ -207,7 +207,8 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
           errorDescription: errorDescription?.toString(),
         );
 
-        final serviceSuffix = serviceDisabledHint != null ? ' / $serviceDisabledHint' : '';
+        final serviceSuffix =
+            serviceDisabledHint != null ? ' / $serviceDisabledHint' : '';
         final detailSuffix = validationHint != null ? ' / $validationHint' : '';
 
         if (code != null && msg != null) {
@@ -222,21 +223,20 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
           return serviceDisabledHint;
         }
         if (body['errorType'] != null) {
-          final typeText = '${body['errorType']} ${body['error_description'] ?? ''}';
+          final typeText =
+              '${body['errorType']} ${body['error_description'] ?? ''}';
           return '$typeText$serviceSuffix$detailSuffix';
         }
       }
     } catch (_) {}
     return response.reasonPhrase?.isNotEmpty == true
-        ? '${response.reasonPhrase}${
-            response.reasonPhrase?.toLowerCase().contains('forbidden') == true ? ' (FORBIDDEN)' : ''
-          }'
+        ? '${response.reasonPhrase}${response.reasonPhrase?.toLowerCase().contains('forbidden') == true ? ' (FORBIDDEN)' : ''}'
         : '';
   }
 
   String? _extractKakaoValidationHint(dynamic details) {
     if (details == null) return null;
-    final List<dynamic> list = details is List< dynamic> ? details : [details];
+    final List<dynamic> list = details is List<dynamic> ? details : [details];
 
     for (final item in list) {
       if (item is! Map<String, dynamic>) continue;

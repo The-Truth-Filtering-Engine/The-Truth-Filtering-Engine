@@ -6,10 +6,14 @@ class AppBarLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: const [
-        Icon(Icons.verified, size: 20),
-        SizedBox(width: 6),
-        Text("진실의 입"),
+      children: [
+        Image.asset(
+          'assets/logo.png',
+          width: 32,
+          height: 32,
+        ),
+        const SizedBox(width: 6),
+        const Text("진실의 입"),
       ],
     );
   }
