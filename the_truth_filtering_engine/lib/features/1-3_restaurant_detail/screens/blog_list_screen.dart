@@ -14,7 +14,8 @@ class _SkeletonBox extends StatefulWidget {
   final double width;
   final double height;
   final BorderRadius? borderRadius;
-  const _SkeletonBox({required this.width, required this.height, this.borderRadius});
+  const _SkeletonBox(
+      {required this.width, required this.height, this.borderRadius});
 
   @override
   State<_SkeletonBox> createState() => _SkeletonBoxState();
@@ -91,7 +92,10 @@ class _BlogCardSkeleton extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              _SkeletonBox(width: 36, height: 22, borderRadius: BorderRadius.circular(5)),
+              _SkeletonBox(
+                  width: 36,
+                  height: 22,
+                  borderRadius: BorderRadius.circular(5)),
             ],
           ),
           const SizedBox(height: 10),
@@ -131,7 +135,8 @@ class _SkeletonList extends StatelessWidget {
 class BlogListScreen extends StatefulWidget {
   final ShopInfo shopInfo;
   final List<BlogReview> blogs;
-  const BlogListScreen({super.key, required this.shopInfo, required this.blogs});
+  const BlogListScreen(
+      {super.key, required this.shopInfo, required this.blogs});
 
   @override
   State<BlogListScreen> createState() => _BlogListScreenState();
@@ -140,20 +145,21 @@ class BlogListScreen extends StatefulWidget {
 class _BlogListScreenState extends State<BlogListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isLoading = true;
+  // bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _simulateLoading();
+    // _simulateLoading();
   }
 
   // 실제 API 연동 시 이 부분을 API 호출로 교체하세요
-  Future<void> _simulateLoading() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
-    if (mounted) setState(() => _isLoading = false);
-  }
+  // Future<void> _simulateLoading() async {
+  //   await Future.delayed(const Duration(milliseconds: 1800));
+  //   if (mounted) setState(() => _isLoading = false);
+  // }
 
   @override
   void dispose() {
@@ -161,11 +167,11 @@ class _BlogListScreenState extends State<BlogListScreen>
     super.dispose();
   }
 
-  List<BlogReview> get _sortedByReal =>
-    [...widget.blogs]..sort((a, b) => a.adProbability.compareTo(b.adProbability));
+  List<BlogReview> get _sortedByReal => [...widget.blogs]
+    ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
   List<BlogReview> get _sortedByDate =>
-    [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
+      [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
 
   Future<void> _openWebview(BlogReview blog) async {
     final uri = Uri.parse(blog.url);
@@ -204,8 +210,8 @@ class _BlogListScreenState extends State<BlogListScreen>
                           Text(shop.name, style: AppText.title()),
                           const SizedBox(height: 3),
                           Text(
-                            '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
-                            style: AppText.caption()),
+                              '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
+                              style: AppText.caption()),
                         ],
                       ),
                     ),
@@ -240,14 +246,16 @@ class _BlogListScreenState extends State<BlogListScreen>
                       borderRadius: BorderRadius.circular(6),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(.06),
-                          blurRadius: 4, offset: const Offset(0, 1)),
+                            color: Colors.black.withOpacity(.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1)),
                       ],
                     ),
                     labelColor: AppColors.primary500,
                     unselectedLabelColor: AppColors.textSecondary,
-                    labelStyle: AppText.caption()
-                      .copyWith(fontWeight: FontWeight.w500, color: AppColors.primary500),
+                    labelStyle: AppText.caption().copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primary500),
                     unselectedLabelStyle: AppText.caption(),
                     dividerColor: Colors.transparent,
                     tabs: const [
@@ -265,14 +273,14 @@ class _BlogListScreenState extends State<BlogListScreen>
           // ── 리뷰 리스트 or 스켈레톤 ──
           Expanded(
             child: _isLoading
-              ? const _SkeletonList()
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _BlogList(blogs: _sortedByReal, onTap: _openWebview),
-                    _BlogList(blogs: _sortedByDate, onTap: _openWebview),
-                  ],
-                ),
+                ? const _SkeletonList()
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _BlogList(blogs: _sortedByReal, onTap: _openWebview),
+                      _BlogList(blogs: _sortedByDate, onTap: _openWebview),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -291,7 +299,7 @@ class _BlogList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: blogs.length,
       itemBuilder: (_, i) =>
-        ReviewItem(blog: blogs[i], onTap: () => onTap(blogs[i])),
+          ReviewItem(blog: blogs[i], onTap: () => onTap(blogs[i])),
     );
   }
 }

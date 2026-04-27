@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
@@ -6,21 +8,79 @@ import '../../1-1_map/widgets/truth_score_badge.dart';
 import '../providers/blog_review.dart';
 import 'blog_list_screen.dart';
 
-class RestaurantDetailScreen extends StatelessWidget {
+// ── API 호출 ──────────────────────────────────────────────────────────────────
+
+Future<List<BlogReview>> _fetchReviews(String restaurantName) async {
+  final uri = Uri.parse('http://localhost:8000/api/search')
+      .replace(queryParameters: {'query': restaurantName});
+
+  final res = await http.get(uri).timeout(const Duration(seconds: 30));
+
+  if (res.statusCode != 200) {
+    throw Exception('서버 오류 (${res.statusCode})');
+  }
+
+  final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  final reviewsJson = body['reviews'] as List<dynamic>? ?? [];
+
+  return reviewsJson
+      .map((e) => BlogReview.fromApi(e as Map<String, dynamic>))
+      .toList();
+}
+
+// ── 화면 ─────────────────────────────────────────────────────────────────────
+
+class RestaurantDetailScreen extends StatefulWidget {
   final RestaurantModel restaurant;
 
   const RestaurantDetailScreen({super.key, required this.restaurant});
 
-  // 레스토랑 ID에 맞는 ShopInfo + 블로그 리스트 반환
-  // 실제 연동 시 API로 교체
-  ShopInfo get _shopInfo => ShopInfo(
-        name: restaurant.name,
-        category: '${restaurant.category} · ${restaurant.address}',
-        trustScore: restaurant.truthScore,
-        adRatio: 100 - restaurant.truthScore,
-        realRatio: restaurant.truthScore,
-        totalReviews: dummyBlogs.length,
+  @override
+  State<RestaurantDetailScreen> createState() => _RestaurantDetailScreenState();
+}
+
+class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
+  // 버튼 탭 시 로딩 상태 관리 (화면 전체 로딩 X, 버튼만 표시)
+  bool _isLoadingReviews = false;
+
+  RestaurantModel get _r => widget.restaurant;
+
+  Future<void> _onReviewButtonTap() async {
+    setState(() => _isLoadingReviews = true);
+
+    try {
+      final reviews = await _fetchReviews(_r.name);
+
+      final shopInfo = ShopInfo.fromApiResponse(
+        name: _r.name,
+        category: '${_r.category} · ${_r.address}',
+        reviews: reviews,
       );
+
+      if (!mounted) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BlogListScreen(
+            shopInfo: shopInfo,
+            blogs: reviews,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('리뷰를 불러오지 못했어요: $e'),
+          backgroundColor: const Color(0xFFE85C5C),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoadingReviews = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +107,8 @@ class RestaurantDetailScreen extends StatelessWidget {
           ],
         ),
         centerTitle: true,
-        // 식당 이름을 중앙에 유지
         flexibleSpace: Center(
-          child: Text(restaurant.name,
+          child: Text(_r.name,
               style: AppTextStyles.restaurantName.copyWith(fontSize: 16)),
         ),
         actions: [
@@ -81,11 +140,9 @@ class RestaurantDetailScreen extends StatelessWidget {
               color: const Color(0xFFD4A96A),
               child: Stack(
                 children: [
-                  // 플레이스홀더 패턴
                   Positioned.fill(
                     child: CustomPaint(painter: _WoodGrainPainter()),
                   ),
-                  // 98% Verified 뱃지
                   Positioned(
                     top: 14,
                     left: 14,
@@ -97,7 +154,7 @@ class RestaurantDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        '${restaurant.truthScore}% Veritas Verified',
+                        '${_r.truthScore}% Veritas Verified',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -123,29 +180,29 @@ class RestaurantDetailScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(restaurant.name,
-                                style: AppTextStyles.restaurantName),
+                            Text(_r.name, style: AppTextStyles.restaurantName),
                             const SizedBox(height: 4),
                             Row(
                               children: [
                                 const Icon(Icons.location_on_outlined,
                                     size: 13, color: Color(0xFF888888)),
                                 const SizedBox(width: 2),
-                                Text(
-                                    '${restaurant.address} · ${restaurant.category}',
-                                    style: AppTextStyles.restaurantMeta),
+                                Expanded(
+                                  child: Text(
+                                    '${_r.address} · ${_r.category}',
+                                    style: AppTextStyles.restaurantMeta,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
                           ],
                         ),
                       ),
-                      TruthScoreBadge(score: restaurant.truthScore),
+                      TruthScoreBadge(score: _r.truthScore),
                     ],
                   ),
-
                   const SizedBox(height: 14),
-
-                  // 액션 버튼 (Call / Save / Route / Share)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -196,25 +253,22 @@ class RestaurantDetailScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     Row(
                       children: [
-                        // Trust 원형
                         Container(
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color: _trustColor(restaurant.truthScore),
-                                width: 5),
+                                color: _trustColor(_r.truthScore), width: 5),
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('${restaurant.truthScore}%',
+                              Text('${_r.truthScore}%',
                                   style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: _trustTextColor(
-                                          restaurant.truthScore))),
+                                      color: _trustTextColor(_r.truthScore))),
                               const Text('TRUST',
                                   style: TextStyle(
                                       fontSize: 7, color: Color(0xFFA0A0C0))),
@@ -227,13 +281,13 @@ class RestaurantDetailScreen extends StatelessWidget {
                             children: [
                               _StatBar(
                                 label: '광고 의심 게재',
-                                value: 100 - restaurant.truthScore,
+                                value: 100 - _r.truthScore,
                                 color: const Color(0xFFE85C5C),
                               ),
                               const SizedBox(height: 8),
                               _StatBar(
                                 label: '진성 리뷰 비율',
-                                value: restaurant.truthScore,
+                                value: _r.truthScore,
                                 color: const Color(0xFF4CBB87),
                               ),
                             ],
@@ -252,34 +306,37 @@ class RestaurantDetailScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(20),
               child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BlogListScreen(
-                        shopInfo: _shopInfo,
-                        blogs: dummyBlogs,
-                      ),
-                    ),
-                  );
-                },
+                onTap: _isLoadingReviews ? null : _onReviewButtonTap,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: _isLoadingReviews
+                        ? AppColors.primary.withOpacity(0.6)
+                        : AppColors.primary,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.rate_review_outlined,
-                          color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
-                      Text('블로그 리뷰 ${dummyBlogs.length}개 보기',
-                          style: AppTextStyles.primaryButton),
-                    ],
-                  ),
+                  child: _isLoadingReviews
+                      ? const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.rate_review_outlined,
+                                color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Text('블로그 리뷰 분석하기',
+                                style: AppTextStyles.primaryButton),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -304,7 +361,8 @@ class RestaurantDetailScreen extends StatelessWidget {
   }
 }
 
-// ── 하단 액션 아이템 ──────────────────────────
+// ── 하단 액션 아이템 ──────────────────────────────────────────────────────────
+
 class _ActionItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -331,7 +389,8 @@ class _ActionItem extends StatelessWidget {
   }
 }
 
-// ── 통계 진행 바 ──────────────────────────────
+// ── 통계 진행 바 ──────────────────────────────────────────────────────────────
+
 class _StatBar extends StatelessWidget {
   final String label;
   final int value;
@@ -369,7 +428,8 @@ class _StatBar extends StatelessWidget {
   }
 }
 
-// ── 이미지 플레이스홀더 패턴 ──────────────────
+// ── 이미지 플레이스홀더 패턴 ──────────────────────────────────────────────────
+
 class _WoodGrainPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
