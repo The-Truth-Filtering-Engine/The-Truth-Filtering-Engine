@@ -435,172 +435,71 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final requestId = ++_viewportSearchReqId;
     if (!mounted) return;
 
-    setState(() {
-      _viewportSearchError = null;
-    });
+    setState(() => _viewportSearchError = null);
 
     try {
-      final documents = <Map<String, dynamic>>[];
+      final uri = Uri.http(
+        'localhost:8000',
+        '/places/nearby-restaurants',
+        {
+          'lat': center.latitude.toString(),
+          'lng': center.longitude.toString(),
+          'radius': radiusMeters.toString(),
+          'display': '20',
+        },
+      );
 
-      for (final categoryCode in _viewportCategoryCodes) {
-        final uri = Uri.https(
-          'dapi.kakao.com',
-          '/v2/local/search/category.json',
-          {
-            'category_group_code': categoryCode,
-            'x': center.longitude.toString(),
-            'y': center.latitude.toString(),
-            'radius': radiusMeters.toString(),
-            'size': _categoryRequestSize.toString(),
-            'sort': 'distance',
-          },
-        );
+      final response = await http.get(uri);
 
-        final response = await http.get(
-          uri,
-          headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
-        );
-
-        if (response.statusCode != 200) {
-          final error = _extractKakaoError(response);
-          if (!mounted || requestId != _viewportSearchReqId) return;
-          setState(() {
-            _viewportSearchError = '카카오 검색 API 에러 (${response.statusCode})'
-                '${error.isNotEmpty ? ' / $error' : ''}';
-          });
-          return;
-        }
-
-        final decodedBody = jsonDecode(response.body);
-        if (decodedBody is! Map<String, dynamic>) continue;
-
-        final rawDocuments = (decodedBody['documents'] as List?) ?? [];
-        for (final document in rawDocuments) {
-          if (document is Map) {
-            documents.add(document.cast<String, dynamic>());
-          }
-        }
+      if (response.statusCode != 200) {
+        if (!mounted || requestId != _viewportSearchReqId) return;
+        setState(() => _viewportSearchError = '서버 에러 (${response.statusCode})');
+        return;
       }
 
-      final byId = <String, RestaurantModel>{};
-      for (final item in documents) {
-        final id = item['id']?.toString() ?? '';
-        if (id.isEmpty || byId.containsKey(id)) continue;
+      final data = jsonDecode(response.body);
+      final List items = data['restaurants'] ?? [];
 
-        byId[id] = RestaurantModel(
-          id: id,
-          name: item['place_name']?.toString() ?? '',
-          category: _parseCategory(item),
-          address: (item['road_address_name']?.toString() ?? '').isNotEmpty
-              ? item['road_address_name'].toString()
-              : item['address_name']?.toString() ?? '',
-          truthScore: _mockTrustScore(id),
-          distance: int.tryParse(item['distance']?.toString() ?? '0') ?? 0,
-          phone: item['phone']?.toString(),
-          placeUrl: item['place_url']?.toString(),
-          reviewSummary: item['place_name']?.toString() ?? '검색 결과',
-          imageUrl: item['image_url']?.toString(),
-          latitude:
-              double.tryParse(item['y']?.toString() ?? '0') ?? center.latitude,
-          longitude:
-              double.tryParse(item['x']?.toString() ?? '0') ?? center.longitude,
-        );
-      }
-
-      final nextRestaurants = byId.values.toList()
-        ..sort((a, b) => a.distance.compareTo(b.distance));
-
-      final resultRestaurants =
-          nextRestaurants.take(_maxMapRestaurants).toList();
+      final restaurants = items
+          .map((item) => RestaurantModel(
+                id: item['id']?.toString() ?? '',
+                name: item['name'] ?? '',
+                category: item['category'] ?? '음식점',
+                address: item['address'] ?? '',
+                truthScore: _mockTrustScore(item['id']?.toString() ?? ''),
+                distance: item['distance'] ?? 0,
+                phone: null,
+                placeUrl: item['link'],
+                reviewSummary: item['name'] ?? '검색 결과',
+                imageUrl: null,
+                latitude: (item['lat'] as num).toDouble(),
+                longitude: (item['lng'] as num).toDouble(),
+              ))
+          .toList();
 
       if (!mounted || requestId != _viewportSearchReqId) return;
+
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
       if (selectedRestaurant != null &&
-          resultRestaurants.every((r) => r.id != selectedRestaurant.id)) {
+          restaurants.every((r) => r.id != selectedRestaurant.id)) {
         ref.read(selectedRestaurantProvider.notifier).state = null;
       }
 
       setState(() {
-        _viewportRestaurants = resultRestaurants;
+        _viewportRestaurants = restaurants;
         _viewportSearchError = null;
         _lastSearchedCenter = center;
         _lastSearchedZoom = zoom;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted || requestId != _viewportSearchReqId) return;
-      setState(() {
-        _viewportSearchError = '네트워크 에러가 발생했습니다';
-      });
+      setState(() => _viewportSearchError = '네트워크 에러가 발생했습니다');
     }
-  }
-
-  String _parseCategory(Map<String, dynamic> item) {
-    final categoryName = item['category_name']?.toString() ?? '';
-    final parts = categoryName.split(' > ');
-    if (parts.length >= 2) return parts[1];
-    return categoryName.isNotEmpty ? categoryName : '음식점';
   }
 
   int _mockTrustScore(String id) {
     final hash = id.hashCode.abs() % 40;
     return 60 + hash;
-  }
-
-  String _extractKakaoError(http.Response response) {
-    try {
-      final body = jsonDecode(response.body);
-      if (body is Map<String, dynamic>) {
-        final code = body['code'];
-        final msg = body['msg'];
-        final message = body['message'];
-        final details = body['details'];
-        final extra = <String>[];
-        final validation = _extractKakaoValidationHint(details);
-        if (validation != null && validation.isNotEmpty) {
-          extra.add(validation);
-        }
-
-        if (code != null && msg != null) {
-          return 'code=$code msg=$msg${extra.isNotEmpty ? ' / ${extra.join(', ')}' : ''}';
-        }
-        if (message != null) {
-          return '$message${extra.isNotEmpty ? ' / ${extra.join(', ')}' : ''}';
-        }
-      }
-    } catch (_) {}
-
-    return response.reasonPhrase?.isNotEmpty == true
-        ? '${response.reasonPhrase}'
-        : '요청 처리 중 오류가 발생했습니다';
-  }
-
-  String? _extractKakaoValidationHint(dynamic details) {
-    if (details == null) return null;
-    final List<dynamic> list = details is List<dynamic> ? details : [details];
-
-    for (final item in list) {
-      if (item is! Map<String, dynamic>) continue;
-
-      final parts = <String>[];
-
-      final field = item['field'];
-      final error = item['error'];
-      final reason = item['reason'];
-
-      if (field != null && field.toString().isNotEmpty) {
-        parts.add('field=${field.toString()}');
-      }
-      if (error != null && error.toString().isNotEmpty) {
-        parts.add('error=${error.toString()}');
-      }
-      if (reason != null && reason.toString().isNotEmpty) {
-        parts.add('reason=${reason.toString()}');
-      }
-
-      if (parts.isNotEmpty) return parts.join(', ');
-    }
-
-    return null;
   }
 
   List<RestaurantModel> _reduceRestaurantOverdraw({

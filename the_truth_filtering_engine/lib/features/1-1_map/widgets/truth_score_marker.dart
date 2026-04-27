@@ -17,9 +17,9 @@ class TruthScoreMarker extends StatelessWidget {
       case MarkerType.high:
         return AppColors.markerHigh;
       case MarkerType.mid:
-        return AppColors.markerMid;
+        return AppColors.markerHigh;
       case MarkerType.low:
-        return AppColors.markerMid;
+        return AppColors.markerHigh;
     }
   }
 

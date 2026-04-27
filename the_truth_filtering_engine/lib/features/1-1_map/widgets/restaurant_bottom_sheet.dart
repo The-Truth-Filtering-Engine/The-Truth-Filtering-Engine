@@ -108,26 +108,26 @@ class RestaurantBottomSheet extends StatelessWidget {
 
                     const SizedBox(width: 10),
                     // TRUTH 뱃지
-                    TruthScoreBadge(score: restaurant.truthScore),
+                    // TruthScoreBadge(score: restaurant.truthScore),
                   ],
                 ),
 
-                const SizedBox(height: 14),
+                // const SizedBox(height: 14),
 
                 // 리뷰 요약 인용
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.sheetQuoteBackground,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '"${restaurant.reviewSummary}"',
-                    style: AppTextStyles.reviewQuote,
-                  ),
-                ),
+                // Container(
+                //   width: double.infinity,
+                //   padding:
+                //       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                //   decoration: BoxDecoration(
+                //     color: AppColors.sheetQuoteBackground,
+                //     borderRadius: BorderRadius.circular(10),
+                //   ),
+                //   child: Text(
+                //     '"${restaurant.reviewSummary}"',
+                //     style: AppTextStyles.reviewQuote,
+                //   ),
+                // ),
 
                 const SizedBox(height: 16),
 
@@ -169,9 +169,8 @@ class RestaurantBottomSheet extends StatelessWidget {
                       icon:
                           isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                       onTap: onBookmarkTap,
-                      iconColor: isBookmarked
-                          ? Colors.white
-                          : AppColors.primary,
+                      iconColor:
+                          isBookmarked ? Colors.white : AppColors.primary,
                       backgroundColor: isBookmarked
                           ? AppColors.primary
                           : AppColors.sheetQuoteBackground,
