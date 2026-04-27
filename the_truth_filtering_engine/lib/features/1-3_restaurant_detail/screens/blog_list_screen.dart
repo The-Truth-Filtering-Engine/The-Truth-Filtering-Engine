@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/blog_review.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../common/app_bar_logo.dart';
 import '../../../common/stat_progress_bar.dart';
 import '../../../common/trust_circle.dart';
 import '../widgets/review_item.dart';
-import 'blog_webview_screen.dart';
 
 // ───────────────────────────────────────────
 // 스켈레톤 shimmer 위젯
@@ -167,10 +167,11 @@ class _BlogListScreenState extends State<BlogListScreen>
   List<BlogReview> get _sortedByDate =>
     [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
 
-  void _openWebview(BlogReview blog) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => BlogWebviewScreen(blog: blog),
-    ));
+  Future<void> _openWebview(BlogReview blog) async {
+    final uri = Uri.parse(blog.url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
