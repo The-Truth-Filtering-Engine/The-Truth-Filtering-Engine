@@ -11,7 +11,6 @@ class SettingsScreen extends ConsumerWidget {
     final color = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

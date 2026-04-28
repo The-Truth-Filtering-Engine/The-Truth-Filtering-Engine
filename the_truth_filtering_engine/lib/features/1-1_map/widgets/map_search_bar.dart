@@ -21,21 +21,31 @@ class MapSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const borderRadius = BorderRadius.all(Radius.circular(14));
+    final defaultBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide.none,
+    );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: const BorderSide(
+        color: AppColors.markerVerified,
+        width: 1.5,
+      ),
+    );
+
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        color: AppColors.searchBarBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      alignment: Alignment.center,
       child: TextField(
         controller: controller,
         textInputAction: TextInputAction.search,
@@ -45,8 +55,16 @@ class MapSearchBar extends StatelessWidget {
         cursorColor: AppColors.searchBarIcon,
         style: AppTextStyles.searchHint,
         decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
+          filled: true,
+          fillColor: AppColors.searchBarBg,
+          isDense: false,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 15,
+          ),
+          border: defaultBorder,
+          enabledBorder: defaultBorder,
+          focusedBorder: focusedBorder,
           hintStyle: AppTextStyles.searchHint,
           prefixIcon: Icon(
             Icons.search,
@@ -54,7 +72,7 @@ class MapSearchBar extends StatelessWidget {
             size: 22,
           ),
           prefixIconConstraints: const BoxConstraints(
-            minWidth: 38,
+            minWidth: 54,
             minHeight: 52,
           ),
           hintText: hintText,

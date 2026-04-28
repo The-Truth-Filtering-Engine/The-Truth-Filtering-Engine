@@ -74,32 +74,6 @@ class _MainShellState extends State<MainShell> {
             ),
           ],
         ),
-        // 우측: 알림 버튼 + 프로필 아이콘
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: AppColors.textSecondary,
-              size: 22,
-            ),
-            onPressed: () {},
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: () {},
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.primary50,
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  size: 18,
-                  color: AppColors.primary500,
-                ),
-              ),
-            ),
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Container(height: 0.5, color: AppColors.border),
