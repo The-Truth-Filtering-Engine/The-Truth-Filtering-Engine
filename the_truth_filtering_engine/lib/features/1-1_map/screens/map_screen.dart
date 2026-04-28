@@ -317,11 +317,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           'lat': center.latitude.toString(),
           'lng': center.longitude.toString(),
           'radius': radiusMeters.toString(),
-<<<<<<< HEAD
           'display': '10',
-=======
-          'display': '20',
->>>>>>> origin/dev
         },
       );
 
