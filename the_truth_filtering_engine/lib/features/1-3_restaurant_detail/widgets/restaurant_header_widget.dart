@@ -11,19 +11,47 @@ class RestaurantHeaderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = restaurant;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── 이미지 영역 ──
-        Container(
+        SizedBox(
           height: 220,
           width: double.infinity,
-          color: const Color(0xFFD4A96A),
           child: Stack(
+            fit: StackFit.expand,
             children: [
+              // 카테고리 이미지 (imageUrl 있으면 우선, 없으면 카테고리 이미지)
+              r.imageUrl != null
+                  ? Image.network(
+                      r.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        r.categoryImagePath,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Image.asset(
+                      r.categoryImagePath,
+                      fit: BoxFit.cover,
+                    ),
+              // 하단 그라데이션
               Positioned.fill(
-                child: CustomPaint(painter: _WoodGrainPainter()),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.3),
+                      ],
+                    ),
+                  ),
+                ),
               ),
+              // Veritas 배지
               Positioned(
                 top: 14,
                 left: 14,
@@ -130,21 +158,4 @@ class _ActionItem extends StatelessWidget {
     );
   }
 }
-
-// ── 이미지 플레이스홀더 패턴 ──────────────────────────────────────────────────
-
-class _WoodGrainPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFBF8C50).withOpacity(0.3)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    for (double y = 0; y < size.height; y += 12) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y + 6), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_WoodGrainPainter old) => false;
-}
+// _WoodGrainPainter 삭제됨

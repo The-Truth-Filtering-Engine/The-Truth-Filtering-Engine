@@ -311,13 +311,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     try {
       final uri = Uri.http(
-        '172.30.1.19:8000',
+        'localhost:8000',
         '/places/nearby-restaurants',
         {
           'lat': center.latitude.toString(),
           'lng': center.longitude.toString(),
           'radius': radiusMeters.toString(),
-          'display': '20',
+          'display': '10',
         },
       );
 
