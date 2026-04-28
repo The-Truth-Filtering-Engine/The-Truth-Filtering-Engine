@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
+import 'features/4_setting/screens/settings_screen.dart';
 
 void main() {
   runApp(
@@ -41,7 +42,7 @@ class _MainShellState extends State<MainShell> {
     MapScreen(),
     BookmarkScreen(),
     _PlaceholderScreen(icon: Icons.auto_awesome_outlined, label: 'AI 추천'),
-    _PlaceholderScreen(icon: Icons.settings_outlined, label: '설정'),
+    SettingsScreen(),
   ];
 
   @override

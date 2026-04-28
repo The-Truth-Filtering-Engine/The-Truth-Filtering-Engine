@@ -1,3 +1,5 @@
+import 'package:truth_mouth/core/providers/analysis_mode_provider.dart';
+
 enum ReviewStatus { real, suspicious, ad }
 
 class BlogReview {
@@ -26,48 +28,26 @@ class BlogReview {
   });
 
   // ── FastAPI /search 응답 단건 파싱 ──────────────────────────────────────
-  factory BlogReview.fromApi(Map<String, dynamic> json) {
-    final electraPred = json['is_ad_electra_pred'] as int? ?? -1;
+  factory BlogReview.fromApiWithMode(
+    Map<String, dynamic> json,
+    AnalysisMode mode, // analysis_mode_provider.dart 에서 import
+  ) {
+    final pred = switch (mode) {
+      AnalysisMode.model => json['is_ad_electra_pred'] as int? ?? -1,
+      AnalysisMode.llm => json['is_ad_llm_pred'] as int? ?? -1,
+    };
 
-    // ── LLM 앙상블 사용 시 아래 주석 해제 ───────────────────────────────
-    // final llmPred = json['is_ad_llm_pred'] as int? ?? -1;
-    //
-    // 앙상블 로직 (둘 다 판별된 경우)
-    // final int adProb;
-    // final ReviewStatus status;
-    // if (llmPred != -1 && electraPred != -1) {
-    //   if (llmPred == 1 && electraPred == 1) {
-    //     adProb = 90; status = ReviewStatus.ad;
-    //   } else if (llmPred == 0 && electraPred == 0) {
-    //     adProb = 10; status = ReviewStatus.real;
-    //   } else {
-    //     adProb = 60; status = ReviewStatus.suspicious; // 의견 불일치
-    //   }
-    // } else if (electraPred != -1) {
-    //   adProb  = electraPred == 1 ? 90 : 10;
-    //   status  = electraPred == 1 ? ReviewStatus.ad : ReviewStatus.real;
-    // } else if (llmPred != -1) {
-    //   adProb  = llmPred == 1 ? 90 : 10;
-    //   status  = llmPred == 1 ? ReviewStatus.ad : ReviewStatus.real;
-    // } else {
-    //   adProb = 50; status = ReviewStatus.suspicious;
-    // }
-    // ────────────────────────────────────────────────────────────────────
-
-    // ── ELECTRA 단독 판별 ────────────────────────────────────────────────
-    // adProbability: 광고(1) → 90, 일반(0) → 10, 미판별(-1) → 50
-    final int adProb = switch (electraPred) {
+    final int adProb = switch (pred) {
       1 => 90,
       0 => 10,
       _ => 50,
     };
 
-    final ReviewStatus status = switch (electraPred) {
+    final ReviewStatus status = switch (pred) {
       1 => ReviewStatus.ad,
       0 => ReviewStatus.real,
       _ => ReviewStatus.suspicious,
     };
-    // ────────────────────────────────────────────────────────────────────
 
     final String description = json['review_description'] as String? ?? '';
 
@@ -83,7 +63,7 @@ class BlogReview {
       url: json['review_url'] as String? ?? '',
       status: status,
       adProbability: adProb,
-      isSponsored: electraPred == 1,
+      isSponsored: pred == 1,
     );
   }
 }
