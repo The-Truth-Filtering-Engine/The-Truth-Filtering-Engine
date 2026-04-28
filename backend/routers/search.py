@@ -1,8 +1,8 @@
 from fastapi import APIRouter
-from services.supabase_service import get_cached_reviews, save_reviews, update_llm_pred, update_electra_pred
+from services.supabase_service import get_cached_reviews, save_reviews, update_llm_pred, update_electra_pred, update_finetuned_pred
 from services.naver_service import fetch_blog_previews
 from services.llm_service import classify_ad, summarize_reviews
-from services.electra_service import predict_is_ad
+from services.electra_service import predict_is_ad, score_is_ad
 
 router = APIRouter()
 
@@ -49,9 +49,13 @@ async def search(query: str, mode: str = "model"):
         else:
             print(f"[DEBUG] ELECTRA 판별 중 | id: {review['id']}")
             is_ad_electra = predict_is_ad(description)
+            score = score_is_ad(description)
             await update_electra_pred(review["id"], is_ad_electra)
+            await update_finetuned_pred(review["id"], score)
             review["is_ad_electra_pred"] = is_ad_electra
-            print(f"[DEBUG] ELECTRA 판별 완료 | id: {review['id']} | is_ad_electra_pred: {is_ad_electra}")
+            review["is_ad_finetuned_pred"] = score
+            print(f"[DEBUG] ELECTRA_pred 판별 완료 | id: {review['id']} | is_ad_electra_pred: {is_ad_electra}")
+            print(f"[DEBUG] ELECTRA_score 판별 완료 | id: {review['id']} | is_ad_finetuned_pred: {score}")
 
     # Step 6: 진짜 리뷰 요약
     print("[DEBUG] 리뷰 요약 시작")

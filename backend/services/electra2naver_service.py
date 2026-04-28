@@ -38,6 +38,7 @@ def _load_model() -> None:
         _model.eval()
 
 
+# 이진 분류
 def predict_is_ad(review_description: str) -> int:
     _load_model()
     text = (review_description or "").strip()
@@ -58,6 +59,28 @@ def predict_is_ad(review_description: str) -> int:
         pred = torch.argmax(logits, dim=-1).item()
     return int(pred)
 
+
+# score 계산
+def predict_is_ad_score(review_description: str) -> float:
+    _load_model()
+    text = (review_description or "").strip()
+    if not text:
+        return 0.0
+
+    encoded = _tokenizer(
+        text,
+        truncation=True,
+        padding=True,
+        max_length=512,
+        return_tensors="pt",
+    )
+    encoded = {k: v.to(DEVICE) for k, v in encoded.items()}
+
+    with torch.no_grad():
+        logits = _model(**encoded).logits
+        probs = torch.softmax(logits, dim=-1)
+        ad_score = probs[0, 1].item()  # 광고 클래스 index=1 가정
+    return float(ad_score)
 
 def _fetch_target_reviews(batch_size: int) -> list[dict[str, Any]]:
     supabase = _get_supabase()
