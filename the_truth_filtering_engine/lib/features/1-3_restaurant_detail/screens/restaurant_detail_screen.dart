@@ -1,18 +1,24 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../../1-1_map/widgets/truth_score_badge.dart';
 import '../providers/blog_review.dart';
+import '../../../core/providers/analysis_mode_provider.dart';
 import 'blog_list_screen.dart';
 
 // ── API 호출 ──────────────────────────────────────────────────────────────────
 
-Future<List<BlogReview>> _fetchReviews(String restaurantName) async {
-  final uri = Uri.parse('http://localhost:8000/api/search')
-      .replace(queryParameters: {'query': restaurantName});
+Future<List<BlogReview>> _fetchReviews(
+    String restaurantName, AnalysisMode mode) async {
+  final uri =
+      Uri.parse('http://localhost:8000/api/search').replace(queryParameters: {
+    'query': restaurantName,
+    'mode': mode.name,
+  });
 
   final res = await http.get(uri).timeout(const Duration(seconds: 30));
 
@@ -24,23 +30,27 @@ Future<List<BlogReview>> _fetchReviews(String restaurantName) async {
   final reviewsJson = body['reviews'] as List<dynamic>? ?? [];
 
   return reviewsJson
-      .map((e) => BlogReview.fromApi(e as Map<String, dynamic>))
+      .map((e) =>
+          BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode)) // ← 변경
       .toList();
 }
 
 // ── 화면 ─────────────────────────────────────────────────────────────────────
 
-class RestaurantDetailScreen extends StatefulWidget {
+class RestaurantDetailScreen extends ConsumerStatefulWidget {
+  // ← 변경
   final RestaurantModel restaurant;
 
   const RestaurantDetailScreen({super.key, required this.restaurant});
 
   @override
-  State<RestaurantDetailScreen> createState() => _RestaurantDetailScreenState();
+  ConsumerState<RestaurantDetailScreen> createState() =>
+      _RestaurantDetailScreenState(); // ← 변경
 }
 
-class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
-  // 버튼 탭 시 로딩 상태 관리 (화면 전체 로딩 X, 버튼만 표시)
+class _RestaurantDetailScreenState
+    extends ConsumerState<RestaurantDetailScreen> {
+  // ← 변경
   bool _isLoadingReviews = false;
 
   RestaurantModel get _r => widget.restaurant;
@@ -49,7 +59,8 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     setState(() => _isLoadingReviews = true);
 
     try {
-      final reviews = await _fetchReviews(_r.name);
+      final mode = ref.read(analysisModeProvider); // ← 추가
+      final reviews = await _fetchReviews(_r.name, mode); // ← mode 전달
 
       final shopInfo = ShopInfo.fromApiResponse(
         name: _r.name,
