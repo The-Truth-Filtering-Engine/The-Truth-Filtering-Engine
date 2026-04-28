@@ -2,6 +2,7 @@ from pathlib import Path
 from optimum.intel import OVModelForSequenceClassification
 from transformers import PreTrainedTokenizerFast
 
+# electra2naver 모델 선정
 MODEL_DIR = Path(__file__).resolve().parents[1] / "models" / "electra2naver"
 
 _tokenizer = None
