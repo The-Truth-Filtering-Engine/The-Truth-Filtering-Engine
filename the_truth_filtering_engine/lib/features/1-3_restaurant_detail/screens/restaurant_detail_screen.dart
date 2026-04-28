@@ -15,7 +15,7 @@ import 'blog_list_screen.dart';
 Future<List<BlogReview>> _fetchReviews(
     String restaurantName, AnalysisMode mode) async {
   final uri =
-      Uri.parse('http://localhost:8000/api/search').replace(queryParameters: {
+      Uri.parse('http://172.30.1.19:8000/api/search').replace(queryParameters: {
     'query': restaurantName,
     'mode': mode.name,
   });

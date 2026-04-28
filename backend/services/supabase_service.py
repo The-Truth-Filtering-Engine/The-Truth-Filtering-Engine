@@ -35,3 +35,9 @@ async def update_electra_pred(review_id: int, is_ad_electra_pred: int):
         .update({"is_ad_electra_pred": is_ad_electra_pred}) \
         .eq("id", review_id) \
         .execute()
+
+async def update_finetuned_pred(review_id: int, is_ad_finetuned_pred: float):
+    res = supabase.table("reviews") \
+        .update({"is_ad_finetuned_pred": float(is_ad_finetuned_pred)}) \
+        .eq("id", review_id) \
+        .execute()
