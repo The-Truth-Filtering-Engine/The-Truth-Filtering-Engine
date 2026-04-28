@@ -32,6 +32,52 @@
     if (truthScore >= 70) return MarkerType.mid;
     return MarkerType.low;
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'category': category,
+      'truthScore': truthScore,
+      'distance': distance,
+      'reviewSummary': reviewSummary,
+      'phone': phone,
+      'placeUrl': placeUrl,
+      'imageUrl': imageUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+
+  factory RestaurantModel.fromJson(Map<String, dynamic> json) {
+    return RestaurantModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
+      category: json['category']?.toString() ?? '',
+      truthScore: _asInt(json['truthScore'], fallback: 0),
+      distance: _asInt(json['distance'], fallback: 0),
+      reviewSummary: json['reviewSummary']?.toString() ?? '',
+      phone: json['phone']?.toString(),
+      placeUrl: json['placeUrl']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
+      latitude: _asDouble(json['latitude']),
+      longitude: _asDouble(json['longitude']),
+    );
+  }
+
+  static int _asInt(dynamic value, {required int fallback}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  static double _asDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
 }
 
 enum MarkerType { high, mid, low }

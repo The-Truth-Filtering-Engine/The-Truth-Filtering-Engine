@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 
@@ -19,7 +23,11 @@ final bookmarkRestaurantsProvider =
 
 // 북마크 추가/삭제
 class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
-  BookmarkRestaurantsNotifier() : super(const []);
+  static const _storageKey = 'bookmarked_restaurants';
+
+  BookmarkRestaurantsNotifier() : super(const []) {
+    _load();
+  }
 
   void toggle(RestaurantModel restaurant) {
     final index = state.indexWhere((item) => item.id == restaurant.id);
@@ -28,14 +36,48 @@ class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
         ...state.sublist(0, index),
         ...state.sublist(index + 1),
       ];
+      _save();
       return;
     }
 
     state = [...state, restaurant];
+    _save();
   }
 
   void remove(RestaurantModel restaurant) {
     state = state.where((item) => item.id != restaurant.id).toList();
+    _save();
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+
+      state = decoded
+          .whereType<Map>()
+          .map((item) => RestaurantModel.fromJson(
+                item.cast<String, dynamic>(),
+              ))
+          .where((restaurant) => restaurant.id.isNotEmpty)
+          .toList();
+    } catch (_) {
+      state = const [];
+    }
+  }
+
+  Future<void> _save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = jsonEncode(
+        state.map((restaurant) => restaurant.toJson()).toList(),
+      );
+      await prefs.setString(_storageKey, encoded);
+    } catch (_) {}
   }
 }
 
