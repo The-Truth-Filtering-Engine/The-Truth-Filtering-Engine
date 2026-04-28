@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 import httpx
 import os
-import hashlib
-import asyncio
 from math import radians, cos, sin, asin, sqrt
 
 router = APIRouter(prefix="/places", tags=["places"])
@@ -11,6 +9,10 @@ NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 NAVER_MAP_CLIENT_ID = os.getenv("NAVER_MAP_CLIENT_ID")
 NAVER_MAP_CLIENT_SECRET = os.getenv("NAVER_MAP_CLIENT_SECRET")
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
+
+KAKAO_LOCAL_CATEGORY_URL = "https://dapi.kakao.com/v2/local/search/category.json"
+KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
 
 def haversine(lat1, lng1, lat2, lng2):
     R = 6371000
@@ -51,83 +53,80 @@ async def get_nearby_restaurants(
     lat: float = Query(...),
     lng: float = Query(...),
     radius: int = Query(500),
-    display: int = Query(20, le=20),
+    display: int = Query(10, ge=1, le=10),
 ):
-    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="네이버 검색 API 키 없음")
+    if not KAKAO_REST_API_KEY:
+        raise HTTPException(status_code=500, detail="KAKAO_REST_API_KEY 없음")
 
-    neighborhood = await get_neighborhood(lat, lng)
-    print(f"동네명: {neighborhood}, 반경: {radius}m")
+    radius = max(1, min(radius, 20000))
+    headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
 
-    queries = [
-        f"{neighborhood} 식당",
-        f"{neighborhood} 맛집",
-        f"{neighborhood} 음식점",
-        f"{neighborhood} 한식",
-        f"{neighborhood} 중식",
-        f"{neighborhood} 일식",
-        f"{neighborhood} 양식",
-        f"{neighborhood} 카페",
-        f"{neighborhood} 분식",
-        f"{neighborhood} 치킨",
-    ]
-
-    url = "https://openapi.naver.com/v1/search/local.json"
-    headers = {
-        "X-Naver-Client-Id": NAVER_CLIENT_ID,
-        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
-    }
-
-    async def fetch_query(client: httpx.AsyncClient, query: str):
+    async def fetch_category(client: httpx.AsyncClient, category_code: str):
         params = {
-            "query": query,
-            "display": display,
-            "sort": "random",
-            "coordinate": f"{lng},{lat}",
+            "category_group_code": category_code,
+            "x": lng,
+            "y": lat,
+            "radius": radius,
+            "sort": "accuracy",
+            "size": display,
         }
-        try:
-            resp = await client.get(url, headers=headers, params=params)
-            if resp.status_code == 200:
-                return resp.json().get("items", [])
-        except Exception:
-            pass
-        return []
+        response = await client.get(
+            KAKAO_LOCAL_CATEGORY_URL,
+            headers=headers,
+            params=params,
+        )
+        if response.status_code != 200:
+            print(
+                "카카오 Local API 에러 "
+                f"category={category_code} status={response.status_code} "
+                f"body={response.text}"
+            )
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="카카오 Local API 호출 실패",
+            )
+        return response.json().get("documents", [])
 
-    async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(*[
-            fetch_query(client, query) for query in queries
-        ])
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        documents = []
+        for category_code in KAKAO_PLACE_CATEGORY_CODES:
+            documents.extend(await fetch_category(client, category_code))
 
-    all_items: dict[str, dict] = {}
-    for items in results:
-        for item in items:
-            mapx = int(item.get("mapx", 0))
-            mapy = int(item.get("mapy", 0))
-            wgs_lng = mapx / 1e7
-            wgs_lat = mapy / 1e7
+    unique_by_id: dict[str, dict] = {}
+    for item in documents:
+        place_id = str(item.get("id", "")).strip()
+        if not place_id or place_id in unique_by_id:
+            continue
 
-            dist = haversine(lat, lng, wgs_lat, wgs_lng)
+        place_lat = float(item.get("y") or 0)
+        place_lng = float(item.get("x") or 0)
+        distance = int(float(item.get("distance") or 0))
+        if distance <= 0:
+            distance = int(haversine(lat, lng, place_lat, place_lng))
 
-            if dist > radius * 2:
-                continue
+        unique_by_id[place_id] = {
+            "id": place_id,
+            "name": item.get("place_name", ""),
+            "address": item.get("road_address_name") or item.get("address_name", ""),
+            "category": parse_kakao_category(item.get("category_name", "")),
+            "lat": place_lat,
+            "lng": place_lng,
+            "link": item.get("place_url", ""),
+            "distance": distance,
+            "phone": item.get("phone", ""),
+        }
 
-            name = item.get("title", "").replace("<b>", "").replace("</b>", "")
-            unique_str = f"{name}_{wgs_lat}_{wgs_lng}"
-            place_id = hashlib.md5(unique_str.encode()).hexdigest()[:12]
+    restaurants = sorted(
+        unique_by_id.values(),
+        key=lambda restaurant: restaurant["distance"],
+    )[:display]
 
-            if place_id not in all_items:
-                all_items[place_id] = {
-                    "id": place_id,
-                    "name": name,
-                    "address": item.get("roadAddress") or item.get("address", ""),
-                    "category": item.get("category", ""),
-                    "lat": wgs_lat,
-                    "lng": wgs_lng,
-                    "link": item.get("link", ""),
-                    "distance": int(dist),
-                }
-
-    restaurants = sorted(all_items.values(), key=lambda x: x["distance"])
-    print(f"최종 식당 수: {len(restaurants)}개")
-
+    print(f"카카오 주변 FD6/CE7 장소 수: {len(restaurants)}개, 반경: {radius}m")
     return {"count": len(restaurants), "restaurants": restaurants}
+
+
+def parse_kakao_category(category_name: str) -> str:
+    parts = [part.strip() for part in category_name.split(">") if part.strip()]
+    if len(parts) >= 2:
+        return parts[-1]
+    return parts[0] if parts else "음식점"

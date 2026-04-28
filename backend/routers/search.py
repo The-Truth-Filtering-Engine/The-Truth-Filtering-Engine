@@ -6,6 +6,11 @@ from services.electra_service import predict_is_ad, score_is_ad
 
 router = APIRouter()
 
+@router.get("/search/cached")
+async def search_cached(query: str):
+    cached = await get_cached_reviews(query)  # 기존 함수 재사용
+    return {"reviews": cached or []}
+
 @router.get("/search")
 async def search(query: str, mode: str = "model"):
     print(f"[DEBUG] 검색 요청 | query: {query} | mode: {mode}")

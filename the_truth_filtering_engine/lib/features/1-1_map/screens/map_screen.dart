@@ -4,19 +4,18 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../core/theme/app_colors.dart';
+import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 import '../providers/map_provider.dart';
+import '../widgets/kakao_map_view.dart';
 import '../widgets/map_control_buttons.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
-import '../widgets/truth_score_marker.dart';
 import '../../1-2_restaurant_list/screens/restaurant_list_screen.dart';
 import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
@@ -28,57 +27,24 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
-  final MapController _mapController = MapController();
+  final GlobalKey<KakaoMapViewState> _mapViewKey =
+      GlobalKey<KakaoMapViewState>();
   final TextEditingController _searchController = TextEditingController();
-  final Distance _distance = const Distance();
   Timer? _viewportSearchTimer;
   int _viewportSearchReqId = 0;
 
-  int _mapModeIndex = 3;
-
-  static const String _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
-  static const int _maxMapRestaurants = 50;
-  static const int _categoryRequestSize = 15;
+  static const int _maxMapRestaurants = 10;
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
-  static const double _refreshZoomDelta = 0.2;
-  static const List<String> _viewportCategoryCodes = ['FD6', 'CE7'];
 
-  static const _initialCenter = LatLng(37.5245, 127.0370);
-  static const _initialZoom = 14.0;
+  static const _initialCenter = MapPoint(37.5245, 127.0370);
+  static const _initialLevel = 4;
 
   List<RestaurantModel>? _viewportRestaurants;
   String? _viewportSearchError;
-  LatLng? _lastSearchedCenter;
-  double? _lastSearchedZoom;
-  LatLng _latestMapCenter = _initialCenter;
-  double _latestMapZoom = _initialZoom;
-  bool _isMapReady = false;
-
-  static final _mapTileModes = [
-    _MapTileMode(
-      label: 'Carto Light',
-      urlTemplate:
-          'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      subdomains: ['a', 'b', 'c', 'd'],
-    ),
-    _MapTileMode(
-      label: 'Carto Dark',
-      urlTemplate:
-          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      subdomains: ['a', 'b', 'c', 'd'],
-    ),
-    _MapTileMode(
-      label: 'OpenTopoMap',
-      urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      subdomains: ['a', 'b', 'c'],
-    ),
-    _MapTileMode(
-      label: 'OpenStreetMap Standard',
-      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      subdomains: [],
-    ),
-  ];
+  MapPoint? _lastSearchedCenter;
+  int? _lastSearchedLevel;
+  int _latestMapLevel = _initialLevel;
 
   @override
   void initState() {
@@ -100,10 +66,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
     final currentLocation = ref.watch(currentLocationProvider);
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
-    final mapMode = _currentMapMode();
     final displayRestaurants = _reduceRestaurantOverdraw(
       restaurants: _viewportRestaurants,
-      zoom: _latestMapZoom,
+      level: _latestMapLevel,
     );
     final isSelectedBookmarked = selectedRestaurant != null &&
         bookmarkedRestaurants.any((item) => item.id == selectedRestaurant.id);
@@ -112,76 +77,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       backgroundColor: AppColors.mapTeal,
       body: Stack(
         children: [
-          // ── flutter_map ──────────────────────────
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _initialCenter,
-              initialZoom: _initialZoom,
-              onTap: (_, __) {
-                ref.read(selectedRestaurantProvider.notifier).state = null;
-              },
-              onPositionChanged: (camera, hasGesture) {
-                _updateLatestMapCamera(camera);
-                _onViewportChanged(camera, hasGesture: hasGesture);
-              },
-              onMapEvent: (event) {
-                _updateLatestMapCamera(event.camera);
-                _onMapEvent(event);
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: mapMode.urlTemplate,
-                subdomains: mapMode.subdomains,
-                userAgentPackageName: 'com.example.truth_map',
-              ),
-              MarkerLayer(
-                markers: [
-                  ...displayRestaurants.map((restaurant) {
-                    return Marker(
-                      point: LatLng(restaurant.latitude, restaurant.longitude),
-                      width: 36,
-                      height: 36,
-                      child: TruthScoreMarker(
-                        restaurant: restaurant,
-                        onTap: () => _onMarkerTapped(restaurant),
-                      ),
-                    );
-                  }),
-                  if (currentLocation != null)
-                    Marker(
-                      point: currentLocation,
-                      width: 30,
-                      height: 30,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: const BoxDecoration(
-                              color: Color(0x3323A0FF),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Container(
-                            width: 14,
-                            height: 14,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ].toList(),
-              ),
-            ],
+          KakaoMapView(
+            key: _mapViewKey,
+            initialCenter: _initialCenter,
+            initialLevel: _initialLevel,
+            restaurants: displayRestaurants,
+            currentLocation: currentLocation,
+            onMarkerTap: _onMarkerTapped,
+            onMapTap: () {
+              ref.read(selectedRestaurantProvider.notifier).state = null;
+            },
+            onCameraIdle: _onCameraIdle,
           ),
-
           if (_viewportSearchError != null)
             Positioned(
               left: 16,
@@ -194,7 +101,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.75),
+                    color: Colors.black.withValues(alpha: 0.75),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -209,7 +116,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -243,20 +149,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
-
           Positioned(
             right: 16,
             bottom: selectedRestaurant != null ? 230 : 100,
             child: MapControlButtons(
               onLocationTap: _moveToCurrentLocation,
-              onLayerTap: () {
-                _cycleMapMode();
-              },
-              onZoomIn: () => _zoomMap(1),
-              onZoomOut: () => _zoomMap(-1),
+              onLayerTap: () => _mapViewKey.currentState?.toggleMapType(),
+              onZoomIn: () => _mapViewKey.currentState?.zoomIn(),
+              onZoomOut: () => _mapViewKey.currentState?.zoomOut(),
             ),
           ),
-
           if (selectedRestaurant != null)
             Positioned(
               left: 0,
@@ -311,10 +213,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
   }
 
-  void _updateLatestMapCamera(MapCamera camera) {
-    _latestMapCenter = camera.center;
-    _latestMapZoom = camera.zoom;
-    _isMapReady = true;
+  void _onCameraIdle(KakaoMapCamera camera) {
+    _latestMapLevel = camera.level;
+    _onViewportChanged(camera);
   }
 
   Future<void> _shareRestaurant(
@@ -334,7 +235,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
 
     await Clipboard.setData(ClipboardData(text: link));
-    if (!mounted) return;
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('링크가 복사되었습니다'),
@@ -343,35 +244,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _zoomMap(double delta) {
-    if (!_isMapReady) return;
-    _mapController.move(
-      _latestMapCenter,
-      _latestMapZoom + delta,
-    );
-  }
-
-  void _onMapEvent(MapEvent event) {
-    if (event is MapEventMoveEnd ||
-        event is MapEventDoubleTapZoomEnd ||
-        event is MapEventFlingAnimationEnd ||
-        event is MapEventRotateEnd ||
-        event is MapEventNonRotatedSizeChange) {
-      _onViewportChanged(event.camera, hasGesture: false, force: true);
-    }
-  }
-
-  void _onViewportChanged(
-    MapCamera camera, {
-    required bool hasGesture,
-    bool force = false,
-  }) {
-    if (hasGesture && !force) return;
-    if (camera.nonRotatedSize.x <= 0 || camera.nonRotatedSize.y <= 0) return;
-    if (!force && !_shouldRefreshViewport(camera.center, camera.zoom)) return;
+  void _onViewportChanged(KakaoMapCamera camera) {
+    if (!_shouldRefreshViewport(camera.center, camera.level)) return;
 
     final radiusMeters = _calculateViewportRadius(
-      camera.visibleBounds,
+      camera.bounds,
       camera.center,
     );
     if (radiusMeters <= 0) return;
@@ -381,37 +258,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (!mounted) return;
       _searchViewportRestaurants(
         center: camera.center,
-        zoom: camera.zoom,
+        level: camera.level,
         radiusMeters: radiusMeters,
       );
     });
   }
 
-  bool _shouldRefreshViewport(LatLng center, double zoom) {
-    if (_lastSearchedCenter == null || _lastSearchedZoom == null) return true;
+  bool _shouldRefreshViewport(MapPoint center, int level) {
+    if (_lastSearchedCenter == null || _lastSearchedLevel == null) return true;
 
-    final movedMeters = _distance.as(
-      LengthUnit.Meter,
-      center,
-      _lastSearchedCenter!,
-    );
-    final zoomDelta = (zoom - _lastSearchedZoom!).abs();
+    final movedMeters = distanceMeters(center, _lastSearchedCenter!);
+    final levelChanged = level != _lastSearchedLevel;
 
-    return movedMeters >= _refreshDistanceMeters ||
-        zoomDelta >= _refreshZoomDelta;
+    return movedMeters >= _refreshDistanceMeters || levelChanged;
   }
 
-  int _calculateViewportRadius(LatLngBounds bounds, LatLng center) {
+  int _calculateViewportRadius(MapBounds bounds, MapPoint center) {
     final northEast = bounds.northEast;
     final southWest = bounds.southWest;
-    final northWest = LatLng(northEast.latitude, southWest.longitude);
-    final southEast = LatLng(southWest.latitude, northEast.longitude);
+    final northWest = MapPoint(northEast.latitude, southWest.longitude);
+    final southEast = MapPoint(southWest.latitude, northEast.longitude);
 
     final candidates = [
-      _distance.as(LengthUnit.Meter, center, northWest),
-      _distance.as(LengthUnit.Meter, center, southEast),
-      _distance.as(LengthUnit.Meter, center, northEast),
-      _distance.as(LengthUnit.Meter, center, southWest),
+      distanceMeters(center, northWest),
+      distanceMeters(center, southEast),
+      distanceMeters(center, northEast),
+      distanceMeters(center, southWest),
     ];
 
     var maxDistance = 0.0;
@@ -428,8 +300,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _searchViewportRestaurants({
-    required LatLng center,
-    required double zoom,
+    required MapPoint center,
+    required int level,
     required int radiusMeters,
   }) async {
     final requestId = ++_viewportSearchReqId;
@@ -489,9 +361,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _viewportRestaurants = restaurants;
         _viewportSearchError = null;
         _lastSearchedCenter = center;
-        _lastSearchedZoom = zoom;
+        _lastSearchedLevel = level;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted || requestId != _viewportSearchReqId) return;
       setState(() => _viewportSearchError = '네트워크 에러가 발생했습니다');
     }
@@ -504,15 +376,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   List<RestaurantModel> _reduceRestaurantOverdraw({
     required List<RestaurantModel>? restaurants,
-    required double zoom,
+    required int level,
   }) {
     final source = restaurants ?? const <RestaurantModel>[];
     if (source.isEmpty) return const [];
 
-    final maxMarkers = _maxMapMarkersByZoom(zoom);
+    final maxMarkers = _maxMapMarkersByLevel(level);
     if (source.length <= maxMarkers) return List.of(source);
 
-    final minCellMeters = _markerCellSizeMeters(zoom);
+    final minCellMeters = _markerCellSizeMeters(level);
     if (minCellMeters <= 0) return source.take(maxMarkers).toList();
 
     final selected = <RestaurantModel>[];
@@ -535,18 +407,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return selected;
   }
 
-  int _maxMapMarkersByZoom(double zoom) {
-    if (zoom <= 11.9) return 15;
-    if (zoom <= 12.9) return 25;
-    if (zoom <= 13.9) return 40;
+  int _maxMapMarkersByLevel(int level) {
+    if (level >= 7) return 15;
+    if (level >= 6) return 25;
+    if (level >= 5) return 40;
     return _maxMapRestaurants;
   }
 
-  double _markerCellSizeMeters(double zoom) {
-    if (zoom <= 11.9) return 800;
-    if (zoom <= 12.9) return 400;
-    if (zoom <= 13.9) return 200;
-    if (zoom <= 14.9) return 100;
+  double _markerCellSizeMeters(int level) {
+    if (level >= 7) return 800;
+    if (level >= 6) return 400;
+    if (level >= 5) return 200;
+    if (level >= 4) return 100;
     return 40;
   }
 
@@ -571,29 +443,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return '$latIndex:$lngIndex';
   }
 
-  void _cycleMapMode() {
-    if (_mapTileModes.isEmpty) return;
-
-    setState(() {
-      _mapModeIndex = (_mapModeIndex + 1) % _mapTileModes.length;
-    });
-  }
-
   void _moveToCurrentLocation() {
     _syncCurrentLocationToProvider();
-  }
-
-  _MapTileMode _currentMapMode() {
-    if (_mapTileModes.isEmpty) {
-      return const _MapTileMode(
-        label: 'OpenStreetMap Standard',
-        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        subdomains: [],
-      );
-    }
-
-    final normalizedIndex = _mapModeIndex % _mapTileModes.length;
-    return _mapTileModes[normalizedIndex];
   }
 
   Future<void> _syncCurrentLocationToProvider() async {
@@ -611,23 +462,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
-      final location = LatLng(position.latitude, position.longitude);
+      final location = MapPoint(position.latitude, position.longitude);
       ref.read(currentLocationProvider.notifier).state = location;
-      _mapController.move(location, _initialZoom);
+      _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}
   }
-}
-
-class _MapTileMode {
-  final String label;
-  final String urlTemplate;
-  final List<String> subdomains;
-
-  const _MapTileMode({
-    required this.label,
-    required this.urlTemplate,
-    required this.subdomains,
-  });
 }
