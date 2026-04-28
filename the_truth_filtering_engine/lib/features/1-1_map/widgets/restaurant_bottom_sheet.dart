@@ -68,16 +68,22 @@ class RestaurantBottomSheet extends StatelessWidget {
                     // 이미지
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Container(
+                      child: SizedBox(
                         width: 80,
                         height: 80,
-                        color: const Color(0xFFD4A96A),
                         child: restaurant.imageUrl != null
                             ? Image.network(
                                 restaurant.imageUrl!,
                                 fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  restaurant.categoryThumbnailPath,
+                                  fit: BoxFit.cover,
+                                ),
                               )
-                            : const _PlaceholderImage(),
+                            : Image.asset(
+                                restaurant.categoryThumbnailPath,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -231,40 +237,6 @@ class _ActionItem extends StatelessWidget {
       ),
     );
   }
-  @override
-  bool shouldRepaint(_WoodGrainPainter oldDelegate) => false;
-}
-
-// 이미지 없을 때 플레이스홀더 (목재 질감 느낌)
-class _PlaceholderImage extends StatelessWidget {
-  const _PlaceholderImage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(color: const Color(0xFFD4A96A)),
-        Positioned.fill(
-          child: CustomPaint(painter: _WoodGrainPainter()),
-        ),
-      ],
-    );
-  }
-}
-
-class _WoodGrainPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFBF8C50).withOpacity(0.4)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    for (double y = 0; y < size.height; y += 10) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y + 5), paint);
-    }
-  }
-
   @override
   bool shouldRepaint(_WoodGrainPainter oldDelegate) => false;
 }

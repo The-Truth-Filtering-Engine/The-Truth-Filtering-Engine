@@ -126,7 +126,4 @@ async def get_nearby_restaurants(
 
 
 def parse_kakao_category(category_name: str) -> str:
-    parts = [part.strip() for part in category_name.split(">") if part.strip()]
-    if len(parts) >= 2:
-        return parts[-1]
-    return parts[0] if parts else "음식점"
+    return category_name.strip() if category_name.strip() else "음식점"
