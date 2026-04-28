@@ -445,7 +445,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           'lat': center.latitude.toString(),
           'lng': center.longitude.toString(),
           'radius': radiusMeters.toString(),
-          'display': '50',
+          'display': '20',
         },
       );
 
