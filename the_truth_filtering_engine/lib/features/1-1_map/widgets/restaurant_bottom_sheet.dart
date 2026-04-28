@@ -9,6 +9,8 @@ class RestaurantBottomSheet extends StatelessWidget {
   final VoidCallback? onDetailTap;
   final VoidCallback? onBookmarkTap;
   final VoidCallback? onShareTap;
+  final VoidCallback? onCallTap;
+  final VoidCallback? onRouteTap;
   final bool isBookmarked;
 
   const RestaurantBottomSheet({
@@ -17,6 +19,8 @@ class RestaurantBottomSheet extends StatelessWidget {
     this.onDetailTap,
     this.onBookmarkTap,
     this.onShareTap,
+    this.onCallTap,
+    this.onRouteTap,
     this.isBookmarked = false,
   });
 
@@ -57,7 +61,7 @@ class RestaurantBottomSheet extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 상단: 이미지 + 정보 + 뱃지
+                // 상단: 이미지 + 정보
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -96,45 +100,60 @@ class RestaurantBottomSheet extends StatelessWidget {
                                 color: AppColors.sheetSubtext,
                               ),
                               const SizedBox(width: 2),
-                              Text(
-                                '${restaurant.address} · ${restaurant.category}',
-                                style: AppTextStyles.restaurantMeta,
+                              Expanded(
+                                child: Text(
+                                  '${restaurant.address} · ${restaurant.category}',
+                                  style: AppTextStyles.restaurantMeta,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-
-                    const SizedBox(width: 10),
-                    // TRUTH 뱃지
-                    // TruthScoreBadge(score: restaurant.truthScore),
                   ],
                 ),
 
-                // const SizedBox(height: 14),
+                const SizedBox(height: 20),
 
-                // 리뷰 요약 인용
-                // Container(
-                //   width: double.infinity,
-                //   padding:
-                //       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                //   decoration: BoxDecoration(
-                //     color: AppColors.sheetQuoteBackground,
-                //     borderRadius: BorderRadius.circular(10),
-                //   ),
-                //   child: Text(
-                //     '"${restaurant.reviewSummary}"',
-                //     style: AppTextStyles.reviewQuote,
-                //   ),
-                // ),
+                // 액션 버튼 영역 (Call, Save, Route, Share)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _ActionItem(
+                      icon: Icons.phone_outlined,
+                      label: 'Call',
+                      onTap: onCallTap,
+                    ),
+                    _ActionItem(
+                      icon: isBookmarked
+                          ? Icons.bookmark
+                          : Icons.bookmark_outline,
+                      label: 'Save',
+                      onTap: onBookmarkTap,
+                      iconColor: isBookmarked
+                          ? const Color(0xFF2B54E8)
+                          : const Color(0xFF2B54E8),
+                    ),
+                    _ActionItem(
+                      icon: Icons.near_me_outlined,
+                      label: 'Route',
+                      onTap: onRouteTap,
+                    ),
+                    _ActionItem(
+                      icon: Icons.ios_share_outlined,
+                      label: 'Share',
+                      onTap: onShareTap,
+                    ),
+                  ],
+                ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // 버튼 영역
+                // 버튼 영역 (상세보기)
                 Row(
                   children: [
-                    // 상세보기 버튼
                     Expanded(
                       child: GestureDetector(
                         onTap: onDetailTap,
@@ -162,26 +181,6 @@ class RestaurantBottomSheet extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-
-                    // 북마크 버튼
-                    _IconActionButton(
-                      icon:
-                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      onTap: onBookmarkTap,
-                      iconColor:
-                          isBookmarked ? Colors.white : AppColors.primary,
-                      backgroundColor: isBookmarked
-                          ? AppColors.primary
-                          : AppColors.sheetQuoteBackground,
-                    ),
-                    const SizedBox(width: 10),
-
-                    // 공유 버튼
-                    _IconActionButton(
-                      icon: Icons.ios_share,
-                      onTap: onShareTap,
-                    ),
                   ],
                 ),
 
@@ -195,34 +194,45 @@ class RestaurantBottomSheet extends StatelessWidget {
   }
 }
 
-class _IconActionButton extends StatelessWidget {
+class _ActionItem extends StatelessWidget {
   final IconData icon;
+  final String label;
   final VoidCallback? onTap;
   final Color iconColor;
-  final Color backgroundColor;
 
-  const _IconActionButton({
+  const _ActionItem({
     required this.icon,
+    required this.label,
     this.onTap,
-    this.iconColor = AppColors.primary,
-    this.backgroundColor = AppColors.sheetQuoteBackground,
+    this.iconColor = const Color(0xFF2B54E8),
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, size: 22, color: iconColor),
+      child: Column(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF0FF),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Icon(icon, size: 20, color: iconColor),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF6060A0)),
+          ),
+        ],
       ),
     );
   }
+  @override
+  bool shouldRepaint(_WoodGrainPainter oldDelegate) => false;
 }
 
 // 이미지 없을 때 플레이스홀더 (목재 질감 느낌)

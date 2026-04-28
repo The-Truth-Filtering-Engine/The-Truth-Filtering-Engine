@@ -47,7 +47,7 @@ Future<List<BlogReview>> _fetchCachedReviews(
 Future<List<BlogReview>> _fetchFreshReviews(
     String name, AnalysisMode mode) async {
   final uri =
-      Uri.parse('http://localhost:8000/api/search').replace(queryParameters: {
+      Uri.parse('http://172.30.1.42:8000/api/search').replace(queryParameters: {
     'query': name,
     'mode': mode.name,
   });

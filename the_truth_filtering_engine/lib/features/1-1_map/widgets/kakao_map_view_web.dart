@@ -84,6 +84,11 @@ class KakaoMapViewState extends State<KakaoMapView> {
     }
     if (oldWidget.currentLocation != widget.currentLocation) {
       _syncCurrentLocationOverlay();
+
+      // 현재 위치가 처음으로 설정되었을 때 지도를 해당 위치로 이동
+      if (oldWidget.currentLocation == null && widget.currentLocation != null) {
+        moveTo(widget.currentLocation!);
+      }
     }
   }
 
@@ -105,7 +110,9 @@ class KakaoMapViewState extends State<KakaoMapView> {
       if (!mounted) return;
 
       final maps = _maps;
-      final center = _latLng(widget.initialCenter);
+      // 현재 위치가 이미 확보되어 있다면 초기 위치로 사용, 없으면 기본값 사용
+      final initialPoint = widget.currentLocation ?? widget.initialCenter;
+      final center = _latLng(initialPoint);
       final options = js.JsObject.jsify({'level': widget.initialLevel});
       options['center'] = center;
 
