@@ -48,6 +48,7 @@ class BlogReview {
       0 => ReviewStatus.real,
       _ => ReviewStatus.suspicious,
     };
+    // ────────────────────────────────────────────────────────────────────
 
     final String description = json['review_description'] as String? ?? '';
 
