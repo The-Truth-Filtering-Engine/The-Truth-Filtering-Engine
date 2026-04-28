@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -35,3 +36,8 @@ app.include_router(places.router)
 @app.get("/")
 def root():
     return {"status": "ok"}
+
+
+@app.get("/config")
+def config():
+    return {"kakaoJsKey": os.getenv("KAKAO_JS_KEY", "").strip()}
