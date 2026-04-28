@@ -23,3 +23,15 @@ def predict_is_ad(review_description: str) -> int:
     logits = _model(**encoded).logits
     pred = logits.argmax(dim=-1).item()
     return int(pred)
+
+def score_is_ad(review_description: str) -> float:
+    if _model is None or _tokenizer is None:
+        raise RuntimeError("모델이 로드되지 않았습니다.")
+    text = (review_description or "").strip()
+    if not text:
+        return 0.0
+    encoded = _tokenizer(text, truncation=True, padding=True, max_length=512, return_tensors="pt")
+    logits = _model(**encoded).logits
+    probs = logits.softmax(dim=-1)
+    ad_score = probs[0, 1].item() 
+    return float(ad_score)
