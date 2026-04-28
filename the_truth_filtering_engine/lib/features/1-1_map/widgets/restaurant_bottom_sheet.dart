@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import 'truth_score_badge.dart';
 import '../models/restaurant_model.dart';
 
 class RestaurantBottomSheet extends StatelessWidget {
@@ -237,6 +236,4 @@ class _ActionItem extends StatelessWidget {
       ),
     );
   }
-  @override
-  bool shouldRepaint(_WoodGrainPainter oldDelegate) => false;
 }

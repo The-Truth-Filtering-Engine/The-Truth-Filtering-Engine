@@ -1,5 +1,3 @@
-﻿import 'package:flutter/material.dart';
-
 class RestaurantModel {
   final String id;
   final String name;
@@ -28,6 +26,54 @@ class RestaurantModel {
     required this.latitude,
     required this.longitude,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'category': category,
+      'truthScore': truthScore,
+      'distance': distance,
+      'reviewSummary': reviewSummary,
+      'phone': phone,
+      'placeUrl': placeUrl,
+      'imageUrl': imageUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+
+  factory RestaurantModel.fromJson(Map<String, dynamic> json) {
+    return RestaurantModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
+      category: json['category']?.toString() ?? '',
+      truthScore: _asInt(json['truthScore'], fallback: 0),
+      distance: _asInt(json['distance'], fallback: 0),
+      reviewSummary: json['reviewSummary']?.toString() ?? '',
+      phone: json['phone']?.toString(),
+      placeUrl: json['placeUrl']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
+      latitude: _asDouble(json['latitude'], fallback: 0),
+      longitude: _asDouble(json['longitude'], fallback: 0),
+    );
+  }
+
+  static int _asInt(Object? value, {required int fallback}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  static double _asDouble(Object? value, {required double fallback}) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
 
   // ── Marker 타입 ──
   MarkerType get markerType {
