@@ -1,6 +1,51 @@
+import 'package:flutter/material.dart';
 import 'package:truth_mouth/core/providers/analysis_mode_provider.dart';
 
 enum ReviewStatus { real, suspicious, ad }
+
+/// 광고 확률 등급
+/// 1에 가까울수록 광고 → 등급이 높을수록 광고성 강함
+enum AdGrade {
+  low, // < 0.3  → 상 (진성)
+  mid, // 0.3 ~ 0.6 → 중 (의심)
+  high, // > 0.6  → 하 (광고)
+}
+
+extension AdGradeX on AdGrade {
+  String get label => switch (this) {
+        AdGrade.low => '상',
+        AdGrade.mid => '중',
+        AdGrade.high => '하',
+      };
+
+  Color get color {
+    switch (this) {
+      case AdGrade.low:
+        return const Color(0xFF34A853);
+      case AdGrade.mid:
+        return const Color(0xFFF9A825);
+      case AdGrade.high:
+        return const Color(0xFFE53935);
+    }
+  }
+
+  Color get bgColor {
+    switch (this) {
+      case AdGrade.low:
+        return const Color(0xFFE8F5E9);
+      case AdGrade.mid:
+        return const Color(0xFFFFFDE7);
+      case AdGrade.high:
+        return const Color(0xFFFFEBEE);
+    }
+  }
+}
+
+AdGrade adGradeFromScore(double score) {
+  if (score >= 0.6) return AdGrade.high;
+  if (score >= 0.3) return AdGrade.mid;
+  return AdGrade.low;
+}
 
 class BlogReview {
   final int id;
@@ -14,6 +59,11 @@ class BlogReview {
   final int adProbability; // 0~100
   final bool isSponsored;
 
+  /// llm 또는 finetuned 확률값 (0.0~1.0, 없으면 null)
+  final double? adScore;
+
+  AdGrade? get adGrade => adScore != null ? adGradeFromScore(adScore!) : null;
+
   const BlogReview({
     required this.id,
     required this.title,
@@ -25,30 +75,51 @@ class BlogReview {
     required this.status,
     required this.adProbability,
     required this.isSponsored,
+    this.adScore,
   });
 
-  // ── FastAPI /search 응답 단건 파싱 ──────────────────────────────────────
+  // ── FastAPI /search 응답 단건 파싱 ────────────────────────────────────
   factory BlogReview.fromApiWithMode(
     Map<String, dynamic> json,
-    AnalysisMode mode, // analysis_mode_provider.dart 에서 import
+    AnalysisMode mode,
   ) {
+    // ── 1. pred (int) : electra 0/1, llm 모드는 float으로 별도 처리 ──
     final pred = switch (mode) {
       AnalysisMode.model => json['is_ad_electra_pred'] as int? ?? -1,
-      AnalysisMode.llm => json['is_ad_llm_pred'] as int? ?? -1,
+      AnalysisMode.llm => -1,
     };
 
-    final int adProb = switch (pred) {
-      1 => 90,
-      0 => 10,
-      _ => 50,
+    // ── 2. adScore (float) : 모드에 따라 다른 컬럼 사용 ──
+    final double? adScore = switch (mode) {
+      AnalysisMode.llm => (json['is_ad_llm_pred'] as num?)?.toDouble(),
+      AnalysisMode.model => (json['is_ad_finetuned_pred'] as num?)?.toDouble(),
     };
 
-    final ReviewStatus status = switch (pred) {
-      1 => ReviewStatus.ad,
-      0 => ReviewStatus.real,
-      _ => ReviewStatus.suspicious,
+    // ── 3. status ──
+    final ReviewStatus status = switch (mode) {
+      AnalysisMode.llm => adScore == null
+          ? ReviewStatus.suspicious
+          : adScore >= 0.6
+              ? ReviewStatus.ad
+              : adScore < 0.3
+                  ? ReviewStatus.real
+                  : ReviewStatus.suspicious,
+      AnalysisMode.model => switch (pred) {
+          1 => ReviewStatus.ad,
+          0 => ReviewStatus.real,
+          _ => ReviewStatus.suspicious,
+        },
     };
-    // ────────────────────────────────────────────────────────────────────
+
+    // ── 4. adProbability (0~100 int) ──
+    final int adProb = switch (mode) {
+      AnalysisMode.llm => adScore != null ? (adScore * 100).round() : 50,
+      AnalysisMode.model => switch (pred) {
+          1 => 90,
+          0 => 10,
+          _ => 50,
+        },
+    };
 
     final String description = json['review_description'] as String? ?? '';
 
@@ -64,7 +135,8 @@ class BlogReview {
       url: json['review_url'] as String? ?? '',
       status: status,
       adProbability: adProb,
-      isSponsored: pred == 1,
+      isSponsored: status == ReviewStatus.ad,
+      adScore: adScore,
     );
   }
 }
@@ -77,7 +149,7 @@ String _formatDate(String raw) {
   return raw;
 }
 
-// ── ShopInfo ────────────────────────────────────────────────────────────────
+// ── ShopInfo ──────────────────────────────────────────────────────────────
 
 class ShopInfo {
   final String name;
@@ -96,7 +168,6 @@ class ShopInfo {
     required this.totalReviews,
   });
 
-  /// API 응답 전체(reviews 배열 포함)로 ShopInfo 생성
   factory ShopInfo.fromApiResponse({
     required String name,
     required String category,
@@ -120,7 +191,7 @@ class ShopInfo {
   }
 }
 
-// ── 더미 데이터 (개발/테스트용 유지) ────────────────────────────────────────
+// ── 더미 데이터 ──────────────────────────────────────────────────────────
 
 final dummyShop = ShopInfo(
   name: '오모테나시 스시',
@@ -138,12 +209,12 @@ final dummyBlogs = <BlogReview>[
     author: '내돈내산 먹방러',
     date: '2024.05.14',
     preview: '"예약 3개월 기다렸는데 정말 가치있었어요. 생선 신선도가 놀라울 정도였고, 셰프가 직접 설명해줘서 더 좋았어요."',
-    content:
-        '오늘은 강남 오마카세 후기를 써볼게요.\n\n3개월 전부터 예약해서 드디어 다녀왔습니다. 총 12코스로 진행됐는데, 각 코스마다 셰프가 직접 재료 설명을 해줘서 정말 좋았어요.\n\n특히 성게알 군함말이가 인상적이었어요. 홋카이도산 성게를 사용한다고 하는데, 쓴맛이 전혀 없고 달달하면서 크리미한 맛이 정말 일품이었습니다.\n\n가격은 1인 12만원으로 오마카세치고는 합리적인 편이에요. 총평: 강남에서 이 가격에 이 퀄리티면 충분히 재방문 의사 있어요!',
+    content: '오늘은 강남 오마카세 후기를 써볼게요.\n\n3개월 전부터 예약해서 드디어 다녀왔습니다.',
     url: 'https://blog.naver.com/realfoodie/223456789',
     status: ReviewStatus.real,
     adProbability: 4,
     isSponsored: false,
+    adScore: 0.12,
   ),
   BlogReview(
     id: 2,
@@ -151,38 +222,38 @@ final dummyBlogs = <BlogReview>[
     author: '라이프스타일블로그',
     date: '2024.05.20',
     preview: '"이번에 협찬으로 방문하게 되었는데요~ 정말 너무 맛있고 서비스도 좋아서 강추해요!"',
-    content:
-        '안녕하세요! 오늘은 강남 핫플 스시 맛집을 소개해드릴게요.\n\n이번에 협찬으로 방문하게 되었는데요, 정말 너무 맛있고 서비스도 훌륭했어요!\n\n인테리어가 너무 예쁘고 사진도 잘 나와요. 인스타 감성 넘치는 공간이랍니다.\n\n오마카세 코스 정말 맛있었어요. 특히 디저트가 인상적이었어요!\n\n예약은 홈페이지에서 하실 수 있어요. 꼭 방문해 보세요!',
+    content: '안녕하세요! 오늘은 강남 핫플 스시 맛집을 소개해드릴게요.',
     url: 'https://blog.naver.com/lifestyleblog/223567890',
     status: ReviewStatus.ad,
     adProbability: 92,
     isSponsored: true,
+    adScore: 0.780171275138855,
   ),
   BlogReview(
     id: 3,
     title: '남편 생일 기념 오마카세 다녀왔어요',
     author: '일상기록 주부',
     date: '2024.05.09',
-    preview: '"가격이 조금 부담스럽지만 특별한 날에 딱 맞는 곳이에요. 서비스도 친절하고 맛도 기대 이상이었어요."',
-    content:
-        '남편 생일을 맞아 특별한 저녁을 준비했어요.\n\n평소에 스시를 좋아하는 남편을 위해 오마카세를 예약했는데, 결과적으로 대만족이었어요!\n\n12만원이라는 가격이 처음엔 부담됐지만, 코스 하나하나가 정말 정성스러워서 충분히 값어치를 했어요.\n\n직원분들이 처음부터 끝까지 매우 친절하게 안내해주셔서 식사 내내 기분이 좋았어요.',
+    preview: '"가격이 조금 부담스럽지만 특별한 날에 딱 맞는 곳이에요."',
+    content: '남편 생일을 맞아 특별한 저녁을 준비했어요.',
     url: 'https://blog.naver.com/dailymom/223345678',
     status: ReviewStatus.real,
     adProbability: 8,
     isSponsored: false,
+    adScore: 0.08,
   ),
   BlogReview(
     id: 4,
     title: '강남 스시 오마카세 가격 비교 분석',
     author: '맛집탐방 foodie',
     date: '2024.04.28',
-    preview: '"여러 오마카세를 다녀봤는데 여기가 가성비로는 최고인 것 같아요. 예약이 힘든 게 단점이에요."',
-    content:
-        '강남 오마카세 투어를 하면서 여러 곳을 다녀봤는데 비교 후기를 써볼게요.\n\n가성비 측면에서는 이곳이 제일 낫더라고요. 비슷한 가격대의 다른 곳들보다 코스 퀄리티가 확실히 높았어요.\n\n단점이 있다면 예약이 정말 어려워요. 3개월 대기는 기본이에요.\n\n전체적으로 만족스러웠고, 기회가 된다면 재방문할 의향이 있어요.',
+    preview: '"여러 오마카세를 다녀봤는데 여기가 가성비로는 최고인 것 같아요."',
+    content: '강남 오마카세 투어를 하면서 여러 곳을 다녀봤는데 비교 후기를 써볼게요.',
     url: 'https://blog.naver.com/foodielog/223234567',
     status: ReviewStatus.suspicious,
     adProbability: 41,
     isSponsored: false,
+    adScore: 0.43,
   ),
 ];
 

@@ -200,37 +200,37 @@ class _BlogListScreenState extends State<BlogListScreen>
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
             child: Column(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(shop.name, style: AppText.title()),
-                          const SizedBox(height: 3),
-                          Text(
-                              '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
-                              style: AppText.caption()),
-                        ],
-                      ),
-                    ),
-                    TrustCircle(shop.trustScore),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                StatProgressBar(
-                  label: '광고 비율',
-                  value: shop.adRatio.toDouble(),
-                  color: AppColors.danger400,
-                ),
-                const SizedBox(height: 8),
-                StatProgressBar(
-                  label: '진성 리뷰',
-                  value: shop.realRatio.toDouble(),
-                  color: AppColors.success400,
-                ),
-                const SizedBox(height: 14),
+                // Row(
+                //   crossAxisAlignment: CrossAxisAlignment.start,
+                //   children: [
+                //     Expanded(
+                //       child: Column(
+                //         crossAxisAlignment: CrossAxisAlignment.start,
+                //         children: [
+                //           Text(shop.name, style: AppText.title()),
+                //           const SizedBox(height: 3),
+                //           Text(
+                //               '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
+                //               style: AppText.caption()),
+                //         ],
+                //       ),
+                //     ),
+                //     TrustCircle(shop.trustScore),
+                //   ],
+                // ),
+                // const SizedBox(height: 14),
+                // StatProgressBar(
+                //   label: '광고 비율',
+                //   value: shop.adRatio.toDouble(),
+                //   color: AppColors.danger400,
+                // ),
+                // const SizedBox(height: 8),
+                // StatProgressBar(
+                //   label: '진성 리뷰',
+                //   value: shop.realRatio.toDouble(),
+                //   color: AppColors.success400,
+                // ),
+                // const SizedBox(height: 14),
 
                 // ── 탭바 ──
                 Container(
