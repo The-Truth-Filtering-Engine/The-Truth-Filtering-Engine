@@ -33,7 +33,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Timer? _viewportSearchTimer;
   int _viewportSearchReqId = 0;
 
-  static const int _maxMapRestaurants = 50;
+  static const int _maxMapRestaurants = 10;
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
 
@@ -317,7 +317,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           'lat': center.latitude.toString(),
           'lng': center.longitude.toString(),
           'radius': radiusMeters.toString(),
-          'display': '50',
+          'display': '10',
         },
       );
 
