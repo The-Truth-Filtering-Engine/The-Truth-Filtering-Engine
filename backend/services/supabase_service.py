@@ -24,9 +24,9 @@ async def save_reviews(name: str, blogs: list[dict]):
     ]
     supabase.table("reviews").insert(rows).execute()
 
-async def update_llm_pred(review_id: int, is_ad_llm_pred: int):
+async def update_llm_pred(review_id: int, is_ad_llm_pred: float):  
     supabase.table("reviews") \
-        .update({"is_ad_llm_pred": is_ad_llm_pred}) \
+        .update({"is_ad_llm_pred": float(is_ad_llm_pred)}) \
         .eq("id", review_id) \
         .execute()
 
