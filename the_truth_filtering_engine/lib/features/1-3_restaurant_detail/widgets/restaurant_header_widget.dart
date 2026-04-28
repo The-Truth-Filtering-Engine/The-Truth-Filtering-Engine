@@ -5,8 +5,21 @@ import '../../1-1_map/widgets/truth_score_badge.dart';
 
 class RestaurantHeaderWidget extends StatelessWidget {
   final RestaurantModel restaurant;
+  final bool isBookmarked;
+  final VoidCallback? onCallTap;
+  final VoidCallback? onBookmarkTap;
+  final VoidCallback? onRouteTap;
+  final VoidCallback? onShareTap;
 
-  const RestaurantHeaderWidget({super.key, required this.restaurant});
+  const RestaurantHeaderWidget({
+    super.key,
+    required this.restaurant,
+    this.isBookmarked = false,
+    this.onCallTap,
+    this.onBookmarkTap,
+    this.onRouteTap,
+    this.onShareTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -88,11 +101,28 @@ class RestaurantHeaderWidget extends StatelessWidget {
               // ── 액션 버튼 ──
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: const [
-                  _ActionItem(icon: Icons.phone_outlined, label: 'Call'),
-                  _ActionItem(icon: Icons.bookmark_outline, label: 'Save'),
-                  _ActionItem(icon: Icons.near_me_outlined, label: 'Route'),
-                  _ActionItem(icon: Icons.ios_share_outlined, label: 'Share'),
+                children: [
+                  _ActionItem(
+                    icon: Icons.phone_outlined,
+                    label: 'Call',
+                    onTap: onCallTap,
+                  ),
+                  _ActionItem(
+                    icon:
+                        isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                    label: 'Save',
+                    onTap: onBookmarkTap,
+                  ),
+                  _ActionItem(
+                    icon: Icons.near_me_outlined,
+                    label: 'Route',
+                    onTap: onRouteTap,
+                  ),
+                  _ActionItem(
+                    icon: Icons.ios_share_outlined,
+                    label: 'Share',
+                    onTap: onShareTap,
+                  ),
                 ],
               ),
             ],
@@ -108,25 +138,34 @@ class RestaurantHeaderWidget extends StatelessWidget {
 class _ActionItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _ActionItem({required this.icon, required this.label});
+  final VoidCallback? onTap;
+
+  const _ActionItem({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEEF0FF),
-            borderRadius: BorderRadius.circular(22),
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF0FF),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Icon(icon, size: 20, color: const Color(0xFF2B54E8)),
           ),
-          child: Icon(icon, size: 20, color: const Color(0xFF2B54E8)),
-        ),
-        const SizedBox(height: 4),
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF6060A0))),
-      ],
+          const SizedBox(height: 4),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF6060A0))),
+        ],
+      ),
     );
   }
 }
@@ -137,7 +176,7 @@ class _WoodGrainPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFBF8C50).withOpacity(0.3)
+      ..color = const Color(0xFFBF8C50).withValues(alpha: 0.3)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     for (double y = 0; y < size.height; y += 12) {

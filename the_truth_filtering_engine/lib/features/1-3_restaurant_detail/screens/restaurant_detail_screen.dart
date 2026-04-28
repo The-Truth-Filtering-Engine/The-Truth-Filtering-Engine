@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
+import '../../1-1_map/providers/map_provider.dart';
 import '../providers/blog_review.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
 import '../widgets/restaurant_header_widget.dart';
@@ -156,6 +159,10 @@ class _RestaurantDetailScreenState
   // ── 빌드 ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
+    final isBookmarked =
+        bookmarkedRestaurants.any((item) => item.id == _r.id);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
@@ -164,7 +171,14 @@ class _RestaurantDetailScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── 헤더 (항상 표시) ──
-            RestaurantHeaderWidget(restaurant: _r),
+            RestaurantHeaderWidget(
+              restaurant: _r,
+              isBookmarked: isBookmarked,
+              onCallTap: _copyPhone,
+              onBookmarkTap: _toggleBookmark,
+              onRouteTap: _openPlaceUrl,
+              onShareTap: _copyPlaceUrl,
+            ),
 
             const SizedBox(height: 16),
             const Divider(height: 1, color: Color(0xFFF0F0F0)),
@@ -228,6 +242,59 @@ class _RestaurantDetailScreenState
           ],
         );
     }
+  }
+
+  Future<void> _copyPhone() async {
+    final phone = _r.phone?.trim();
+    if (phone == null || phone.isEmpty) {
+      _showSnack('등록된 전화번호가 없습니다');
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: phone));
+    _showSnack('전화번호가 복사되었습니다');
+  }
+
+  void _toggleBookmark() {
+    final previous = ref.read(bookmarkRestaurantsProvider);
+    final alreadyBookmarked = previous.any((item) => item.id == _r.id);
+
+    ref.read(bookmarkRestaurantsProvider.notifier).toggle(_r);
+    _showSnack(alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다');
+  }
+
+  Future<void> _copyPlaceUrl() async {
+    final link = _r.placeUrl?.trim();
+    if (link == null || link.isEmpty) {
+      _showSnack('공유 가능한 링크가 없습니다');
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: link));
+    _showSnack('링크가 복사되었습니다');
+  }
+
+  Future<void> _openPlaceUrl() async {
+    final link = _r.placeUrl?.trim();
+    if (link == null || link.isEmpty) {
+      _showSnack('길찾기 링크가 없습니다');
+      return;
+    }
+
+    await launchUrl(
+      Uri.parse(link),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   // ── AppBar ────────────────────────────────────────────────────────────────────

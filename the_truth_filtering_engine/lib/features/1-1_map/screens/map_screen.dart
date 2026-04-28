@@ -202,6 +202,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   onShareTap: () {
                     _shareRestaurant(selectedRestaurant, context);
                   },
+                  onCallTap: () {
+                    _copyRestaurantPhone(selectedRestaurant, context);
+                  },
+                  onRouteTap: () async {
+                    final link = selectedRestaurant.placeUrl?.trim();
+                    if (link != null && link.isNotEmpty) {
+                      final uri = Uri.parse(link);
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('길찾기 링크가 없습니다')),
+                      );
+                    }
+                  },
                 ),
               ),
             ),
@@ -240,6 +254,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('링크가 복사되었습니다'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Future<void> _copyRestaurantPhone(
+    RestaurantModel restaurant,
+    BuildContext context,
+  ) async {
+    final phone = restaurant.phone?.trim();
+    if (phone == null || phone.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('등록된 전화번호가 없습니다'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: phone));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('전화번호가 복사되었습니다'),
         duration: Duration(seconds: 1),
       ),
     );
@@ -341,7 +381,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 address: item['address'] ?? '',
                 truthScore: _mockTrustScore(item['id']?.toString() ?? ''),
                 distance: item['distance'] ?? 0,
-                phone: null,
+                phone: item['phone']?.toString(),
                 placeUrl: item['link'],
                 reviewSummary: item['name'] ?? '검색 결과',
                 imageUrl: null,
