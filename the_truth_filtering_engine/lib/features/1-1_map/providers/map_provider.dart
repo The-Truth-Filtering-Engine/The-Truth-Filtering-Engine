@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
+import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 
 // 레스토랑 목록 provider (더미 데이터)
@@ -43,4 +43,4 @@ class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
 final showLayerMenuProvider = StateProvider<bool>((ref) => false);
 
 // 지도 화면에서 획득한 현재 위치
-final currentLocationProvider = StateProvider<LatLng?>((ref) => null);
+final currentLocationProvider = StateProvider<MapPoint?>((ref) => null);
