@@ -64,11 +64,35 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<RestaurantModel?>(mapFocusRestaurantProvider, (previous, next) {
+      if (next == null) return;
+
+      ref.read(selectedRestaurantProvider.notifier).state = next;
+      setState(() {
+        _viewportRestaurants = _appendRestaurantIfMissing(
+          _viewportRestaurants,
+          next,
+        );
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapViewKey.currentState?.moveTo(
+          MapPoint(next.latitude, next.longitude),
+          level: 3,
+        );
+      });
+    });
+
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
     final currentLocation = ref.watch(currentLocationProvider);
+    final focusedRestaurant = ref.watch(mapFocusRestaurantProvider);
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
     final displayRestaurants = _reduceRestaurantOverdraw(
-      restaurants: _viewportRestaurants,
+      restaurants: _appendRestaurantIfMissing(
+        _viewportRestaurants,
+        focusedRestaurant,
+      ),
       level: _latestMapLevel,
     );
     final isSelectedBookmarked = selectedRestaurant != null &&
@@ -392,14 +416,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       if (!mounted || requestId != _viewportSearchReqId) return;
 
+      final focusedRestaurant = ref.read(mapFocusRestaurantProvider);
+      final mergedRestaurants = _appendRestaurantIfMissing(
+        restaurants,
+        focusedRestaurant,
+      ) ?? restaurants;
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
       if (selectedRestaurant != null &&
-          restaurants.every((r) => r.id != selectedRestaurant.id)) {
+          mergedRestaurants.every((r) => r.id != selectedRestaurant.id)) {
         ref.read(selectedRestaurantProvider.notifier).state = null;
       }
 
       setState(() {
-        _viewportRestaurants = restaurants;
+        _viewportRestaurants = mergedRestaurants;
         _viewportSearchError = null;
         _lastSearchedCenter = center;
         _lastSearchedLevel = level;
@@ -482,6 +511,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final latIndex = (lat / latCellDeg).floor();
     final lngIndex = (lng / lngCellDeg).floor();
     return '$latIndex:$lngIndex';
+  }
+
+  List<RestaurantModel>? _appendRestaurantIfMissing(
+    List<RestaurantModel>? restaurants,
+    RestaurantModel? restaurant,
+  ) {
+    if (restaurant == null) return restaurants;
+
+    final source = restaurants ?? const <RestaurantModel>[];
+    if (source.any((item) => item.id == restaurant.id)) return restaurants;
+
+    return [restaurant, ...source];
   }
 
   void _moveToCurrentLocation() {
