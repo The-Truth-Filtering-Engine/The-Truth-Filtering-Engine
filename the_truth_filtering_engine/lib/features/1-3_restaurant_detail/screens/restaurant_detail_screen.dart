@@ -94,14 +94,21 @@ class _RestaurantDetailScreenState
   }
 
   Future<void> _onDetailTap() async {
-    setState(() => _state = _ScreenState.checking);
+    setState(() => _state = _ScreenState.checking); // 로딩 스피너만 표시
 
     try {
       final mode = ref.read(analysisModeProvider);
       final cached = await _fetchCachedReviews(_r.name, mode);
 
       if (cached.isEmpty) {
-        setState(() => _state = _ScreenState.noData);
+        // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
+        try {
+          final fresh = await _fetchFreshReviews(_r.name, mode);
+          _applyReviews(fresh);
+        } catch (e) {
+          setState(() => _state = _ScreenState.noData);
+          _showError('분석 중 오류가 발생했어요: $e');
+        }
       } else {
         _applyReviews(cached);
       }
