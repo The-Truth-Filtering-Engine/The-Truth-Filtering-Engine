@@ -65,26 +65,26 @@ class RestaurantHeaderWidget extends StatelessWidget {
                 ),
               ),
               // Veritas 배지
-              Positioned(
-                top: 14,
-                left: 14,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1D9E75),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${r.truthScore}% Veritas Verified',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
+              // Positioned(
+              //   top: 14,
+              //   left: 14,
+              //   child: Container(
+              //     padding:
+              //         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              //     decoration: BoxDecoration(
+              //       color: const Color(0xFF1D9E75),
+              //       borderRadius: BorderRadius.circular(20),
+              //     ),
+              //     child: Text(
+              //       '${r.truthScore}% Veritas Verified',
+              //       style: const TextStyle(
+              //         color: Colors.white,
+              //         fontSize: 11,
+              //         fontWeight: FontWeight.w500,
+              //       ),
+              //     ),
+              //   ),
+              // ),
             ],
           ),
         ),
@@ -121,7 +121,7 @@ class RestaurantHeaderWidget extends StatelessWidget {
                       ],
                     ),
                   ),
-                  TruthScoreBadge(score: r.truthScore),
+                  // TruthScoreBadge(score: r.truthScore),
                 ],
               ),
               const SizedBox(height: 14),
