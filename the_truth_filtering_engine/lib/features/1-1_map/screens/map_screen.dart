@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -46,6 +47,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   MapPoint? _lastSearchedCenter;
   int? _lastSearchedLevel;
   int _latestMapLevel = _initialLevel;
+  bool _isLayerToggled = false;
 
   @override
   void initState() {
@@ -177,11 +179,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           Positioned(
             right: 16,
             bottom: selectedRestaurant != null ? 230 : 100,
-            child: MapControlButtons(
-              onLocationTap: _moveToCurrentLocation,
-              onLayerTap: () => _mapViewKey.currentState?.toggleMapType(),
-              onZoomIn: () => _mapViewKey.currentState?.zoomIn(),
-              onZoomOut: () => _mapViewKey.currentState?.zoomOut(),
+            child: PointerInterceptor(
+              child: MapControlButtons(
+                onLocationTap: _moveToCurrentLocation,
+                onLayerTap: _toggleLayer,
+                onZoomIn: () => _mapViewKey.currentState?.zoomIn(),
+                onZoomOut: () => _mapViewKey.currentState?.zoomOut(),
+                isLayerToggled: _isLayerToggled,
+              ),
             ),
           ),
           if (selectedRestaurant != null)
@@ -527,6 +532,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _moveToCurrentLocation() {
     _syncCurrentLocationToProvider();
+  }
+
+  void _toggleLayer() {
+    _mapViewKey.currentState?.toggleMapType();
+    setState(() {
+      _isLayerToggled = !_isLayerToggled;
+    });
   }
 
   Future<void> _syncCurrentLocationToProvider() async {

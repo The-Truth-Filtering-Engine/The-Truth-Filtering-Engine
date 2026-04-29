@@ -62,7 +62,8 @@ class KakaoMapViewState extends State<KakaoMapView> {
       ..id = _viewType
       ..style.width = '100%'
       ..style.height = '100%'
-      ..style.border = '0';
+      ..style.border = '0'
+      ..style.cursor = 'pointer';
 
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
