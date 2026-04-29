@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../models/restaurant_model.dart';
 import '../providers/map_provider.dart';
-import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
 class BookmarkScreen extends ConsumerWidget {
-  const BookmarkScreen({super.key});
+  final ValueChanged<RestaurantModel> onViewPlace;
+
+  const BookmarkScreen({
+    super.key,
+    required this.onViewPlace,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,14 +38,7 @@ class BookmarkScreen extends ConsumerWidget {
             },
           ),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RestaurantDetailScreen(
-                  restaurant: restaurant,
-                ),
-              ),
-            );
+            onViewPlace(restaurant);
           },
         );
       },

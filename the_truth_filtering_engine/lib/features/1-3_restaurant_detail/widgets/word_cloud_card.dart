@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-// ── 워드 빈도 모델 (외부에서도 사용) ──────────────────────────────────────────
+// ── 워드 빈도 모델 ─────────────────────────────────────────────────────────────
 
 class WordFreq {
   final String word;
@@ -9,7 +9,7 @@ class WordFreq {
   const WordFreq(this.word, this.freq);
 }
 
-// ── 워드클라우드 카드 ─────────────────────────────────────────────────────────
+// ── 워드클라우드 카드 ──────────────────────────────────────────────────────────
 
 class WordCloudCard extends StatelessWidget {
   final List<WordFreq> wordFreqs;
@@ -19,6 +19,8 @@ class WordCloudCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // 높이를 부모(IntrinsicHeight Row)에 맞게 stretch
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F7FA),
@@ -50,12 +52,14 @@ class WordCloudCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── 워드클라우드 캔버스 ──
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: WordCloudPainter(wordFreqs),
+          // ── 말풍선 워드클라우드 ──
+          Flexible(
+            child: SizedBox(
+              width: double.infinity,
+              child: CustomPaint(
+                painter: BubbleWordCloudPainter(wordFreqs),
+                size: Size.infinite,
+              ),
             ),
           ),
         ],
@@ -64,12 +68,12 @@ class WordCloudCard extends StatelessWidget {
   }
 }
 
-// ── 워드클라우드 Painter ──────────────────────────────────────────────────────
+// ── 말풍선 Painter ─────────────────────────────────────────────────────────────
 
-class WordCloudPainter extends CustomPainter {
+class BubbleWordCloudPainter extends CustomPainter {
   final List<WordFreq> words;
 
-  WordCloudPainter(this.words);
+  BubbleWordCloudPainter(this.words);
 
   static const _palette = [
     Color(0xFF2B54E8),
@@ -83,18 +87,65 @@ class WordCloudPainter extends CustomPainter {
     Color(0xFF16A085),
   ];
 
+  /// 말풍선 외곽 경로 — 꼬리는 하단 중앙
+  Path _bubblePath(Size size) {
+    const r = 16.0; // 모서리 반경
+    const tailW = 18.0; // 꼬리 너비
+    const tailH = 12.0; // 꼬리 높이
+    final w = size.width;
+    final h = size.height - tailH;
+    final cx = w / 2;
+
+    return Path()
+      ..moveTo(r, 0)
+      ..lineTo(w - r, 0)
+      ..arcToPoint(Offset(w, r),
+          radius: const Radius.circular(r), clockwise: true)
+      ..lineTo(w, h - r)
+      ..arcToPoint(Offset(w - r, h),
+          radius: const Radius.circular(r), clockwise: true)
+      ..lineTo(cx + tailW / 2, h)
+      ..lineTo(cx, h + tailH) // 꼬리 끝
+      ..lineTo(cx - tailW / 2, h)
+      ..lineTo(r, h)
+      ..arcToPoint(Offset(0, h - r),
+          radius: const Radius.circular(r), clockwise: true)
+      ..lineTo(0, r)
+      ..arcToPoint(Offset(r, 0),
+          radius: const Radius.circular(r), clockwise: true)
+      ..close();
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (words.isEmpty) return;
 
+    const tailH = 12.0;
+    final bubbleSize = Size(size.width, size.height);
+
+    // ── 말풍선 배경 ──
+    final bgPaint = Paint()..color = Colors.white;
+    final borderPaint = Paint()
+      ..color = const Color(0xFFE4E4EC)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final path = _bubblePath(bubbleSize);
+    canvas.drawPath(path, bgPaint);
+    canvas.drawPath(path, borderPaint);
+
+    // ── 텍스트 배치 영역 (꼬리 제외) ──
+    final paintArea = Size(size.width, size.height - tailH);
+    const padding = EdgeInsets.all(14.0);
+
     final maxFreq = words.first.freq;
     final placed = <Rect>[];
-    final rng = math.Random(42); // 고정 시드 → 동일 레이아웃
+    final rng = math.Random(42);
 
     for (int i = 0; i < words.length; i++) {
       final w = words[i];
       final ratio = w.freq / maxFreq;
-      final fontSize = 12.0 + ratio * 16.0; // 12~28px
+      final fontSize = 13.0 + ratio * 14.0; // 13~27px
       final fontWeight = ratio > 0.6 ? FontWeight.w700 : FontWeight.w500;
       final color = _palette[i % _palette.length];
 
@@ -108,14 +159,17 @@ class WordCloudPainter extends CustomPainter {
           ),
         ),
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: size.width);
+      )..layout(maxWidth: paintArea.width - padding.horizontal);
+
+      final xMax = (paintArea.width - padding.left - padding.right - tp.width)
+          .clamp(0.0, double.maxFinite);
+      final yMax = (paintArea.height - padding.top - padding.bottom - tp.height)
+          .clamp(0.0, double.maxFinite);
 
       Offset? pos;
-      for (int attempt = 0; attempt < 300; attempt++) {
-        final x =
-            rng.nextDouble() * (size.width - tp.width).clamp(0, size.width);
-        final y =
-            rng.nextDouble() * (size.height - tp.height).clamp(0, size.height);
+      for (int attempt = 0; attempt < 400; attempt++) {
+        final x = padding.left + rng.nextDouble() * xMax;
+        final y = padding.top + rng.nextDouble() * yMax;
         final candidate = Rect.fromLTWH(x, y, tp.width + 6, tp.height + 2);
 
         if (placed.every((r) => !r.overlaps(candidate))) {
@@ -130,7 +184,7 @@ class WordCloudPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(WordCloudPainter old) {
+  bool shouldRepaint(BubbleWordCloudPainter old) {
     if (old.words.length != words.length) return true;
     for (int i = 0; i < words.length; i++) {
       if (old.words[i].word != words[i].word ||
@@ -140,7 +194,7 @@ class WordCloudPainter extends CustomPainter {
   }
 }
 
-// ── 워드 빈도 계산 유틸 ───────────────────────────────────────────────────────
+// ── 워드 빈도 계산 유틸 ────────────────────────────────────────────────────────
 
 class WordFreqBuilder {
   static const _stopWords = {
@@ -208,17 +262,26 @@ class WordFreqBuilder {
 
   static List<WordFreq> build(List<String> titles) {
     final freq = <String, int>{};
+
     for (final title in titles) {
-      final words = title
-          .split(RegExp(r'[\s\[\]「」『』《》<>【】,\.!?\-_/\(\)\|#@&+*]'))
+      final cleaned = title.replaceAll(RegExp(r'''["'""''\u0022\u0027]'''), '');
+      final wordList = cleaned
+          .split(RegExp(r'[\s\[\]「」『』《》<>【】,\.!?\-_/\(\)\|#@&+*：:；;]'))
           .map((w) => w.trim())
           .where((w) => w.length >= 2 && !_stopWords.contains(w));
-      for (final w in words) {
+      for (final w in wordList) {
         freq[w] = (freq[w] ?? 0) + 1;
       }
     }
+
     final sorted = freq.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    return sorted.take(30).map((e) => WordFreq(e.key, e.value)).toList();
+
+    // C방식: 빈도 2회 이상 + 상위 8개
+    return sorted
+        .where((e) => e.value >= 2)
+        .take(8)
+        .map((e) => WordFreq(e.key, e.value))
+        .toList();
   }
 }

@@ -19,11 +19,11 @@ import '../widgets/review_list_section.dart';
 // ── 화면 상태 ─────────────────────────────────────────────────────────────────
 
 enum _ScreenState {
-  initial, // 첫 진입
-  checking, // Supabase 조회 중
-  noData, // 데이터 없음
-  analyzing, // 분석하기 눌러서 API 호출 중
-  loaded, // 데이터 표시 완료
+  initial,
+  checking,
+  noData,
+  analyzing,
+  loaded,
 }
 
 // ── API: Supabase 캐시 조회 ───────────────────────────────────────────────────
@@ -87,23 +87,28 @@ class _RestaurantDetailScreenState
 
   RestaurantModel get _r => widget.restaurant;
 
-  // ── 화면 진입 즉시 Supabase 조회 시작 ────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _onDetailTap());
   }
 
-  // ── 상세보기 버튼 탭: Supabase 조회 ─────────────────────────────────────────
   Future<void> _onDetailTap() async {
-    setState(() => _state = _ScreenState.checking);
+    setState(() => _state = _ScreenState.checking); // 로딩 스피너만 표시
 
     try {
       final mode = ref.read(analysisModeProvider);
       final cached = await _fetchCachedReviews(_r.name, mode);
 
       if (cached.isEmpty) {
-        setState(() => _state = _ScreenState.noData);
+        // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
+        try {
+          final fresh = await _fetchFreshReviews(_r.name, mode);
+          _applyReviews(fresh);
+        } catch (e) {
+          setState(() => _state = _ScreenState.noData);
+          _showError('분석 중 오류가 발생했어요: $e');
+        }
       } else {
         _applyReviews(cached);
       }
@@ -113,7 +118,6 @@ class _RestaurantDetailScreenState
     }
   }
 
-  // ── 분석하기 버튼 탭: 신규 크롤링 + AI ──────────────────────────────────────
   Future<void> _onAnalyzeTap() async {
     setState(() => _state = _ScreenState.analyzing);
 
@@ -127,7 +131,6 @@ class _RestaurantDetailScreenState
     }
   }
 
-  // ── 공통: 리뷰 데이터 적용 ───────────────────────────────────────────────────
   void _applyReviews(List<BlogReview> reviews) {
     final shopInfo = ShopInfo.fromApiResponse(
       name: _r.name,
@@ -156,7 +159,8 @@ class _RestaurantDetailScreenState
     );
   }
 
-  // ── 빌드 ─────────────────────────────────────────────────────────────────────
+  // ── 빌드 ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
@@ -164,84 +168,124 @@ class _RestaurantDetailScreenState
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── 헤더 (항상 표시) ──
-            RestaurantHeaderWidget(
-              restaurant: _r,
-              isBookmarked: isBookmarked,
-              onCallTap: _copyPhone,
-              onBookmarkTap: _toggleBookmark,
-              onRouteTap: _openPlaceUrl,
-              onShareTap: _copyPlaceUrl,
+      appBar: _buildAppBar(), // AppBar는 항상 고정
+      body: CustomScrollView(
+        slivers: [
+          // ── 레스토랑 헤더 ──
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                RestaurantHeaderWidget(
+                  restaurant: _r,
+                  isBookmarked: isBookmarked,
+                  onCallTap: _copyPhone,
+                  onBookmarkTap: _toggleBookmark,
+                  onRouteTap: _openPlaceUrl,
+                  onShareTap: _copyPlaceUrl,
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1, color: Color(0xFFF0F0F0)),
+                const SizedBox(height: 16),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 16),
-            const Divider(height: 1, color: Color(0xFFF0F0F0)),
+          // ── 상태별 콘텐츠 ──
+          ..._buildSliverBody(),
 
-            // ── 상태별 콘텐츠 ──
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: _buildBody(),
-            ),
-
-            const SizedBox(height: 40),
-          ],
-        ),
+          // ── 하단 여백 ──
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
+        ],
       ),
     );
   }
 
-  // ── 상태별 본문 ───────────────────────────────────────────────────────────────
-  Widget _buildBody() {
+  // ── Sliver 기반 상태별 본문 ──────────────────────────────────────────────────
+
+  List<Widget> _buildSliverBody() {
     switch (_state) {
-      // 첫 진입 or Supabase 조회 중 → 로딩 표시
       case _ScreenState.initial:
       case _ScreenState.checking:
-        return const _LoadingIndicator();
+        return [
+          const SliverToBoxAdapter(child: _LoadingIndicator()),
+        ];
 
-      // 데이터 없음
       case _ScreenState.noData:
-        return NoDataCard(
-          isAnalyzing: false,
-          onAnalyzeTap: _onAnalyzeTap,
-        );
-
-      // 분석하기 진행 중
-      case _ScreenState.analyzing:
-        return NoDataCard(
-          isAnalyzing: true,
-          onAnalyzeTap: _onAnalyzeTap,
-        );
-
-      // 데이터 로드 완료
-      case _ScreenState.loaded:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // AI 진실 분석 카드
-            AiAnalysisCard(truthScore: _shopInfo?.trustScore ?? _r.truthScore),
-            const SizedBox(height: 16),
-
-            // 워드클라우드 카드 (단어가 있을 때만)
-            if (_wordFreqs.isNotEmpty) ...[
-              WordCloudCard(wordFreqs: _wordFreqs),
-              const SizedBox(height: 16),
-            ],
-
-            // 블로그 리뷰 리스트
-            if (_shopInfo != null)
-              ReviewListSection(
-                shopInfo: _shopInfo!,
-                blogs: _reviews,
+        return [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: NoDataCard(
+                isAnalyzing: false,
+                onAnalyzeTap: _onAnalyzeTap,
               ),
-          ],
-        );
+            ),
+          ),
+        ];
+
+      case _ScreenState.analyzing:
+        return [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: NoDataCard(
+                isAnalyzing: true,
+                onAnalyzeTap: _onAnalyzeTap,
+              ),
+            ),
+          ),
+        ];
+
+      case _ScreenState.loaded:
+        return [
+          // ── AI 분석 + 워드클라우드 (스크롤하면 사라짐) ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: SizedBox(
+                height: 200, // 고정 높이 → 워드클라우드 충분한 공간 확보
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 왼쪽: AI 진실 분석 (40%)
+                    Expanded(
+                      flex: 4,
+                      child: AiAnalysisCard(
+                        truthScore: _shopInfo?.trustScore ?? _r.truthScore,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 오른쪽: 리뷰 키워드 워드클라우드 (60%)
+                    Expanded(
+                      flex: 6,
+                      child: _wordFreqs.isNotEmpty
+                          ? WordCloudCard(wordFreqs: _wordFreqs)
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+          // ── 블로그 리스트 (스크롤 이어짐) ──
+          if (_shopInfo != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: ReviewListSection(
+                  shopInfo: _shopInfo!,
+                  blogs: _reviews,
+                ),
+              ),
+            ),
+        ];
     }
   }
+
+  // ── 유틸 ──────────────────────────────────────────────────────────────────
 
   Future<void> _copyPhone() async {
     final phone = _r.phone?.trim();
@@ -249,7 +293,6 @@ class _RestaurantDetailScreenState
       _showSnack('등록된 전화번호가 없습니다');
       return;
     }
-
     await Clipboard.setData(ClipboardData(text: phone));
     _showSnack('전화번호가 복사되었습니다');
   }
@@ -257,7 +300,6 @@ class _RestaurantDetailScreenState
   void _toggleBookmark() {
     final previous = ref.read(bookmarkRestaurantsProvider);
     final alreadyBookmarked = previous.any((item) => item.id == _r.id);
-
     ref.read(bookmarkRestaurantsProvider.notifier).toggle(_r);
     _showSnack(alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다');
   }
@@ -268,7 +310,6 @@ class _RestaurantDetailScreenState
       _showSnack('공유 가능한 링크가 없습니다');
       return;
     }
-
     await Clipboard.setData(ClipboardData(text: link));
     _showSnack('링크가 복사되었습니다');
   }
@@ -279,11 +320,7 @@ class _RestaurantDetailScreenState
       _showSnack('길찾기 링크가 없습니다');
       return;
     }
-
-    await launchUrl(
-      Uri.parse(link),
-      mode: LaunchMode.externalApplication,
-    );
+    await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
   }
 
   void _showSnack(String message) {
@@ -296,7 +333,8 @@ class _RestaurantDetailScreenState
     );
   }
 
-  // ── AppBar ────────────────────────────────────────────────────────────────────
+  // ── AppBar ─────────────────────────────────────────────────────────────────
+
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: AppColors.background,
@@ -346,7 +384,7 @@ class _RestaurantDetailScreenState
   }
 }
 
-// ── 로딩 인디케이터 ───────────────────────────────────────────────────────────
+// ── 로딩 인디케이터 ────────────────────────────────────────────────────────────
 
 class _LoadingIndicator extends StatelessWidget {
   const _LoadingIndicator();

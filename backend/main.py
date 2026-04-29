@@ -8,7 +8,7 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import search, places
+from routers import search, places, ai_recommend
 from services.electra_service import load_model
 
 
@@ -30,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(search.router, prefix="/api")
+app.include_router(ai_recommend.router, prefix="/api")
 app.include_router(places.router)
 
 

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'features/1-1_map/models/restaurant_model.dart';
+import 'features/1-1_map/providers/map_provider.dart';
 import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
+import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
 
 void main() {
@@ -28,22 +31,21 @@ class TruthMouthApp extends StatelessWidget {
   }
 }
 
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    MapScreen(),
-    BookmarkScreen(),
-    _PlaceholderScreen(icon: Icons.auto_awesome_outlined, label: 'AI 추천'),
-    SettingsScreen(),
-  ];
+  void _showRestaurantOnMap(RestaurantModel restaurant) {
+    ref.read(mapFocusRestaurantProvider.notifier).state = restaurant;
+    ref.read(selectedRestaurantProvider.notifier).state = restaurant;
+    setState(() => _currentIndex = 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +83,15 @@ class _MainShellState extends State<MainShell> {
       ),
       // ── 여기까지 추가 ──────────────────────────
 
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          const MapScreen(),
+          BookmarkScreen(onViewPlace: _showRestaurantOnMap),
+          AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
+          const SettingsScreen(),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(
@@ -122,28 +132,3 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 48, color: AppColors.textHint),
-          const SizedBox(height: 12),
-          Text('$label 화면',
-              style: const TextStyle(
-                  fontSize: 15, color: AppColors.textSecondary)),
-          const SizedBox(height: 6),
-          const Text('준비 중이에요',
-              style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-        ],
-      ),
-    );
-  }
-}

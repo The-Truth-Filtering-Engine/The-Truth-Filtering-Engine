@@ -129,10 +129,16 @@ class KakaoMapViewState extends State<KakaoMapView> {
       _syncCurrentLocationOverlay();
       _emitCameraIdle();
 
-      Future<void>.delayed(const Duration(milliseconds: 100), () {
-        if (!mounted || _map == null) return;
-        _map!.callMethod('relayout');
-      });
+      for (final delay in const [
+        Duration(milliseconds: 100),
+        Duration(milliseconds: 300),
+        Duration(milliseconds: 700),
+      ]) {
+        Future<void>.delayed(delay, () {
+          if (!mounted || _map == null) return;
+          _map!.callMethod('relayout');
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadError = error.toString());

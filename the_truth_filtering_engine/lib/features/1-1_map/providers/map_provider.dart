@@ -15,6 +15,10 @@ final restaurantListProvider = Provider<List<RestaurantModel>>((ref) {
 final selectedRestaurantProvider =
     StateProvider<RestaurantModel?>((ref) => null);
 
+// 외부 화면에서 지도 탭으로 이동시키며 특정 식당에 포커스할 때 사용
+final mapFocusRestaurantProvider =
+    StateProvider<RestaurantModel?>((ref) => null);
+
 // 북마크 목록
 final bookmarkRestaurantsProvider =
     StateNotifierProvider<BookmarkRestaurantsNotifier, List<RestaurantModel>>(

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/blog_review.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../common/stat_progress_bar.dart';
-import '../../../common/trust_circle.dart';
 import '../widgets/review_item.dart';
 
 // ── 스켈레톤 shimmer ──────────────────────────────────────────────────────────
@@ -138,6 +136,8 @@ class _ReviewListSectionState extends State<ReviewListSection>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // 탭 전환 시 리스트 다시 그리기
+    _tabController.addListener(() => setState(() {}));
   }
 
   @override
@@ -159,53 +159,20 @@ class _ReviewListSectionState extends State<ReviewListSection>
     }
   }
 
+  List<BlogReview> get _currentBlogs =>
+      _tabController.index == 0 ? _sortedByReal : _sortedByDate;
+
   @override
   Widget build(BuildContext context) {
-    final shop = widget.shopInfo;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 가게 요약 헤더 ──
+        // ── 탭바 ──
         Container(
           color: AppColors.surface,
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Column(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(shop.name, style: AppText.title()),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${shop.category} · 블로그 리뷰 ${shop.totalReviews}개',
-                          style: AppText.caption(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TrustCircle(shop.trustScore),
-                ],
-              ),
-              const SizedBox(height: 14),
-              StatProgressBar(
-                label: '광고 비율',
-                value: shop.adRatio.toDouble(),
-                color: AppColors.danger400,
-              ),
-              const SizedBox(height: 8),
-              StatProgressBar(
-                label: '진성 리뷰',
-                value: shop.realRatio.toDouble(),
-                color: AppColors.success400,
-              ),
-              const SizedBox(height: 14),
-
-              // ── 탭바 ──
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.bg,
@@ -246,45 +213,18 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
         const Divider(height: 1),
 
-        // ── 탭 뷰 (고정 높이로 내부 스크롤) ──
-        SizedBox(
-          height: 480,
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _BlogList(blogs: _sortedByReal, onTap: _openUrl),
-              _BlogList(blogs: _sortedByDate, onTap: _openUrl),
-            ],
+        // ── 리스트 (shrinkWrap → 외부 CustomScrollView에 스크롤 위임) ──
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemCount: _currentBlogs.length,
+          itemBuilder: (_, i) => ReviewItem(
+            blog: _currentBlogs[i],
+            onTap: () => _openUrl(_currentBlogs[i]),
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── 블로그 리스트 ─────────────────────────────────────────────────────────────
-
-class _BlogList extends StatelessWidget {
-  final List<BlogReview> blogs;
-  final void Function(BlogReview) onTap;
-
-  const _BlogList({required this.blogs, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    if (blogs.isEmpty) {
-      return const Center(
-        child: Text(
-          '리뷰가 없습니다',
-          style: TextStyle(fontSize: 13, color: Color(0xFF9090A8)),
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: blogs.length,
-      itemBuilder: (_, i) =>
-          ReviewItem(blog: blogs[i], onTap: () => onTap(blogs[i])),
     );
   }
 }
