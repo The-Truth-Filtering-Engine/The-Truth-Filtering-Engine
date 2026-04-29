@@ -169,6 +169,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         query: query,
                         initialLatitude: currentLocation?.latitude,
                         initialLongitude: currentLocation?.longitude,
+                        onViewPlace: _showRestaurantFromSearchResult,
                       ),
                     ),
                   );
@@ -238,7 +239,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     final link = selectedRestaurant.placeUrl?.trim();
                     if (link != null && link.isNotEmpty) {
                       final uri = Uri.parse(link);
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('길찾기 링크가 없습니다')),
@@ -254,6 +256,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onMarkerTapped(RestaurantModel restaurant) {
+    ref.read(selectedRestaurantProvider.notifier).state = restaurant;
+  }
+
+  void _showRestaurantFromSearchResult(RestaurantModel restaurant) {
+    ref.read(mapFocusRestaurantProvider.notifier).state = restaurant;
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
   }
 
@@ -423,9 +430,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       final focusedRestaurant = ref.read(mapFocusRestaurantProvider);
       final mergedRestaurants = _appendRestaurantIfMissing(
-        restaurants,
-        focusedRestaurant,
-      ) ?? restaurants;
+            restaurants,
+            focusedRestaurant,
+          ) ??
+          restaurants;
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
       if (selectedRestaurant != null &&
           mergedRestaurants.every((r) => r.id != selectedRestaurant.id)) {
