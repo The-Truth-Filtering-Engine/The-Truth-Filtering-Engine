@@ -32,12 +32,12 @@ class AiAnalysisCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           const Text(
             '실제 방문자 리뷰 기반의 신뢰도',
             style: TextStyle(fontSize: 11, color: Color(0xFF9090A8)),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 24),
 
           // ── 신뢰도 원형 + 바 ──
           Row(
@@ -89,6 +89,14 @@ class AiAnalysisCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // ── AI 한계 고지 ──
+          const Text(
+            '* AI 분석 결과는 참고용이며 오류가 있을 수 있습니다.',
+            style: TextStyle(fontSize: 10, color: Color(0xFFB0B0C8)),
           ),
         ],
       ),
