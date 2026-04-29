@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/theme/app_theme.dart';
 import '../../1-1_map/models/restaurant_model.dart';
-import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
 const _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
 
@@ -14,12 +13,14 @@ class RestaurantListScreen extends StatefulWidget {
   final String query;
   final double? initialLatitude;
   final double? initialLongitude;
+  final ValueChanged<RestaurantModel> onViewPlace;
 
   const RestaurantListScreen({
     super.key,
     required this.query,
     this.initialLatitude,
     this.initialLongitude,
+    required this.onViewPlace,
   });
 
   @override
@@ -99,7 +100,9 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
             if (permission == LocationPermission.whileInUse ||
                 permission == LocationPermission.always) {
               final position = await Geolocator.getCurrentPosition(
-                desiredAccuracy: LocationAccuracy.high,
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.high,
+                ),
               );
               lat = position.latitude;
               lng = position.longitude;
@@ -162,7 +165,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
             id: map['id']?.toString() ?? '',
             name: map['place_name']?.toString() ?? '',
             category: _parseCategory(map['category_name']?.toString() ?? ''),
-            address: (map['road_address_name']?.toString()?.isNotEmpty == true
+            address: (map['road_address_name']?.toString().isNotEmpty == true
                         ? map['road_address_name']
                         : map['address_name'])
                     ?.toString() ??
@@ -530,14 +533,10 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) => _RestaurantCard(
                     restaurant: results[i],
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RestaurantDetailScreen(
-                          restaurant: results[i],
-                        ),
-                      ),
-                    ),
+                    onTap: () {
+                      widget.onViewPlace(results[i]);
+                      Navigator.pop(context);
+                    },
                   ),
                 ),
         ),
