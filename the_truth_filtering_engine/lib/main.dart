@@ -87,7 +87,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         index: _currentIndex,
         children: [
           const MapScreen(),
-          const BookmarkScreen(),
+          BookmarkScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
           const SettingsScreen(),
         ],
