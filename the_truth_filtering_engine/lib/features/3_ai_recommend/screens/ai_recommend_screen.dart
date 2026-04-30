@@ -103,7 +103,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          '광고 가능성이 낮게 감지된 리뷰를 name별로 하나씩 모았어요.',
+          '가게별로 광고 가능성이 가장 낮게 감지된 리뷰입니다.',
           style: AppText.body().copyWith(color: AppColors.textSecondary),
         ),
       ],
