@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../../1-1_map/providers/map_provider.dart';
@@ -168,7 +169,46 @@ class _RestaurantDetailScreenState
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(), // AppBar는 항상 고정
+      appBar: _buildAppBar(),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: Color(0xFFEEEEEE), width: 0.5),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: ref.watch(mainTabIndexProvider),
+          onTap: (index) {
+            ref.read(mainTabIndexProvider.notifier).state = index;
+            Navigator.popUntil(context, (route) => route.isFirst);
+          },
+          selectedLabelStyle:
+              const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+          unselectedLabelStyle: const TextStyle(fontSize: 10),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map_outlined),
+              activeIcon: Icon(Icons.map_rounded),
+              label: '탐색',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.bookmark_border_rounded),
+              activeIcon: Icon(Icons.bookmark_rounded),
+              label: '북마크',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.auto_awesome_outlined),
+              activeIcon: Icon(Icons.auto_awesome_rounded),
+              label: 'AI 추천',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings_rounded),
+              label: '설정',
+            ),
+          ],
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           // ── 레스토랑 헤더 ──
@@ -363,18 +403,6 @@ class _RestaurantDetailScreenState
           style: AppTextStyles.restaurantName.copyWith(fontSize: 16),
         ),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined,
-              size: 20, color: AppColors.primary),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: const Icon(Icons.person_outline_rounded,
-              size: 20, color: AppColors.primary),
-          onPressed: () {},
-        ),
-      ],
       elevation: 0,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(0.5),
