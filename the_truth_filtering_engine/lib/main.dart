@@ -9,6 +9,8 @@ import 'features/1-1_map/screens/bookmark_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
 
+final mainTabIndexProvider = StateProvider<int>((ref) => 0);
+
 void main() {
   runApp(
     const ProviderScope(
@@ -39,12 +41,10 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
-  int _currentIndex = 0;
-
   void _showRestaurantOnMap(RestaurantModel restaurant) {
     ref.read(mapFocusRestaurantProvider.notifier).state = restaurant;
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
-    setState(() => _currentIndex = 0);
+    ref.read(mainTabIndexProvider.notifier).state = 0;
   }
 
   @override
@@ -84,7 +84,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       // ── 여기까지 추가 ──────────────────────────
 
       body: IndexedStack(
-        index: _currentIndex,
+        index: ref.watch(mainTabIndexProvider),
         children: [
           const MapScreen(),
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
@@ -99,8 +99,8 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          currentIndex: ref.watch(mainTabIndexProvider),
+          onTap: (index) => ref.read(mainTabIndexProvider.notifier).state = index,
           selectedLabelStyle:
               const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
