@@ -42,10 +42,60 @@ class KakaoMapViewState extends State<KakaoMapView> {
   bool _mapReady = false;
   bool _roadmapType = true;
   String? _loadError;
+  bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        'FlutterChannel',
+        onMessageReceived: (message) {
+          final data = jsonDecode(message.message);
+          final type = data['type'] as String;
+
+          if (type == 'markerTap') {
+            final id = data['id'] as String;
+            final restaurant = widget.restaurants.firstWhere((r) => r.id == id);
+            widget.onMarkerTap(restaurant);
+          } else if (type == 'cameraIdle') {
+            final center = MapPoint(
+              (data['lat'] as num).toDouble(),
+              (data['lng'] as num).toDouble(),
+            );
+            final sw = MapPoint(
+              (data['swLat'] as num).toDouble(),
+              (data['swLng'] as num).toDouble(),
+            );
+            final ne = MapPoint(
+              (data['neLat'] as num).toDouble(),
+              (data['neLng'] as num).toDouble(),
+            );
+            final level = (data['level'] as num).toInt();
+
+            widget.onCameraIdle(
+              KakaoMapCamera(
+                center: center,
+                bounds: MapBounds(southWest: sw, northEast: ne),
+                level: level,
+              ),
+            );
+          } else if (type == 'mapTap') {
+            widget.onMapTap?.call();
+          }
+        },
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (_) {
+            setState(() => _mapReady = true);
+            _syncRestaurantOverlays();
+            _syncCurrentLocationOverlay();
+          },
+        ),
+      );
+
     _initializeController();
   }
 
@@ -56,60 +106,18 @@ class KakaoMapViewState extends State<KakaoMapView> {
         throw Exception('백엔드 /config에 KAKAO_JS_KEY가 없습니다');
       }
 
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..addJavaScriptChannel(
-          'FlutterChannel',
-          onMessageReceived: (message) {
-            final data = jsonDecode(message.message);
-            final type = data['type'] as String;
-
-            if (type == 'markerTap') {
-              final id = data['id'] as String;
-              final restaurant = widget.restaurants.firstWhere((r) => r.id == id);
-              widget.onMarkerTap(restaurant);
-            } else if (type == 'cameraIdle') {
-              final center = MapPoint(
-                (data['lat'] as num).toDouble(),
-                (data['lng'] as num).toDouble(),
-              );
-              final sw = MapPoint(
-                (data['swLat'] as num).toDouble(),
-                (data['swLng'] as num).toDouble(),
-              );
-              final ne = MapPoint(
-                (data['neLat'] as num).toDouble(),
-                (data['neLng'] as num).toDouble(),
-              );
-              final level = (data['level'] as num).toInt();
-
-              widget.onCameraIdle(
-                KakaoMapCamera(
-                  center: center,
-                  bounds: MapBounds(southWest: sw, northEast: ne),
-                  level: level,
-                ),
-              );
-            } else if (type == 'mapTap') {
-              widget.onMapTap?.call();
-            }
-          },
-        )
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onPageFinished: (_) {
-              setState(() => _mapReady = true);
-              _syncRestaurantOverlays();
-              _syncCurrentLocationOverlay();
-            },
-          ),
-        );
-
       final htmlContent = _buildHtml(kakaoJsKey);
-      await _controller.loadHtmlString(htmlContent);
+      await _controller.loadHtmlString(
+        htmlContent,
+        baseUrl: 'http://localhost:8080',
+      );
     } catch (e) {
       if (mounted) {
         setState(() => _loadError = e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isInitializing = false);
       }
     }
   }
