@@ -154,8 +154,10 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
   Future<void> _openUrl(BlogReview blog) async {
     final uri = Uri.parse(blog.url);
-    if (await canLaunchUrl(uri)) {
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Could not launch ${blog.url}: $e');
     }
   }
 
