@@ -82,6 +82,7 @@ body {
 .restaurant-actions button:focus-visible,
 .detail-button:focus-visible,
 .detail-secondary-button:focus-visible,
+.ai-region-tabs button:focus-visible,
 .review-tabs button:focus-visible,
 .review-card:focus-visible {
   outline: 2px solid #2563eb;
@@ -631,6 +632,204 @@ body {
   align-items: center;
   margin-top: 9px;
   color: #2563eb;
+}
+
+.ai-panel {
+  background: #f8fafc;
+}
+
+.ai-panel .bookmark-panel-header > svg {
+  background: #3b2f71;
+}
+
+.ai-panel-description {
+  margin: -10px 0 16px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ai-region-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 0 0 9px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.ai-region-tabs button {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: 800 13px/1 system-ui, sans-serif;
+}
+
+.ai-region-tabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.ai-region-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ai-current-region {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.ai-current-region span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ai-current-region strong {
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.ai-current-region small {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.ai-region-status {
+  min-height: 17px;
+  margin: 0 0 14px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.ai-recommend-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.ai-recommend-card {
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.ai-card-heading {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ai-card-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-card-heading span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef0ff;
+  color: #26336b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ai-recommend-card h3 {
+  margin: 11px 0 0;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ai-recommend-card p {
+  display: -webkit-box;
+  margin: 7px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-recommend-card small {
+  display: block;
+  margin-top: 10px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-card-actions,
+.ai-pagination {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ai-card-actions {
+  margin-top: 12px;
+}
+
+.ai-card-actions button,
+.ai-pagination button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #2563eb;
+  cursor: pointer;
+  font: 800 12px/1 system-ui, sans-serif;
+}
+
+.ai-card-actions button:disabled,
+.ai-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ai-pagination {
+  margin-top: 14px;
+}
+
+.ai-pagination button:last-child {
+  border-color: transparent;
+  background: #111827;
+  color: #ffffff;
 }
 
 .map-toast {

@@ -58,6 +58,42 @@ type DetailData = {
   keywords: Array<{ word: string; count: number }>
 }
 
+type AiRecommendItem = {
+  id: number
+  name: string
+  reviewTitle: string
+  reviewDescription: string
+  reviewUrl: string
+  bloggerName: string
+  postDate: string
+  adScore: number
+  placeId: string
+  placeName: string
+  address: string
+  category: string
+  latitude: number | null
+  longitude: number | null
+  placeUrl: string
+  phone: string
+}
+
+type AiRecommendState = {
+  items: AiRecommendItem[]
+  page: number
+  hasNext: boolean
+  isLoading: boolean
+  errorMessage: string
+  hasLoaded: boolean
+  regionLabel: string
+  currentRegionLabel: string
+  currentRegionSi: string
+  currentRegionGu: string
+  currentRegionDong: string
+  isRegionFiltered: boolean
+}
+
+type AiRegionScope = 'dong' | 'gu' | 'si'
+
 type KakaoLatLng = {
   getLat: () => number
   getLng: () => number
@@ -117,6 +153,12 @@ const FOCUSED_LEVEL = 1
 const VIEWPORT_DEBOUNCE_MS = 600
 const REFRESH_DISTANCE_METERS = 150
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
+const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
+  si: '시',
+  gu: '구',
+  dong: '동',
+}
+const AI_REGION_SCOPE_OPTIONS: AiRegionScope[] = ['si', 'gu', 'dong']
 
 let kakaoMapsLoader: Promise<KakaoMaps> | null = null
 
@@ -442,6 +484,48 @@ async function fetchDetailJson(path: string, signal: AbortSignal) {
   }
 }
 
+function parseAiRecommendItem(item: Record<string, unknown>): AiRecommendItem {
+  return {
+    id: Number(item.id ?? 0),
+    name: cleanText(item.name),
+    reviewTitle: cleanText(item.reviewTitle),
+    reviewDescription: cleanText(item.reviewDescription),
+    reviewUrl: cleanText(item.reviewUrl),
+    bloggerName: cleanText(item.bloggerName),
+    postDate: formatReviewDate(item.postDate),
+    adScore: Number(item.adScore ?? 0),
+    placeId: cleanText(item.placeId),
+    placeName: cleanText(item.placeName),
+    address: cleanText(item.address),
+    category: cleanText(item.category) || '음식점',
+    latitude: Number.isFinite(Number(item.lat)) ? Number(item.lat) : null,
+    longitude: Number.isFinite(Number(item.lng)) ? Number(item.lng) : null,
+    placeUrl: cleanText(item.placeUrl),
+    phone: cleanText(item.phone),
+  }
+}
+
+function aiRecommendToRestaurant(item: AiRecommendItem): Restaurant | null {
+  if (item.latitude === null || item.longitude === null) return null
+
+  return {
+    id: item.placeId || `review-${item.id}`,
+    name: item.placeName || item.name || '이름 없는 장소',
+    address: item.address,
+    category: item.category || '음식점',
+    distance: 0,
+    phone: item.phone,
+    link: item.placeUrl,
+    latitude: item.latitude,
+    longitude: item.longitude,
+  }
+}
+
+function formatAdScore(adScore: number) {
+  if (!Number.isFinite(adScore)) return '정보 없음'
+  return `${Math.round(Math.max(0, Math.min(1, adScore)) * 100)}%`
+}
+
 function normalizeRestaurant(value: unknown): Restaurant | null {
   if (!value || typeof value !== 'object') return null
 
@@ -507,7 +591,7 @@ function App() {
     loadBookmarkedRestaurants(),
   )
   const [activeSidePanel, setActiveSidePanel] = useState<
-    'restaurant' | 'bookmarks' | 'detail' | null
+    'restaurant' | 'bookmarks' | 'detail' | 'ai' | null
   >(
     null,
   )
@@ -515,6 +599,22 @@ function App() {
   const [detailData, setDetailData] = useState<DetailData | null>(null)
   const [detailErrorMessage, setDetailErrorMessage] = useState('')
   const [reviewSort, setReviewSort] = useState<'real' | 'latest'>('real')
+  const [currentPosition, setCurrentPosition] = useState<MapPoint | null>(null)
+  const [aiRegionScope, setAiRegionScope] = useState<AiRegionScope>('si')
+  const [aiRecommendState, setAiRecommendState] = useState<AiRecommendState>({
+    items: [],
+    page: 1,
+    hasNext: false,
+    isLoading: false,
+    errorMessage: '',
+    hasLoaded: false,
+    regionLabel: '',
+    currentRegionLabel: '',
+    currentRegionSi: '',
+    currentRegionGu: '',
+    currentRegionDong: '',
+    isRegionFiltered: false,
+  })
   const [toastMessage, setToastMessage] = useState('')
   const bookmarkedIds = bookmarkedRestaurants.map((restaurant) => restaurant.id)
   const detailRequestIdRef = useRef(0)
@@ -654,6 +754,104 @@ function App() {
     loadRestaurantDetail(restaurant, forceFresh)
   }
 
+  async function loadAiRecommendations(page: number, regionScope = aiRegionScope) {
+    setAiRecommendState((previous) => ({
+      ...previous,
+      page,
+      isLoading: true,
+      errorMessage: '',
+    }))
+
+    try {
+      const params = new URLSearchParams({
+        threshold: '0.1',
+        page: page.toString(),
+        pageSize: '10',
+        regionScope,
+      })
+      if (currentPosition) {
+        params.set('lat', currentPosition.latitude.toString())
+        params.set('lng', currentPosition.longitude.toString())
+      }
+
+      const response = await fetch(
+        `${BACKEND_BASE_URL}/api/ai-recommendations?${params.toString()}`,
+      )
+
+      if (!response.ok) {
+        throw new Error(`서버 응답 ${response.status}`)
+      }
+
+      const data = (await response.json()) as {
+        items?: Record<string, unknown>[]
+        page?: number | string
+        hasNext?: boolean
+        regionLabel?: string
+        currentRegion?: {
+          si?: string
+          gu?: string
+          dong?: string
+          label?: string
+        } | null
+        isRegionFiltered?: boolean
+      }
+      const items = (data.items ?? [])
+        .map(parseAiRecommendItem)
+        .filter((item) => item.id !== 0)
+
+      setAiRecommendState({
+        items,
+        page: Number(data.page ?? page) || page,
+        hasNext: data.hasNext === true,
+        isLoading: false,
+        errorMessage: '',
+        hasLoaded: true,
+        regionLabel: cleanText(data.regionLabel),
+        currentRegionLabel: cleanText(data.currentRegion?.label),
+        currentRegionSi: cleanText(data.currentRegion?.si),
+        currentRegionGu: cleanText(data.currentRegion?.gu),
+        currentRegionDong: cleanText(data.currentRegion?.dong),
+        isRegionFiltered: data.isRegionFiltered === true,
+      })
+    } catch (error) {
+      setAiRecommendState((previous) => ({
+        ...previous,
+        isLoading: false,
+        errorMessage:
+          error instanceof Error ? error.message : 'AI 추천 API 오류',
+        hasLoaded: true,
+      }))
+    }
+  }
+
+  function openAiPanel() {
+    setSelectedRestaurant(null)
+    setActiveSidePanel((current) => {
+      const next = current === 'ai' ? null : 'ai'
+      if (next === 'ai' && !aiRecommendState.hasLoaded) {
+        loadAiRecommendations(1)
+      }
+      return next
+    })
+  }
+
+  function changeAiRegionScope(regionScope: AiRegionScope) {
+    setAiRegionScope(regionScope)
+    if (activeSidePanel === 'ai') {
+      loadAiRecommendations(1, regionScope)
+    }
+  }
+
+  function focusAiRecommendation(item: AiRecommendItem) {
+    const restaurant = aiRecommendToRestaurant(item)
+    if (!restaurant) {
+      showToast('위치 정보가 없는 추천입니다')
+      return
+    }
+
+    focusRestaurantOnMap(restaurant)
+  }
+
   useEffect(() => {
     let canceled = false
 
@@ -772,6 +970,10 @@ function App() {
         try {
           const position = await getCurrentPosition()
           if (canceled) return
+          setCurrentPosition({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
 
           const currentCenter = new kakaoMaps.LatLng(
             position.coords.latitude,
@@ -1162,6 +1364,177 @@ function App() {
           </section>
         </aside>
       )}
+      {activeSidePanel === 'ai' && (
+        <aside className="restaurant-panel ai-panel" aria-label="AI 추천">
+          <button
+            type="button"
+            className="panel-close-button"
+            aria-label="AI 추천 닫기"
+            onClick={() => setActiveSidePanel(null)}
+          >
+            <X aria-hidden="true" size={19} strokeWidth={2.2} />
+          </button>
+
+          <section className="bookmark-panel-body">
+            <div className="bookmark-panel-header">
+              <Sparkles aria-hidden="true" size={22} strokeWidth={2.2} />
+              <div>
+                <p>{aiRecommendState.page} 페이지</p>
+                <h2>AI 추천</h2>
+              </div>
+            </div>
+            <p className="ai-panel-description">
+              가게별로 광고 가능성이 낮게 감지된 리뷰입니다.
+            </p>
+            {aiRecommendState.currentRegionLabel && (
+              <div className="ai-current-region" aria-label="현재 위치 행정구역">
+                <span>현재 위치</span>
+                <strong>{aiRecommendState.currentRegionLabel}</strong>
+              </div>
+            )}
+            <div className="ai-region-tabs" role="tablist" aria-label="추천 지역 범위">
+              {AI_REGION_SCOPE_OPTIONS.map((regionScope) => (
+                <button
+                  type="button"
+                  key={regionScope}
+                  className={aiRegionScope === regionScope ? 'active' : ''}
+                  disabled={aiRecommendState.isLoading}
+                  onClick={() => changeAiRegionScope(regionScope)}
+                >
+                  {AI_REGION_SCOPE_LABELS[regionScope]}
+                </button>
+              ))}
+            </div>
+            {!aiRecommendState.currentRegionLabel && (
+              <p className="ai-region-status">
+                {currentPosition
+                  ? '현재 위치를 확인하는 중입니다'
+                  : '현재 위치를 확인하면 지역별 추천이 적용됩니다'}
+              </p>
+            )}
+
+            {aiRecommendState.isLoading && aiRecommendState.items.length === 0 && (
+              <div className="detail-state-card">
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="spinning-icon"
+                  size={24}
+                  strokeWidth={2.2}
+                />
+                <strong>AI 추천을 불러오는 중입니다</strong>
+                <p>광고 가능성이 낮은 리뷰를 찾고 있어요.</p>
+              </div>
+            )}
+
+            {aiRecommendState.errorMessage && aiRecommendState.items.length === 0 && (
+              <div className="detail-state-card detail-state-error">
+                <AlertCircle aria-hidden="true" size={24} strokeWidth={2.2} />
+                <strong>AI 추천 목록을 불러오지 못했어요</strong>
+                <p>{aiRecommendState.errorMessage}</p>
+                <button
+                  type="button"
+                  className="detail-secondary-button"
+                  onClick={() => loadAiRecommendations(aiRecommendState.page)}
+                >
+                  <RefreshCw aria-hidden="true" size={16} strokeWidth={2.2} />
+                  다시 시도
+                </button>
+              </div>
+            )}
+
+            {!aiRecommendState.isLoading &&
+              !aiRecommendState.errorMessage &&
+              aiRecommendState.items.length === 0 && (
+                <div className="bookmark-empty">
+                  표시할 추천 데이터가 없습니다
+                </div>
+              )}
+
+            {aiRecommendState.items.length > 0 && (
+              <>
+                <ul className="ai-recommend-list">
+                  {aiRecommendState.items.map((item) => {
+                    const restaurant = aiRecommendToRestaurant(item)
+                    const placeName =
+                      item.placeName || item.name || '이름 없는 장소'
+
+                    return (
+                      <li key={item.id}>
+                        <article className="ai-recommend-card">
+                          <div className="ai-card-heading">
+                            <strong>{placeName}</strong>
+                            <span>광고 가능성 {formatAdScore(item.adScore)}</span>
+                          </div>
+                          <h3>{item.reviewTitle || '제목 없는 리뷰'}</h3>
+                          {item.reviewDescription && (
+                            <p>{item.reviewDescription}</p>
+                          )}
+                          <small>
+                            {[item.bloggerName, item.postDate]
+                              .filter(Boolean)
+                              .join(' · ') || '블로그 리뷰'}
+                          </small>
+                          <div className="ai-card-actions">
+                            <button
+                              type="button"
+                              disabled={!restaurant}
+                              onClick={() => focusAiRecommendation(item)}
+                            >
+                              <MapPin
+                                aria-hidden="true"
+                                size={15}
+                                strokeWidth={2.2}
+                              />
+                              위치 보기
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!item.reviewUrl}
+                              onClick={() => {
+                                if (item.reviewUrl) {
+                                  window.open(
+                                    item.reviewUrl,
+                                    '_blank',
+                                    'noopener,noreferrer',
+                                  )
+                                }
+                              }}
+                            >
+                              <ExternalLink
+                                aria-hidden="true"
+                                size={15}
+                                strokeWidth={2.2}
+                              />
+                              리뷰 열기
+                            </button>
+                          </div>
+                        </article>
+                      </li>
+                    )
+                  })}
+                </ul>
+
+                <div className="ai-pagination">
+                  <button
+                    type="button"
+                    disabled={aiRecommendState.page <= 1 || aiRecommendState.isLoading}
+                    onClick={() => loadAiRecommendations(aiRecommendState.page - 1)}
+                  >
+                    이전 10개
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!aiRecommendState.hasNext || aiRecommendState.isLoading}
+                    onClick={() => loadAiRecommendations(aiRecommendState.page + 1)}
+                  >
+                    {aiRecommendState.isLoading ? '불러오는 중' : '다음 10개'}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </aside>
+      )}
       <nav className="map-tool-rail" aria-label="지도 메뉴">
         <button
           type="button"
@@ -1176,7 +1549,12 @@ function App() {
         >
           <Bookmark aria-hidden="true" size={20} strokeWidth={2.2} />
         </button>
-        <button type="button" className="map-tool-button" aria-label="AI 추천">
+        <button
+          type="button"
+          className="map-tool-button"
+          aria-label="AI 추천"
+          onClick={openAiPanel}
+        >
           <Sparkles aria-hidden="true" size={20} strokeWidth={2.2} />
         </button>
         <button type="button" className="map-tool-button" aria-label="설정">
