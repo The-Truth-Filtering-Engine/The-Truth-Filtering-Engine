@@ -44,6 +44,196 @@ body {
   color: #991b1b;
 }
 
+.restaurant-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  width: 33.333vw;
+  min-width: 340px;
+  max-width: 460px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: 10px 0 32px rgba(15, 23, 42, 0.18);
+}
+
+.panel-close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.panel-close-button:focus-visible,
+.restaurant-actions button:focus-visible,
+.detail-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.restaurant-panel-hero {
+  display: flex;
+  min-height: 168px;
+  align-items: flex-end;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 64px 24px 20px;
+  background:
+    linear-gradient(135deg, rgba(17, 24, 39, 0.92), rgba(42, 52, 71, 0.84)),
+    #111827;
+}
+
+.restaurant-thumbnail {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  font-size: 42px;
+}
+
+.truth-badge {
+  display: grid;
+  width: 74px;
+  min-height: 74px;
+  place-items: center;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111827;
+}
+
+.truth-badge span {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.truth-badge strong {
+  margin-top: -6px;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.restaurant-panel-body {
+  padding: 24px;
+}
+
+.restaurant-category {
+  margin: 0 0 8px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.restaurant-panel h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.restaurant-meta {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.restaurant-meta svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.restaurant-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.restaurant-actions button {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  gap: 7px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #2b54e8;
+  cursor: pointer;
+  font: 700 12px/1 system-ui, sans-serif;
+}
+
+.restaurant-actions button svg {
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 50%;
+  background: #eef0ff;
+}
+
+.detail-button {
+  display: flex;
+  width: 100%;
+  height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+  border: 0;
+  border-radius: 12px;
+  background: #1a1a1a;
+  color: #ffffff;
+  cursor: pointer;
+  font: 700 15px/1 system-ui, sans-serif;
+}
+
+.map-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 4;
+  max-width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  padding: 11px 16px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .restaurant-panel {
+    width: min(92vw, 420px);
+    min-width: 0;
+  }
+}
+
 .current-location-marker {
   display: flex;
   width: 34px;
@@ -77,4 +267,37 @@ body {
   font-size: 16px;
   line-height: 26px;
   text-align: center;
+}
+
+.map-tool-rail {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-tool-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.14);
+  color: #182238;
+  cursor: pointer;
+}
+
+.map-tool-button:hover {
+  background: #ffffff;
+}
+
+.map-tool-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
