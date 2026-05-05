@@ -6,6 +6,7 @@ import {
   Clock,
   ExternalLink,
   Info,
+  LocateFixed,
   LoaderCircle,
   MapPin,
   Navigation,
@@ -115,6 +116,7 @@ type KakaoMap = {
 
 type KakaoCustomOverlay = {
   setMap: (map: KakaoMap | null) => void
+  setPosition: (latLng: KakaoLatLng) => void
 }
 
 type KakaoMaps = {
@@ -580,6 +582,7 @@ function App() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const kakaoMapsRef = useRef<KakaoMaps | null>(null)
   const kakaoMapRef = useRef<KakaoMap | null>(null)
+  const currentLocationOverlayRef = useRef<KakaoCustomOverlay | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [placesErrorMessage, setPlacesErrorMessage] = useState('')
@@ -660,6 +663,49 @@ function App() {
     map.setLevel(FOCUSED_LEVEL)
     setSelectedRestaurant(restaurant)
     setActiveSidePanel('restaurant')
+  }
+
+  async function focusCurrentLocationOnMap() {
+    const kakaoMaps = kakaoMapsRef.current
+    const map = kakaoMapRef.current
+
+    if (!kakaoMaps || !map) {
+      showToast('지도가 아직 준비되지 않았습니다')
+      return
+    }
+
+    try {
+      const position = await getCurrentPosition()
+      const nextPosition = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      }
+      const latLng = new kakaoMaps.LatLng(
+        nextPosition.latitude,
+        nextPosition.longitude,
+      )
+
+      setCurrentPosition(nextPosition)
+      map.setCenter(latLng)
+      map.setLevel(FOCUSED_LEVEL)
+
+      if (currentLocationOverlayRef.current) {
+        currentLocationOverlayRef.current.setPosition(latLng)
+      } else {
+        const overlay = new kakaoMaps.CustomOverlay({
+          content: createCurrentLocationMarker(),
+          position: latLng,
+          xAnchor: 0.5,
+          yAnchor: 0.5,
+        })
+        overlay.setMap(map)
+        currentLocationOverlayRef.current = overlay
+      }
+
+      showToast('현재 위치로 이동했습니다')
+    } catch {
+      showToast('현재 위치를 가져오지 못했습니다')
+    }
   }
 
   function handleCall(restaurant: Restaurant) {
@@ -989,6 +1035,7 @@ function App() {
 
           map.setCenter(currentCenter)
           currentLocationOverlay.setMap(map)
+          currentLocationOverlayRef.current = currentLocationOverlay
         } catch {
           // 위치 권한 거부나 브라우저 제한이 있어도 기본 위치의 지도를 유지합니다.
         }
@@ -1537,6 +1584,14 @@ function App() {
         </aside>
       )}
       <nav className="map-tool-rail" aria-label="지도 메뉴">
+        <button
+          type="button"
+          className="map-tool-button"
+          aria-label="내 위치로 이동"
+          onClick={focusCurrentLocationOnMap}
+        >
+          <LocateFixed aria-hidden="true" size={20} strokeWidth={2.2} />
+        </button>
         <button
           type="button"
           className="map-tool-button"
