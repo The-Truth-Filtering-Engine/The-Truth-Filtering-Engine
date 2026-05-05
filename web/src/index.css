@@ -1,0 +1,926 @@
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100%;
+}
+
+.map-page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+}
+
+.map-status {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 1;
+  max-width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #172033;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.map-status-error {
+  color: #991b1b;
+}
+
+.restaurant-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  width: 33.333vw;
+  min-width: 340px;
+  max-width: 460px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: 10px 0 32px rgba(15, 23, 42, 0.18);
+}
+
+.panel-close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.panel-close-button:focus-visible,
+.panel-icon-button:focus-visible,
+.restaurant-actions button:focus-visible,
+.detail-button:focus-visible,
+.detail-secondary-button:focus-visible,
+.ai-region-tabs button:focus-visible,
+.review-tabs button:focus-visible,
+.review-card:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.restaurant-panel-hero {
+  display: flex;
+  min-height: 168px;
+  align-items: flex-end;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  padding: 64px 24px 20px;
+  background:
+    linear-gradient(135deg, rgba(17, 24, 39, 0.92), rgba(42, 52, 71, 0.84)),
+    #111827;
+}
+
+.restaurant-thumbnail {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  font-size: 42px;
+}
+
+.restaurant-panel-body {
+  padding: 24px;
+}
+
+.restaurant-category {
+  margin: 0 0 8px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.restaurant-panel h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.restaurant-meta {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.restaurant-meta svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.restaurant-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.restaurant-actions button {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  gap: 7px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #2b54e8;
+  cursor: pointer;
+  font: 700 12px/1 system-ui, sans-serif;
+}
+
+.restaurant-actions button svg {
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 50%;
+  background: #eef0ff;
+}
+
+.detail-button {
+  display: flex;
+  width: 100%;
+  height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+  border: 0;
+  border-radius: 12px;
+  background: #1a1a1a;
+  color: #ffffff;
+  cursor: pointer;
+  font: 700 15px/1 system-ui, sans-serif;
+}
+
+.bookmark-panel {
+  background: #f8fafc;
+}
+
+.bookmark-panel-body {
+  padding: 28px 22px;
+}
+
+.bookmark-panel-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-right: 44px;
+  margin-bottom: 24px;
+}
+
+.bookmark-panel-header > svg {
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 11px;
+  border-radius: 14px;
+  background: #111827;
+  color: #ffffff;
+}
+
+.bookmark-panel-header p {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bookmark-panel-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.bookmark-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bookmark-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.bookmark-list li {
+  display: grid;
+  grid-template-columns: 1fr 38px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.bookmark-list-item,
+.bookmark-remove-button {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.bookmark-list-item {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  min-width: 0;
+  align-items: center;
+  padding: 10px;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.bookmark-list-item:focus-visible,
+.bookmark-remove-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.bookmark-thumb {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: #eef0ff;
+  font-size: 20px;
+}
+
+.bookmark-copy {
+  min-width: 0;
+}
+
+.bookmark-copy strong,
+.bookmark-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-copy strong {
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.bookmark-copy small {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.bookmark-remove-button {
+  display: grid;
+  width: 38px;
+  padding: 0;
+  place-items: center;
+  border-radius: 13px;
+  color: #2b54e8;
+}
+
+.detail-panel {
+  background: #f8fafc;
+}
+
+.detail-panel-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.detail-panel-topbar strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 15px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-icon-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.detail-panel-body {
+  padding: 18px 18px 28px;
+}
+
+.detail-restaurant-card {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 13px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.detail-thumb {
+  width: 52px;
+  height: 52px;
+  font-size: 24px;
+}
+
+.detail-restaurant-card p,
+.detail-restaurant-card h2,
+.detail-restaurant-card small {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-restaurant-card p {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.detail-restaurant-card h2 {
+  margin-top: 4px;
+  color: #111827;
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.detail-restaurant-card small {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.detail-actions {
+  margin: 18px 0 22px;
+}
+
+.detail-state-card,
+.detail-section {
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+}
+
+.detail-state-card {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  min-height: 180px;
+  color: #334155;
+  text-align: center;
+}
+
+.detail-state-card strong {
+  color: #111827;
+  font-size: 15px;
+}
+
+.detail-state-card p,
+.detail-muted {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detail-state-error {
+  color: #991b1b;
+}
+
+.spinning-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.detail-secondary-button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  font: 700 13px/1 system-ui, sans-serif;
+}
+
+.detail-section {
+  margin-top: 14px;
+}
+
+.detail-section-heading {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 10px;
+  color: #111827;
+}
+
+.detail-section-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.keyword-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyword-cloud span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: #eef0ff;
+  color: #26336b;
+  font-weight: 800;
+}
+
+.review-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.review-section .detail-section-heading {
+  padding: 16px 16px 0;
+}
+
+.review-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 4px 16px 0;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.review-tabs button {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: 800 13px/1 system-ui, sans-serif;
+}
+
+.review-tabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.review-list {
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px 18px;
+  margin: 0;
+  list-style: none;
+}
+
+.review-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 13px;
+  background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.review-card strong,
+.review-card p,
+.review-card small {
+  display: block;
+}
+
+.review-card strong {
+  padding-right: 52px;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.review-card p {
+  margin: 8px 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-card small,
+.review-open {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.review-grade {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.review-grade.real {
+  background: #e8f5e9;
+  color: #1b7a3a;
+}
+
+.review-grade.suspicious {
+  background: #fff7d6;
+  color: #9a6400;
+}
+
+.review-grade.ad {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.review-open {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 9px;
+  color: #2563eb;
+}
+
+.ai-panel {
+  background: #f8fafc;
+}
+
+.ai-panel .bookmark-panel-header > svg {
+  background: #3b2f71;
+}
+
+.ai-panel-description {
+  margin: -10px 0 16px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ai-region-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 0 0 9px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.ai-region-tabs button {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: 800 13px/1 system-ui, sans-serif;
+}
+
+.ai-region-tabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.ai-region-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ai-current-region {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.ai-current-region span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ai-current-region strong {
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.ai-current-region small {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.ai-region-status {
+  min-height: 17px;
+  margin: 0 0 14px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.ai-recommend-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.ai-recommend-card {
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.ai-card-heading {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ai-card-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-card-heading span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef0ff;
+  color: #26336b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ai-recommend-card h3 {
+  margin: 11px 0 0;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ai-recommend-card p {
+  display: -webkit-box;
+  margin: 7px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-recommend-card small {
+  display: block;
+  margin-top: 10px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-card-actions,
+.ai-pagination {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ai-card-actions {
+  margin-top: 12px;
+}
+
+.ai-card-actions button,
+.ai-pagination button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #2563eb;
+  cursor: pointer;
+  font: 800 12px/1 system-ui, sans-serif;
+}
+
+.ai-card-actions button:disabled,
+.ai-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ai-pagination {
+  margin-top: 14px;
+}
+
+.ai-pagination button:last-child {
+  border-color: transparent;
+  background: #111827;
+  color: #ffffff;
+}
+
+.map-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 4;
+  max-width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  padding: 11px 16px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .restaurant-panel {
+    width: min(92vw, 420px);
+    min-width: 0;
+  }
+}
+
+.current-location-marker {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(35, 160, 255, 0.2);
+}
+
+.current-location-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #ff0000;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.28);
+  box-sizing: border-box;
+}
+
+.restaurant-marker {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #17b26a;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.24);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 26px;
+  text-align: center;
+}
+
+.map-tool-rail {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-tool-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.14);
+  color: #182238;
+  cursor: pointer;
+}
+
+.map-tool-button:hover {
+  background: #ffffff;
+}
+
+.map-tool-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
