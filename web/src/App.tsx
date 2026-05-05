@@ -27,7 +27,6 @@ type Restaurant = {
   distance: number
   phone: string
   link: string
-  truthScore: number
   latitude: number
   longitude: number
 }
@@ -48,6 +47,7 @@ type KakaoMap = {
   getLevel: () => number
   relayout: () => void
   setCenter: (latLng: KakaoLatLng) => void
+  setLevel: (level: number) => void
 }
 
 type KakaoCustomOverlay = {
@@ -86,6 +86,7 @@ const BACKEND_BASE_URL =
 const KAKAO_SDK_ID = 'kakao-map-sdk'
 const INITIAL_CENTER = { latitude: 37.5245, longitude: 127.037 }
 const INITIAL_LEVEL = 4
+const FOCUSED_LEVEL = 1
 const VIEWPORT_DEBOUNCE_MS = 600
 const REFRESH_DISTANCE_METERS = 150
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
@@ -281,7 +282,6 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
       distance: Number(item.distance ?? 0),
       phone: item.phone?.toString() ?? '',
       link: item.link?.toString() ?? '',
-      truthScore: mockTruthScore(item.id?.toString() ?? ''),
       latitude: Number(item.lat),
       longitude: Number(item.lng),
     }))
@@ -295,21 +295,39 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
     )
 }
 
-function mockTruthScore(id: string) {
-  let hash = 0
-  for (const char of id) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-  }
-  return 60 + (hash % 40)
-}
-
 function formatDistance(distance: number) {
   if (!Number.isFinite(distance) || distance <= 0) return '거리 정보 없음'
   if (distance >= 1000) return `${(distance / 1000).toFixed(1)}km`
   return `${Math.round(distance)}m`
 }
 
-function loadBookmarkedIds() {
+function normalizeRestaurant(value: unknown): Restaurant | null {
+  if (!value || typeof value !== 'object') return null
+
+  const item = value as Record<string, unknown>
+  const id = item.id?.toString() ?? ''
+  const name = item.name?.toString() ?? ''
+  const latitude = Number(item.latitude ?? item.lat)
+  const longitude = Number(item.longitude ?? item.lng)
+
+  if (!id || !name || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null
+  }
+
+  return {
+    id,
+    name,
+    address: item.address?.toString() ?? '',
+    category: item.category?.toString() ?? '음식점',
+    distance: Number(item.distance ?? 0),
+    phone: item.phone?.toString() ?? '',
+    link: (item.link ?? item.placeUrl)?.toString() ?? '',
+    latitude,
+    longitude,
+  }
+}
+
+function loadBookmarkedRestaurants() {
   try {
     const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY)
     if (!raw) return []
@@ -318,35 +336,42 @@ function loadBookmarkedIds() {
     if (!Array.isArray(decoded)) return []
 
     return decoded
-      .map((item) => {
-        if (typeof item === 'string') return item
-        if (item && typeof item === 'object' && 'id' in item) {
-          return String(item.id)
-        }
-        return ''
-      })
-      .filter(Boolean)
+      .map((item) => normalizeRestaurant(item))
+      .filter((restaurant): restaurant is Restaurant => Boolean(restaurant))
   } catch {
     return []
   }
 }
 
-function saveBookmarkedIds(bookmarkedIds: string[]) {
-  window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(bookmarkedIds))
+function saveBookmarkedRestaurants(bookmarkedRestaurants: Restaurant[]) {
+  window.localStorage.setItem(
+    BOOKMARK_STORAGE_KEY,
+    JSON.stringify(bookmarkedRestaurants),
+  )
 }
 
 function App() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
+  const kakaoMapsRef = useRef<KakaoMaps | null>(null)
+  const kakaoMapRef = useRef<KakaoMap | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [placesErrorMessage, setPlacesErrorMessage] = useState('')
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
     null,
   )
-  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() =>
-    loadBookmarkedIds(),
+  const [bookmarkedRestaurants, setBookmarkedRestaurants] = useState<
+    Restaurant[]
+  >(() =>
+    loadBookmarkedRestaurants(),
+  )
+  const [activeSidePanel, setActiveSidePanel] = useState<
+    'restaurant' | 'bookmarks' | null
+  >(
+    null,
   )
   const [toastMessage, setToastMessage] = useState('')
+  const bookmarkedIds = bookmarkedRestaurants.map((restaurant) => restaurant.id)
 
   function showToast(message: string) {
     setToastMessage(message)
@@ -363,16 +388,31 @@ function App() {
   }
 
   function toggleBookmark(restaurant: Restaurant) {
-    setBookmarkedIds((previous) => {
-      const bookmarked = previous.includes(restaurant.id)
+    setBookmarkedRestaurants((previous) => {
+      const bookmarked = previous.some((item) => item.id === restaurant.id)
       const next = bookmarked
-        ? previous.filter((id) => id !== restaurant.id)
-        : [...previous, restaurant.id]
+        ? previous.filter((item) => item.id !== restaurant.id)
+        : [restaurant, ...previous]
 
-      saveBookmarkedIds(next)
+      saveBookmarkedRestaurants(next)
       showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
       return next
     })
+  }
+
+  function focusRestaurantOnMap(restaurant: Restaurant) {
+    const kakaoMaps = kakaoMapsRef.current
+    const map = kakaoMapRef.current
+
+    if (!kakaoMaps || !map) {
+      showToast('지도가 아직 준비되지 않았습니다')
+      return
+    }
+
+    map.setCenter(new kakaoMaps.LatLng(restaurant.latitude, restaurant.longitude))
+    map.setLevel(FOCUSED_LEVEL)
+    setSelectedRestaurant(restaurant)
+    setActiveSidePanel('restaurant')
   }
 
   function handleCall(restaurant: Restaurant) {
@@ -428,7 +468,10 @@ function App() {
 
         restaurantOverlays = restaurants.map((restaurant) => {
           const overlay = new kakaoMaps.CustomOverlay({
-            content: createRestaurantMarker(restaurant, setSelectedRestaurant),
+            content: createRestaurantMarker(restaurant, (selected) => {
+              setSelectedRestaurant(selected)
+              setActiveSidePanel('restaurant')
+            }),
             position: new kakaoMaps.LatLng(
               restaurant.latitude,
               restaurant.longitude,
@@ -496,12 +539,17 @@ function App() {
           center,
           level: INITIAL_LEVEL,
         })
+        kakaoMapsRef.current = kakaoMaps
+        kakaoMapRef.current = map
 
         setLoadState('ready')
         kakaoMaps.event.addListener(map, 'idle', () =>
           scheduleViewportSearch(kakaoMaps, map),
         )
-        kakaoMaps.event.addListener(map, 'click', () => setSelectedRestaurant(null))
+        kakaoMaps.event.addListener(map, 'click', () => {
+          setSelectedRestaurant(null)
+          setActiveSidePanel(null)
+        })
 
         for (const delay of [100, 300, 700]) {
           window.setTimeout(() => {
@@ -562,13 +610,16 @@ function App() {
       {loadState === 'ready' && placesErrorMessage && (
         <div className="map-status map-status-error">{placesErrorMessage}</div>
       )}
-      {selectedRestaurant && (
+      {selectedRestaurant && activeSidePanel === 'restaurant' && (
         <aside className="restaurant-panel" aria-label="선택한 가게 정보">
           <button
             type="button"
             className="panel-close-button"
             aria-label="가게 정보 닫기"
-            onClick={() => setSelectedRestaurant(null)}
+            onClick={() => {
+              setSelectedRestaurant(null)
+              setActiveSidePanel(null)
+            }}
           >
             <X aria-hidden="true" size={19} strokeWidth={2.2} />
           </button>
@@ -576,10 +627,6 @@ function App() {
           <div className="restaurant-panel-hero">
             <div className="restaurant-thumbnail" aria-hidden="true">
               {isCafe(selectedRestaurant) ? '☕' : '🍽'}
-            </div>
-            <div className="truth-badge">
-              <span>TRUTH</span>
-              <strong>{selectedRestaurant.truthScore}</strong>
             </div>
           </div>
 
@@ -631,8 +678,79 @@ function App() {
           </section>
         </aside>
       )}
+      {activeSidePanel === 'bookmarks' && (
+        <aside className="restaurant-panel bookmark-panel" aria-label="북마크">
+          <button
+            type="button"
+            className="panel-close-button"
+            aria-label="북마크 닫기"
+            onClick={() => setActiveSidePanel(null)}
+          >
+            <X aria-hidden="true" size={19} strokeWidth={2.2} />
+          </button>
+
+          <section className="bookmark-panel-body">
+            <div className="bookmark-panel-header">
+              <BookmarkCheck aria-hidden="true" size={22} strokeWidth={2.2} />
+              <div>
+                <p>Saved Places</p>
+                <h2>북마크</h2>
+              </div>
+            </div>
+
+            {bookmarkedRestaurants.length === 0 ? (
+              <div className="bookmark-empty">아직 북마크한 가게가 없습니다</div>
+            ) : (
+              <ul className="bookmark-list">
+                {bookmarkedRestaurants.map((restaurant) => (
+                  <li key={restaurant.id}>
+                    <button
+                      type="button"
+                      className="bookmark-list-item"
+                      onClick={() => focusRestaurantOnMap(restaurant)}
+                    >
+                      <span className="bookmark-thumb" aria-hidden="true">
+                        {isCafe(restaurant) ? '☕' : '🍽'}
+                      </span>
+                      <span className="bookmark-copy">
+                        <strong>{restaurant.name}</strong>
+                        <small>
+                          {restaurant.category} ·{' '}
+                          {restaurant.address || '주소 정보 없음'}
+                        </small>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="bookmark-remove-button"
+                      aria-label={`${restaurant.name} 북마크 해제`}
+                      onClick={() => toggleBookmark(restaurant)}
+                    >
+                      <BookmarkCheck
+                        aria-hidden="true"
+                        size={18}
+                        strokeWidth={2.2}
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </aside>
+      )}
       <nav className="map-tool-rail" aria-label="지도 메뉴">
-        <button type="button" className="map-tool-button" aria-label="북마크">
+        <button
+          type="button"
+          className="map-tool-button"
+          aria-label="북마크"
+          onClick={() => {
+            setSelectedRestaurant(null)
+            setActiveSidePanel((current) =>
+              current === 'bookmarks' ? null : 'bookmarks',
+            )
+          }}
+        >
           <Bookmark aria-hidden="true" size={20} strokeWidth={2.2} />
         </button>
         <button type="button" className="map-tool-button" aria-label="AI 추천">
