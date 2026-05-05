@@ -1,10 +1,16 @@
 import {
+  AlertCircle,
+  ArrowLeft,
   Bookmark,
   BookmarkCheck,
+  Clock,
+  ExternalLink,
   Info,
+  LoaderCircle,
   MapPin,
   Navigation,
   Phone,
+  RefreshCw,
   Settings,
   Share2,
   Sparkles,
@@ -29,6 +35,27 @@ type Restaurant = {
   link: string
   latitude: number
   longitude: number
+}
+
+type DetailState = 'idle' | 'loading' | 'analyzing' | 'loaded' | 'noData' | 'error'
+
+type ReviewGrade = 'real' | 'suspicious' | 'ad'
+
+type BlogReview = {
+  id: number
+  title: string
+  author: string
+  date: string
+  preview: string
+  url: string
+  adScore: number | null
+  adProbability: number
+  grade: ReviewGrade
+}
+
+type DetailData = {
+  reviews: BlogReview[]
+  keywords: Array<{ word: string; count: number }>
 }
 
 type KakaoLatLng = {
@@ -301,6 +328,120 @@ function formatDistance(distance: number) {
   return `${Math.round(distance)}m`
 }
 
+function cleanText(value: unknown) {
+  return String(value ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim()
+}
+
+function formatReviewDate(value: unknown) {
+  const raw = cleanText(value)
+  if (/^\d{8}$/.test(raw)) {
+    return `${raw.slice(0, 4)}.${raw.slice(4, 6)}.${raw.slice(6, 8)}`
+  }
+  return raw
+}
+
+function gradeFromScore(adScore: number | null): ReviewGrade {
+  if (adScore === null) return 'suspicious'
+  if (adScore >= 0.6) return 'ad'
+  if (adScore >= 0.3) return 'suspicious'
+  return 'real'
+}
+
+function gradeLabel(grade: ReviewGrade) {
+  if (grade === 'real') return '진성'
+  if (grade === 'ad') return '광고'
+  return '의심'
+}
+
+function parseBlogReview(item: Record<string, unknown>): BlogReview {
+  const electraPred =
+    typeof item.is_ad_electra_pred === 'number' ? item.is_ad_electra_pred : null
+  const scoreSource =
+    typeof item.is_ad_finetuned_pred === 'number'
+      ? item.is_ad_finetuned_pred
+      : typeof item.is_ad_llm_pred === 'number'
+        ? item.is_ad_llm_pred
+        : electraPred === 1
+          ? 0.9
+          : electraPred === 0
+            ? 0.1
+            : null
+  const adScore = scoreSource === null ? null : Math.max(0, Math.min(1, scoreSource))
+  const description = cleanText(item.review_description)
+  const preview = description
+    ? description.length > 96
+      ? `${description.slice(0, 96)}...`
+      : description
+    : '요약 없음'
+
+  return {
+    id: Number(item.id ?? 0),
+    title: cleanText(item.review_title) || '(제목 없음)',
+    author: cleanText(item.review_bloggername) || '알 수 없음',
+    date: formatReviewDate(item.review_postdate),
+    preview,
+    url: cleanText(item.review_url),
+    adScore,
+    adProbability: adScore === null ? 50 : Math.round(adScore * 100),
+    grade: gradeFromScore(adScore),
+  }
+}
+
+function buildKeywords(reviews: BlogReview[]) {
+  const stopWords = new Set([
+    '맛집',
+    '추천',
+    '후기',
+    '방문',
+    '리뷰',
+    '정말',
+    '너무',
+    '있는',
+    '없는',
+    '그리고',
+    '에서',
+    '으로',
+    '하고',
+    '까지',
+    '강남',
+    '카페',
+  ])
+  const counts = new Map<string, number>()
+
+  for (const review of reviews) {
+    const words = review.title
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 2 && !stopWords.has(word))
+
+    for (const word of words) {
+      counts.set(word, (counts.get(word) ?? 0) + 1)
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 14)
+    .map(([word, count]) => ({ word, count }))
+}
+
+async function fetchDetailJson(path: string, signal: AbortSignal) {
+  const response = await fetch(`${BACKEND_BASE_URL}${path}`, { signal })
+  if (!response.ok) {
+    throw new Error(`상세 데이터 요청 실패: ${response.status}`)
+  }
+  return (await response.json()) as {
+    reviews?: Record<string, unknown>[]
+  }
+}
+
 function normalizeRestaurant(value: unknown): Restaurant | null {
   if (!value || typeof value !== 'object') return null
 
@@ -366,12 +507,17 @@ function App() {
     loadBookmarkedRestaurants(),
   )
   const [activeSidePanel, setActiveSidePanel] = useState<
-    'restaurant' | 'bookmarks' | null
+    'restaurant' | 'bookmarks' | 'detail' | null
   >(
     null,
   )
+  const [detailState, setDetailState] = useState<DetailState>('idle')
+  const [detailData, setDetailData] = useState<DetailData | null>(null)
+  const [detailErrorMessage, setDetailErrorMessage] = useState('')
+  const [reviewSort, setReviewSort] = useState<'real' | 'latest'>('real')
   const [toastMessage, setToastMessage] = useState('')
   const bookmarkedIds = bookmarkedRestaurants.map((restaurant) => restaurant.id)
+  const detailRequestIdRef = useRef(0)
 
   function showToast(message: string) {
     setToastMessage(message)
@@ -440,6 +586,72 @@ function App() {
     }
 
     copyToClipboard(restaurant.link, '링크가 복사되었습니다')
+  }
+
+  async function loadRestaurantDetail(restaurant: Restaurant, forceFresh = false) {
+    const requestId = ++detailRequestIdRef.current
+    const controller = new AbortController()
+    const query = encodeURIComponent(restaurant.name)
+
+    setDetailErrorMessage('')
+    setDetailData(null)
+    setReviewSort('real')
+    setDetailState(forceFresh ? 'analyzing' : 'loading')
+
+    try {
+      let detailJson: Awaited<ReturnType<typeof fetchDetailJson>>
+
+      if (!forceFresh) {
+        const cached = await fetchDetailJson(
+          `/api/search/cached?query=${query}`,
+          controller.signal,
+        )
+        if (requestId !== detailRequestIdRef.current) return
+
+        if ((cached.reviews ?? []).length > 0) {
+          detailJson = cached
+        } else {
+          setDetailState('analyzing')
+          detailJson = await fetchDetailJson(
+            `/api/search?query=${query}&mode=model`,
+            controller.signal,
+          )
+        }
+      } else {
+        detailJson = await fetchDetailJson(
+          `/api/search?query=${query}&mode=model`,
+          controller.signal,
+        )
+      }
+
+      if (requestId !== detailRequestIdRef.current) return
+
+      const reviews = (detailJson.reviews ?? []).map(parseBlogReview)
+      if (reviews.length === 0) {
+        setDetailState('noData')
+        return
+      }
+
+      setDetailData({
+        reviews,
+        keywords: buildKeywords(reviews),
+      })
+      setDetailState('loaded')
+    } catch (error) {
+      if (requestId !== detailRequestIdRef.current) return
+      setDetailErrorMessage(
+        error instanceof Error
+          ? error.message
+          : '상세 데이터를 불러오지 못했습니다',
+      )
+      setDetailState('error')
+    }
+  }
+
+  function openDetailPanel(restaurant: Restaurant, forceFresh = false) {
+    setSelectedRestaurant(restaurant)
+    setActiveSidePanel('detail')
+    loadRestaurantDetail(restaurant, forceFresh)
   }
 
   useEffect(() => {
@@ -598,6 +810,15 @@ function App() {
     }
   }, [])
 
+  const sortedDetailReviews = detailData
+    ? [...detailData.reviews].sort((a, b) => {
+        if (reviewSort === 'latest') {
+          return b.date.localeCompare(a.date) || b.id - a.id
+        }
+        return a.adProbability - b.adProbability || b.id - a.id
+      })
+    : []
+
   return (
     <main className="map-page">
       <div ref={mapContainerRef} className="map-container" />
@@ -670,11 +891,213 @@ function App() {
             <button
               type="button"
               className="detail-button"
-              onClick={() => showToast('상세 화면 준비 중입니다')}
+              onClick={() => openDetailPanel(selectedRestaurant)}
             >
               <Info aria-hidden="true" size={18} strokeWidth={2.2} />
               상세 보기
             </button>
+          </section>
+        </aside>
+      )}
+      {selectedRestaurant && activeSidePanel === 'detail' && (
+        <aside className="restaurant-panel detail-panel" aria-label="가게 상세 정보">
+          <div className="detail-panel-topbar">
+            <button
+              type="button"
+              className="panel-icon-button"
+              aria-label="가게 정보로 돌아가기"
+              onClick={() => setActiveSidePanel('restaurant')}
+            >
+              <ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} />
+            </button>
+            <strong>{selectedRestaurant.name}</strong>
+            <button
+              type="button"
+              className="panel-icon-button"
+              aria-label="상세 정보 닫기"
+              onClick={() => {
+                setSelectedRestaurant(null)
+                setActiveSidePanel(null)
+              }}
+            >
+              <X aria-hidden="true" size={19} strokeWidth={2.2} />
+            </button>
+          </div>
+
+          <section className="detail-panel-body">
+            <div className="detail-restaurant-card">
+              <div className="bookmark-thumb detail-thumb" aria-hidden="true">
+                {isCafe(selectedRestaurant) ? '☕' : '🍽'}
+              </div>
+              <div>
+                <p>{selectedRestaurant.category}</p>
+                <h2>{selectedRestaurant.name}</h2>
+                <small>
+                  {selectedRestaurant.address || '주소 정보 없음'} ·{' '}
+                  {formatDistance(selectedRestaurant.distance)}
+                </small>
+              </div>
+            </div>
+
+            <div className="restaurant-actions detail-actions" aria-label="가게 액션">
+              <button type="button" onClick={() => handleCall(selectedRestaurant)}>
+                <Phone aria-hidden="true" size={20} strokeWidth={2.1} />
+                <span>Call</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleBookmark(selectedRestaurant)}
+              >
+                {bookmarkedIds.includes(selectedRestaurant.id) ? (
+                  <BookmarkCheck aria-hidden="true" size={20} strokeWidth={2.1} />
+                ) : (
+                  <Bookmark aria-hidden="true" size={20} strokeWidth={2.1} />
+                )}
+                <span>Save</span>
+              </button>
+              <button type="button" onClick={() => handleRoute(selectedRestaurant)}>
+                <Navigation aria-hidden="true" size={20} strokeWidth={2.1} />
+                <span>Route</span>
+              </button>
+              <button type="button" onClick={() => handleShare(selectedRestaurant)}>
+                <Share2 aria-hidden="true" size={20} strokeWidth={2.1} />
+                <span>Share</span>
+              </button>
+            </div>
+
+            {(detailState === 'loading' || detailState === 'analyzing') && (
+              <div className="detail-state-card">
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="spinning-icon"
+                  size={24}
+                  strokeWidth={2.2}
+                />
+                <strong>
+                  {detailState === 'loading'
+                    ? '저장된 리뷰를 확인하는 중입니다'
+                    : '새 리뷰를 수집하고 분석하는 중입니다'}
+                </strong>
+                <p>조금만 기다려 주세요. 지도는 그대로 사용할 수 있습니다.</p>
+              </div>
+            )}
+
+            {detailState === 'noData' && (
+              <div className="detail-state-card">
+                <AlertCircle aria-hidden="true" size={24} strokeWidth={2.2} />
+                <strong>아직 분석된 리뷰가 없습니다</strong>
+                <p>새 분석을 다시 요청해 볼 수 있습니다.</p>
+                <button
+                  type="button"
+                  className="detail-secondary-button"
+                  onClick={() => openDetailPanel(selectedRestaurant, true)}
+                >
+                  <RefreshCw aria-hidden="true" size={16} strokeWidth={2.2} />
+                  다시 분석
+                </button>
+              </div>
+            )}
+
+            {detailState === 'error' && (
+              <div className="detail-state-card detail-state-error">
+                <AlertCircle aria-hidden="true" size={24} strokeWidth={2.2} />
+                <strong>상세 정보를 불러오지 못했습니다</strong>
+                <p>{detailErrorMessage}</p>
+                <button
+                  type="button"
+                  className="detail-secondary-button"
+                  onClick={() => openDetailPanel(selectedRestaurant, true)}
+                >
+                  <RefreshCw aria-hidden="true" size={16} strokeWidth={2.2} />
+                  다시 시도
+                </button>
+              </div>
+            )}
+
+            {detailState === 'loaded' && detailData && (
+              <>
+                <section className="detail-section">
+                  <div className="detail-section-heading">
+                    <Info aria-hidden="true" size={17} strokeWidth={2.2} />
+                    <h3>리뷰 키워드</h3>
+                  </div>
+                  {detailData.keywords.length > 0 ? (
+                    <div className="keyword-cloud">
+                      {detailData.keywords.map((keyword) => (
+                        <span
+                          key={keyword.word}
+                          style={{
+                            fontSize: `${Math.min(18, 12 + keyword.count * 2)}px`,
+                          }}
+                        >
+                          {keyword.word}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="detail-muted">표시할 키워드가 없습니다.</p>
+                  )}
+                </section>
+
+                <section className="detail-section review-section">
+                  <div className="detail-section-heading">
+                    <Clock aria-hidden="true" size={17} strokeWidth={2.2} />
+                    <h3>블로그 리뷰</h3>
+                  </div>
+                  <div className="review-tabs" role="tablist" aria-label="리뷰 정렬">
+                    <button
+                      type="button"
+                      className={reviewSort === 'real' ? 'active' : ''}
+                      onClick={() => setReviewSort('real')}
+                    >
+                      진성순
+                    </button>
+                    <button
+                      type="button"
+                      className={reviewSort === 'latest' ? 'active' : ''}
+                      onClick={() => setReviewSort('latest')}
+                    >
+                      최신순
+                    </button>
+                  </div>
+                  <ul className="review-list">
+                    {sortedDetailReviews.map((review) => (
+                      <li key={`${review.id}-${review.url}`}>
+                        <button
+                          type="button"
+                          className="review-card"
+                          onClick={() => {
+                            if (review.url) {
+                              window.open(review.url, '_blank', 'noopener,noreferrer')
+                            } else {
+                              showToast('열 수 있는 리뷰 링크가 없습니다')
+                            }
+                          }}
+                        >
+                          <span className={`review-grade ${review.grade}`}>
+                            {gradeLabel(review.grade)}
+                          </span>
+                          <strong>{review.title}</strong>
+                          <p>{review.preview}</p>
+                          <small>
+                            {review.author}
+                            {review.date ? ` · ${review.date}` : ''}
+                          </small>
+                          <span className="review-open">
+                            원문 보기
+                            <ExternalLink
+                              aria-hidden="true"
+                              size={13}
+                              strokeWidth={2.2}
+                            />
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </>
+            )}
           </section>
         </aside>
       )}

@@ -78,8 +78,12 @@ body {
 }
 
 .panel-close-button:focus-visible,
+.panel-icon-button:focus-visible,
 .restaurant-actions button:focus-visible,
-.detail-button:focus-visible {
+.detail-button:focus-visible,
+.detail-secondary-button:focus-visible,
+.review-tabs button:focus-visible,
+.review-card:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
@@ -322,6 +326,311 @@ body {
   place-items: center;
   border-radius: 13px;
   color: #2b54e8;
+}
+
+.detail-panel {
+  background: #f8fafc;
+}
+
+.detail-panel-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.detail-panel-topbar strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 15px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-icon-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.detail-panel-body {
+  padding: 18px 18px 28px;
+}
+
+.detail-restaurant-card {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 13px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.detail-thumb {
+  width: 52px;
+  height: 52px;
+  font-size: 24px;
+}
+
+.detail-restaurant-card p,
+.detail-restaurant-card h2,
+.detail-restaurant-card small {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-restaurant-card p {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.detail-restaurant-card h2 {
+  margin-top: 4px;
+  color: #111827;
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.detail-restaurant-card small {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.detail-actions {
+  margin: 18px 0 22px;
+}
+
+.detail-state-card,
+.detail-section {
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+}
+
+.detail-state-card {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  min-height: 180px;
+  color: #334155;
+  text-align: center;
+}
+
+.detail-state-card strong {
+  color: #111827;
+  font-size: 15px;
+}
+
+.detail-state-card p,
+.detail-muted {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detail-state-error {
+  color: #991b1b;
+}
+
+.spinning-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.detail-secondary-button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  font: 700 13px/1 system-ui, sans-serif;
+}
+
+.detail-section {
+  margin-top: 14px;
+}
+
+.detail-section-heading {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 10px;
+  color: #111827;
+}
+
+.detail-section-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.keyword-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyword-cloud span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: #eef0ff;
+  color: #26336b;
+  font-weight: 800;
+}
+
+.review-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.review-section .detail-section-heading {
+  padding: 16px 16px 0;
+}
+
+.review-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 4px 16px 0;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.review-tabs button {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: 800 13px/1 system-ui, sans-serif;
+}
+
+.review-tabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.review-list {
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px 18px;
+  margin: 0;
+  list-style: none;
+}
+
+.review-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 13px;
+  background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.review-card strong,
+.review-card p,
+.review-card small {
+  display: block;
+}
+
+.review-card strong {
+  padding-right: 52px;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.review-card p {
+  margin: 8px 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-card small,
+.review-open {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.review-grade {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.review-grade.real {
+  background: #e8f5e9;
+  color: #1b7a3a;
+}
+
+.review-grade.suspicious {
+  background: #fff7d6;
+  color: #9a6400;
+}
+
+.review-grade.ad {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.review-open {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 9px;
+  color: #2563eb;
 }
 
 .map-toast {
