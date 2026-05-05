@@ -152,6 +152,7 @@ const INITIAL_LEVEL = 4
 const FOCUSED_LEVEL = 1
 const VIEWPORT_DEBOUNCE_MS = 600
 const REFRESH_DISTANCE_METERS = 150
+const NEARBY_PLACE_DISPLAY_COUNT = 30
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
 const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
   si: '시',
@@ -318,7 +319,7 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
     lat: center.latitude.toString(),
     lng: center.longitude.toString(),
     radius: radius.toString(),
-    display: '10',
+    display: NEARBY_PLACE_DISPLAY_COUNT.toString(),
   })
   const response = await fetch(
     `${BACKEND_BASE_URL}/places/nearby-restaurants?${params.toString()}`,

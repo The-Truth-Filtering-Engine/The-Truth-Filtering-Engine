@@ -13,6 +13,7 @@ KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
 
 KAKAO_LOCAL_CATEGORY_URL = "https://dapi.kakao.com/v2/local/search/category.json"
 KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
+KAKAO_CATEGORY_PAGE_SIZE_LIMIT = 15
 
 def haversine(lat1, lng1, lat2, lng2):
     R = 6371000
@@ -53,7 +54,7 @@ async def get_nearby_restaurants(
     lat: float = Query(...),
     lng: float = Query(...),
     radius: int = Query(500),
-    display: int = Query(10, ge=1, le=10),
+    display: int = Query(30, ge=1, le=30),
 ):
     if not KAKAO_REST_API_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_REST_API_KEY 없음")
@@ -68,7 +69,7 @@ async def get_nearby_restaurants(
             "y": lat,
             "radius": radius,
             "sort": "accuracy",
-            "size": display,
+            "size": min(display, KAKAO_CATEGORY_PAGE_SIZE_LIMIT),
         }
         response = await client.get(
             KAKAO_LOCAL_CATEGORY_URL,
