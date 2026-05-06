@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
+import '../core/config/backend_config.dart';
 import '../models/search_result.dart';
-import '../models/review_item.dart';
 
 class ApiService {
   final _dio = Dio(BaseOptions(
-    baseUrl: 'http://localhost:8000/api',
+    baseUrl: BackendConfig.apiBaseUrl,
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 60), // LLM 응답 오래 걸릴 수 있음
   ));
