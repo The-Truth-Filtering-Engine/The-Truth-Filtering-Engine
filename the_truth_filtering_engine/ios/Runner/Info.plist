@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>The Truth Filtering Engine</string>
+	<string>진실의 입</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,8 +26,15 @@
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+
+	<!-- ✅ 위치 권한 (geolocator 필수) -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>현재 위치를 기반으로 식당 검색 반경을 계산하기 위해 위치 권한이 필요합니다.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>현재 위치를 기반으로 식당 검색 반경을 계산하기 위해 위치 권한이 필요합니다.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>현재 위치를 기반으로 식당 검색 반경을 계산하기 위해 위치 권한이 필요합니다.</string>
+
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>
@@ -45,12 +52,41 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+
+	<!-- ✅ HTTP(localhost) 허용 -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
+		<!-- 로컬 개발 서버 명시적 허용 -->
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
+
+	<!-- ✅ WebView에서 인라인 미디어 재생 허용 (카카오맵 JS SDK) -->
+	<key>WebKitMediaPlaybackAllowsAirPlay</key>
+	<false/>
+
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- ✅ 외부 앱 연동 (url_launcher) -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaomap</string>
+		<string>nmap</string>
+		<string>tel</string>
+		<string>mailto</string>
+	</array>
+
+	<!-- ✅ 네이버 지도 클라이언트 ID (flutter_naver_map) -->
+	<key>NMFClientId</key>
+	<string>r4m59pfq3y</string>
 </dict>
 </plist>

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+// ✅ iOS에서 WebView 초기화에 필요 (webview_flutter_wkwebview)
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/theme/app_colors.dart';
@@ -47,7 +49,19 @@ class KakaoMapViewState extends State<KakaoMapView> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
+
+    // ✅ iOS(WKWebView) / Android(WebView) 플랫폼별 파라미터 설정
+    late final PlatformWebViewControllerCreationParams params;
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } else {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    _controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel(
         'FlutterChannel',
@@ -93,8 +107,18 @@ class KakaoMapViewState extends State<KakaoMapView> {
             _syncRestaurantOverlays();
             _syncCurrentLocationOverlay();
           },
+          onWebResourceError: (error) {
+            debugPrint('WebView error: ${error.description}');
+          },
         ),
       );
+
+    // ✅ iOS WKWebView: 백그라운드 색상 투명 설정
+    if (_controller.platform is WebKitWebViewController) {
+      (_controller.platform as WebKitWebViewController).setInspectable(
+        true,
+      ); // Safari 디버깅 허용 (개발 중 유용)
+    }
 
     _initializeController();
   }
@@ -107,10 +131,9 @@ class KakaoMapViewState extends State<KakaoMapView> {
       }
 
       final htmlContent = _buildHtml(kakaoJsKey);
-      await _controller.loadHtmlString(
-        htmlContent,
-        baseUrl: 'http://localhost:8080',
-      );
+      // ✅ iOS에서는 baseUrl 없이 loadHtmlString 사용
+      //    (WKWebView는 file:// 기반 baseUrl 필요 or 없음)
+      await _controller.loadHtmlString(htmlContent);
     } catch (e) {
       if (mounted) {
         setState(() => _loadError = e.toString());
@@ -124,7 +147,9 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
   Future<String> _fetchKakaoJsKey() async {
     try {
-      final response = await http.get(Uri.parse('$_backendBaseUrl/config'));
+      final response = await http
+          .get(Uri.parse('$_backendBaseUrl/config'))
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         return decoded['kakaoJsKey']?.toString().trim() ?? '';
@@ -144,7 +169,8 @@ class KakaoMapViewState extends State<KakaoMapView> {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
+        * { -webkit-tap-highlight-color: transparent; }
+        body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
     </style>
 </head>
 <body>
@@ -193,7 +219,6 @@ class KakaoMapViewState extends State<KakaoMapView> {
         }
 
         function setMarkers(restaurantsJson) {
-            // Clear existing markers
             markers.forEach(m => m.setMap(null));
             markers = [];
 
@@ -210,6 +235,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
                 content.style.alignItems = 'center';
                 content.style.justifyContent = 'center';
                 content.style.fontSize = '16px';
+                content.style.cursor = 'pointer';
                 content.innerText = r.emoji;
                 content.onclick = function() {
                     FlutterChannel.postMessage(JSON.stringify({
@@ -246,7 +272,8 @@ class KakaoMapViewState extends State<KakaoMapView> {
             inner.style.width = '14px';
             inner.style.height = '14px';
             inner.style.borderRadius = '50%';
-            inner.style.background = '#FF0000';
+            inner.style.background = '#2196F3';
+            inner.style.border = '2px solid white';
             outer.appendChild(inner);
 
             currentLocationOverlay = new kakao.maps.CustomOverlay({
@@ -266,13 +293,8 @@ class KakaoMapViewState extends State<KakaoMapView> {
             }
         }
 
-        function zoomIn() {
-            map.setLevel(map.getLevel() - 1);
-        }
-
-        function zoomOut() {
-            map.setLevel(map.getLevel() + 1);
-        }
+        function zoomIn() { map.setLevel(map.getLevel() - 1); }
+        function zoomOut() { map.setLevel(map.getLevel() + 1); }
     </script>
 </body>
 </html>
@@ -289,20 +311,28 @@ class KakaoMapViewState extends State<KakaoMapView> {
     }
     if (oldWidget.currentLocation != widget.currentLocation) {
       _syncCurrentLocationOverlay();
+
+      if (oldWidget.currentLocation == null && widget.currentLocation != null) {
+        moveTo(widget.currentLocation!);
+      }
     }
   }
 
   void _syncRestaurantOverlays() {
-    final restaurantsJson = jsonEncode(widget.restaurants.map((r) {
-      return {
-        'id': r.id,
-        'lat': r.latitude,
-        'lng': r.longitude,
-        'emoji': _markerEmoji(r),
-        'color': _markerColor(r),
-      };
-    }).toList());
-    _controller.runJavaScript('setMarkers(\'$restaurantsJson\')');
+    final restaurantsJson = jsonEncode(
+      widget.restaurants.map((r) {
+        return {
+          'id': r.id,
+          'lat': r.latitude,
+          'lng': r.longitude,
+          'emoji': _markerEmoji(r),
+          'color': _markerColor(r),
+        };
+      }).toList(),
+    );
+    // ✅ 작은따옴표 이스케이프 처리
+    final escaped = restaurantsJson.replaceAll("'", "\\'");
+    _controller.runJavaScript("setMarkers('$escaped')");
   }
 
   void _syncCurrentLocationOverlay() {
@@ -335,7 +365,9 @@ class KakaoMapViewState extends State<KakaoMapView> {
   void toggleMapType() {
     if (!_mapReady) return;
     _roadmapType = !_roadmapType;
-    _controller.runJavaScript('setMapType(\'${_roadmapType ? 'ROADMAP' : 'SKYVIEW'}\')');
+    _controller.runJavaScript(
+      "setMapType('${_roadmapType ? 'ROADMAP' : 'SKYVIEW'}')",
+    );
   }
 
   String _markerEmoji(RestaurantModel restaurant) {
@@ -365,6 +397,13 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return const ColoredBox(
+        color: Color(0xFFE9EEF1),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     if (_loadError != null) {
       return ColoredBox(
         color: const Color(0xFFE9EEF1),
