@@ -9,6 +9,7 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
@@ -38,10 +39,6 @@ class KakaoMapView extends StatefulWidget {
 }
 
 class KakaoMapViewState extends State<KakaoMapView> {
-  static const _backendBaseUrl = String.fromEnvironment(
-    'BACKEND_BASE_URL',
-    defaultValue: 'http://localhost:8000',
-  );
   static Completer<void>? _sdkLoader;
 
   late final String _viewType;
@@ -147,7 +144,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
   static Future<String> _fetchKakaoJsKey() async {
     final response = await html.HttpRequest.getString(
-      '$_backendBaseUrl/config',
+      BackendConfig.uri('/config').toString(),
     );
     final decoded = jsonDecode(response) as Map<String, dynamic>;
     return decoded['kakaoJsKey']?.toString().trim() ?? '';

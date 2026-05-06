@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -30,9 +31,11 @@ enum _ScreenState {
 // ── API: Supabase 캐시 조회 ───────────────────────────────────────────────────
 
 Future<List<BlogReview>> _fetchCachedReviews(
-    String name, AnalysisMode mode) async {
-  final uri = Uri.parse('http://localhost:8000/api/search/cached')
-      .replace(queryParameters: {'query': name});
+    String name, String address, AnalysisMode mode) async {
+  final uri = BackendConfig.apiUri('/search/cached', queryParameters: {
+    'query': name,
+    'address': address,
+  });
 
   final res = await http.get(uri).timeout(const Duration(seconds: 15));
   if (res.statusCode != 200) return [];
@@ -49,12 +52,16 @@ Future<List<BlogReview>> _fetchCachedReviews(
 // ── API: 신규 크롤링 + AI 분석 ────────────────────────────────────────────────
 
 Future<List<BlogReview>> _fetchFreshReviews(
-    String name, AnalysisMode mode) async {
-  final uri =
-      Uri.parse('http://localhost:8000/api/search').replace(queryParameters: {
+    String name, String address, AnalysisMode mode,
+    {bool refresh = false}) async {
+  final queryParameters = {
     'query': name,
+    'address': address,
     'mode': mode.name,
-  });
+  };
+  if (refresh) queryParameters['refresh'] = 'true';
+
+  final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
 
   final res = await http.get(uri).timeout(const Duration(seconds: 60));
   if (res.statusCode != 200) throw Exception('서버 오류 (${res.statusCode})');
@@ -99,12 +106,12 @@ class _RestaurantDetailScreenState
 
     try {
       final mode = ref.read(analysisModeProvider);
-      final cached = await _fetchCachedReviews(_r.name, mode);
+      final cached = await _fetchCachedReviews(_r.name, _r.address, mode);
 
       if (cached.isEmpty) {
         // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
         try {
-          final fresh = await _fetchFreshReviews(_r.name, mode);
+          final fresh = await _fetchFreshReviews(_r.name, _r.address, mode);
           _applyReviews(fresh);
         } catch (e) {
           setState(() => _state = _ScreenState.noData);
@@ -124,7 +131,12 @@ class _RestaurantDetailScreenState
 
     try {
       final mode = ref.read(analysisModeProvider);
-      final fresh = await _fetchFreshReviews(_r.name, mode);
+      final fresh = await _fetchFreshReviews(
+        _r.name,
+        _r.address,
+        mode,
+        refresh: true,
+      );
       _applyReviews(fresh);
     } catch (e) {
       setState(() => _state = _ScreenState.noData);

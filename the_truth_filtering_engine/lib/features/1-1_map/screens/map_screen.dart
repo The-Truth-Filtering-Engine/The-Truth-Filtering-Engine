@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
@@ -387,16 +388,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() => _viewportSearchError = null);
 
     try {
-      final uri = Uri.http(
-        'localhost:8000',
-        '/places/nearby-restaurants',
-        {
-          'lat': center.latitude.toString(),
-          'lng': center.longitude.toString(),
-          'radius': radiusMeters.toString(),
-          'display': '10',
-        },
-      );
+      final uri =
+          BackendConfig.uri('/places/nearby-restaurants', queryParameters: {
+        'lat': center.latitude.toString(),
+        'lng': center.longitude.toString(),
+        'radius': radiusMeters.toString(),
+        'display': '10',
+      });
 
       final response = await http.get(uri);
 
