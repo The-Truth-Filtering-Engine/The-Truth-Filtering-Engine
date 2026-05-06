@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/config/backend_config.dart';
 import '../models/ai_recommend_item.dart';
 
 class AiRecommendState {
@@ -38,8 +39,9 @@ class AiRecommendState {
   }
 }
 
-final aiRecommendProvider = StateNotifierProvider.autoDispose<
-    AiRecommendNotifier, AiRecommendState>((ref) {
+final aiRecommendProvider =
+    StateNotifierProvider.autoDispose<AiRecommendNotifier, AiRecommendState>(
+        (ref) {
   return AiRecommendNotifier()..loadPage(1);
 });
 
@@ -85,8 +87,7 @@ class AiRecommendNotifier extends StateNotifier<AiRecommendState> {
   }
 
   Future<_AiRecommendPage> _fetchPage(int page) async {
-    final uri = Uri.parse('http://localhost:8000/api/ai-recommendations')
-        .replace(queryParameters: {
+    final uri = BackendConfig.apiUri('/ai-recommendations', queryParameters: {
       'threshold': '0.1',
       'page': page.toString(),
       'pageSize': _pageSize.toString(),

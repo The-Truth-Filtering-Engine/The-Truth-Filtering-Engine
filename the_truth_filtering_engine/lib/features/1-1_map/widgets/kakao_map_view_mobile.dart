@@ -6,6 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
@@ -35,11 +36,6 @@ class KakaoMapView extends StatefulWidget {
 }
 
 class KakaoMapViewState extends State<KakaoMapView> {
-  static const _backendBaseUrl = String.fromEnvironment(
-    'BACKEND_BASE_URL',
-    defaultValue: 'http://localhost:8000',
-  );
-
   late final WebViewController _controller;
   bool _mapReady = false;
   bool _roadmapType = true;
@@ -148,7 +144,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
   Future<String> _fetchKakaoJsKey() async {
     try {
       final response = await http
-          .get(Uri.parse('$_backendBaseUrl/config'))
+          .get(BackendConfig.uri('/config'))
           .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
