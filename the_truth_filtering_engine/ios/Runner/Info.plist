@@ -87,6 +87,6 @@
 
 	<!-- ✅ 네이버 지도 클라이언트 ID (flutter_naver_map) -->
 	<key>NMFClientId</key>
-	<string>YOUR_NAVER_MAP_CLIENT_ID</string>
+	<string>r4m59pfq3y</string>
 </dict>
 </plist>
