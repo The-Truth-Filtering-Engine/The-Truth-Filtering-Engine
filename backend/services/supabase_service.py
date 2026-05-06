@@ -1,79 +1,185 @@
-from supabase import create_client
+"""
+supabase_service.py
+- 검색 결과를 Supabase reviews 테이블에 자동 저장
+- 광고 판별 결과 업데이트 (electra, finetuned, llm)
+- 캐시 조회, AI 추천 조회 등 모든 DB 접근 통합
+"""
 import os
+import httpx
+from typing import Optional
 
-supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
 
-async def get_cached_reviews(name: str) -> list:
-    res = supabase.table("reviews") \
-        .select("*") \
-        .eq("name", name) \
-        .execute()
-    return res.data if res.data else []
+# ── 공통 헤더 ────────────────────────────────────────────────────────────────
 
-async def save_reviews(name: str, blogs: list[dict]):
+def _h(prefer: str = "") -> dict:
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    return headers
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 리뷰 저장 (검색 시 자동 호출)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def save_reviews(query: str, blogs: list[dict]) -> None:
+    """
+    Naver 블로그 수집 결과를 reviews 테이블에 저장.
+    이미 같은 query + link 가 있으면 upsert로 중복 방지.
+    """
+    if not SUPABASE_URL or not blogs:
+        return
+
     rows = [
         {
-            "name": name,
-            "review_url": blog.get("link"),
-            "review_title": blog.get("title"),
-            "review_description": blog.get("description"),
-            "review_bloggername": blog.get("bloggername"),
-            "review_postdate": blog.get("postdate"),
+            "query": query,
+            "review_title": b.get("title", ""),
+            "review_description": b.get("description", ""),
+            "review_bloggername": b.get("bloggername", ""),
+            "review_bloggerlink": b.get("bloggerlink", ""),
+            "review_link": b.get("link", ""),
+            "review_postdate": b.get("postdate"),
+            # 판별 결과는 초기에 null → 이후 update_* 함수로 채움
+            "is_ad_electra_pred": None,
+            "is_ad_finetuned_pred": None,
+            "is_ad_llm_pred": None,
         }
-        for blog in blogs
+        for b in blogs
     ]
-    supabase.table("reviews").insert(rows).execute()
 
-async def update_llm_pred(review_id: int, is_ad_llm_pred: float):  
-    supabase.table("reviews") \
-        .update({"is_ad_llm_pred": float(is_ad_llm_pred)}) \
-        .eq("id", review_id) \
-        .execute()
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers=_h("resolution=ignore-duplicates"),  # 중복 무시
+            json=rows,
+            timeout=15,
+        )
 
-async def update_electra_pred(review_id: int, is_ad_electra_pred: int):
-    supabase.table("reviews") \
-        .update({"is_ad_electra_pred": is_ad_electra_pred}) \
-        .eq("id", review_id) \
-        .execute()
 
-async def update_finetuned_pred(review_id: int, is_ad_finetuned_pred: float):
-    res = supabase.table("reviews") \
-        .update({"is_ad_finetuned_pred": float(is_ad_finetuned_pred)}) \
-        .eq("id", review_id) \
-        .execute()
+# ══════════════════════════════════════════════════════════════════════════════
+# 캐시 조회
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def get_cached_reviews(query: str) -> list[dict]:
+    """같은 query 로 저장된 리뷰가 있으면 반환, 없으면 빈 리스트."""
+    if not SUPABASE_URL:
+        return []
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers=_h(),
+            params={
+                "query": f"eq.{query}",
+                "order": "created_at.desc",
+            },
+            timeout=10,
+        )
+
+    if resp.status_code != 200:
+        return []
+    return resp.json() or []
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 판별 결과 업데이트 (search.py 에서 호출)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def update_electra_pred(review_id: str, is_ad: int) -> None:
+    """Electra 이진 판별 결과 저장."""
+    await _patch_review(review_id, {"is_ad_electra_pred": bool(is_ad)})
+
+
+async def update_finetuned_pred(review_id: str, score: float) -> None:
+    """파인튜닝 모델 광고 확률(0~1) 저장."""
+    await _patch_review(review_id, {"is_ad_finetuned_pred": round(float(score), 4)})
+
+
+async def update_llm_pred(review_id: str, score: float) -> None:
+    """LLM(GPT) 광고 확률(0~1) 저장."""
+    await _patch_review(review_id, {"is_ad_llm_pred": round(float(score), 4)})
+
+
+async def _patch_review(review_id: str, data: dict) -> None:
+    if not SUPABASE_URL:
+        return
+    async with httpx.AsyncClient() as client:
+        await client.patch(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers=_h("return=minimal"),
+            params={"id": f"eq.{review_id}"},
+            json=data,
+            timeout=10,
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AI 추천 (ai_recommend.py 에서 호출)
+# ══════════════════════════════════════════════════════════════════════════════
 
 async def get_ai_recommendation_reviews(
     threshold: float = 0.1,
     page: int = 1,
     page_size: int = 10,
 ) -> dict:
-    page = max(1, page)
-    page_size = max(1, min(page_size, 10))
-    end_index = page * page_size
-    fetch_limit = min(max((end_index + page_size) * 20, 100), 1000)
+    """
+    광고 확률이 threshold 이하인 리뷰 = 진짜 리뷰로 간주하여 반환.
+    페이지네이션 포함.
+    """
+    if not SUPABASE_URL:
+        return {"items": [], "total": 0}
 
-    res = supabase.table("reviews") \
-        .select("*") \
-        .lt("is_ad_finetuned_pred", threshold) \
-        .order("is_ad_finetuned_pred", desc=False) \
-        .limit(fetch_limit) \
-        .execute()
-    rows = res.data if res.data else []
+    offset = (page - 1) * page_size
+    end = offset + page_size - 1
 
-    grouped: dict[str, dict] = {}
-    for row in rows:
-        name = (row.get("name") or "").strip()
-        if not name or name in grouped:
-            continue
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers={
+                **_h(),
+                "Range": f"{offset}-{end}",
+                "Range-Unit": "items",
+                "Prefer": "count=exact",
+            },
+            params={
+                "is_ad_finetuned_pred": f"lte.{threshold}",
+                "order": "created_at.desc",
+            },
+            timeout=10,
+        )
 
-        grouped[name] = row
-        if len(grouped) >= end_index + 1:
-            break
+    if resp.status_code not in (200, 206):
+        return {"items": [], "total": 0}
 
-    grouped_rows = list(grouped.values())
-    start_index = (page - 1) * page_size
+    total_str = resp.headers.get("Content-Range", "*/0").split("/")[-1]
+    total = int(total_str) if total_str.isdigit() else 0
 
-    return {
-        "items": grouped_rows[start_index:end_index],
-        "has_next": len(grouped_rows) > end_index,
-    }
+    return {"items": resp.json() or [], "total": total}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 단건 조회 (report.py 등에서 review_id 검증 시 사용)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def get_review_by_id(review_id: str) -> Optional[dict]:
+    if not SUPABASE_URL:
+        return None
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers=_h(),
+            params={"id": f"eq.{review_id}", "limit": "1"},
+            timeout=10,
+        )
+
+    if resp.status_code != 200:
+        return None
+    items = resp.json()
+    return items[0] if items else None

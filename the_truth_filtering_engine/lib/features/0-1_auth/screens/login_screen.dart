@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart'; // ✅ 디자인 시스템 임포트
+import '../../../main.dart'; // MainShell
 
 class LoginSignupScreen extends StatefulWidget {
   const LoginSignupScreen({super.key});
@@ -29,8 +29,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
   String? signupPasswordError;
   String? signupPasswordConfirmError;
 
-  final mainColor = AppColors.primary500; // ✅ 블루 계열로 변경
-  final darkColor = AppColors.primary900; // ✅ 다크 블루
+  final mainColor = const Color(0xFF1D9E75);
 
   @override
   void dispose() {
@@ -77,6 +76,11 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('로그인 성공! 환영합니다 👋')),
     );
+
+    // 메인 화면으로 이동 (뒤로가기 불가)
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+    );
     // TODO: Supabase 로그인 연결
   }
 
@@ -96,7 +100,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
       if (signupPasswordController.text.length < 8) {
         signupPasswordError = '비밀번호는 8자 이상이어야 합니다.';
       }
-      if (signupPasswordController.text != signupPasswordConfirmController.text) {
+      if (signupPasswordController.text !=
+          signupPasswordConfirmController.text) {
         signupPasswordConfirmError = '비밀번호가 일치하지 않습니다.';
       }
     });
@@ -118,16 +123,6 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F8F6),
-      // ✅ 뒤로가기 버튼이 있는 상단바 추가
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF6B7A72)),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      extendBodyBehindAppBar: true, // 컨텐츠가 앱바 영역까지 확장되도록 설정
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -168,7 +163,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
             color: mainColor,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.layers_outlined, color: Colors.white, size: 28),
+          child:
+              const Icon(Icons.layers_outlined, color: Colors.white, size: 28),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -176,7 +172,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary, // ✅ 텍스트 색상 통일
+            color: Color(0xFF1E2A24),
           ),
         ),
         const SizedBox(height: 4),
@@ -247,7 +243,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
               isPasswordVisible ? Icons.visibility : Icons.visibility_off,
               color: const Color(0xFF6B7A72),
             ),
-            onPressed: () => setState(() => isPasswordVisible = !isPasswordVisible),
+            onPressed: () =>
+                setState(() => isPasswordVisible = !isPasswordVisible),
           ),
         ),
         Align(
@@ -256,7 +253,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('비밀번호 재설정 기능 연결 예정')),
             ),
-            child: Text('비밀번호 찾기 ↗', style: TextStyle(color: mainColor, fontSize: 12)),
+            child: Text('비밀번호 찾기 ↗',
+                style: TextStyle(color: mainColor, fontSize: 12)),
           ),
         ),
         const SizedBox(height: 6),
@@ -299,7 +297,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
               isPasswordVisible ? Icons.visibility : Icons.visibility_off,
               color: const Color(0xFF6B7A72),
             ),
-            onPressed: () => setState(() => isPasswordVisible = !isPasswordVisible),
+            onPressed: () =>
+                setState(() => isPasswordVisible = !isPasswordVisible),
           ),
         ),
         const SizedBox(height: 8),
@@ -313,10 +312,13 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
           obscureText: !isPasswordConfirmVisible,
           suffixIcon: IconButton(
             icon: Icon(
-              isPasswordConfirmVisible ? Icons.visibility : Icons.visibility_off,
+              isPasswordConfirmVisible
+                  ? Icons.visibility
+                  : Icons.visibility_off,
               color: const Color(0xFF6B7A72),
             ),
-            onPressed: () => setState(() => isPasswordConfirmVisible = !isPasswordConfirmVisible),
+            onPressed: () => setState(
+                () => isPasswordConfirmVisible = !isPasswordConfirmVisible),
           ),
         ),
         const SizedBox(height: 20),
@@ -334,7 +336,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
           backgroundColor: mainColor,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: Text(label),
       ),
@@ -347,7 +350,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
         Expanded(child: Divider()),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text('또는', style: TextStyle(fontSize: 12, color: Color(0xFF6B7A72))),
+          child: Text('또는',
+              style: TextStyle(fontSize: 12, color: Color(0xFF6B7A72))),
         ),
         Expanded(child: Divider()),
       ],
@@ -362,9 +366,9 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
       icon: const Icon(Icons.g_mobiledata, size: 28),
       label: const Text('Google로 계속하기'),
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.textPrimary,
+        foregroundColor: const Color(0xFF1E2A24),
         minimumSize: const Size(double.infinity, 46),
-        side: const BorderSide(color: AppColors.border),
+        side: const BorderSide(color: Color(0xFFDDE7E1)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -383,7 +387,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF6B7A72))),
+        Text(label,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF6B7A72))),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
@@ -394,7 +399,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
             hintText: hint,
             suffixIcon: suffixIcon,
             errorText: errorText,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
             fillColor: Colors.white,
             enabledBorder: OutlineInputBorder(
@@ -424,29 +430,41 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
     String label = '';
     Color color = const Color(0xFFDDE7E1);
 
-    if (score == 1) { label = '약함';     color = const Color(0xFFE24B4A); }
-    else if (score == 2) { label = '보통'; color = const Color(0xFFEF9F27); }
-    else if (score == 3) { label = '강함'; color = const Color(0xFF63B220); }
-    else if (score == 4) { label = '매우 강함'; color = mainColor; }
+    if (score == 1) {
+      label = '약함';
+      color = const Color(0xFFE24B4A);
+    } else if (score == 2) {
+      label = '보통';
+      color = const Color(0xFFEF9F27);
+    } else if (score == 3) {
+      label = '강함';
+      color = const Color(0xFF63B220);
+    } else if (score == 4) {
+      label = '매우 강함';
+      color = mainColor;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: List.generate(4, (i) => Expanded(
-            child: Container(
-              height: 4,
-              margin: EdgeInsets.only(right: i == 3 ? 0 : 4),
-              decoration: BoxDecoration(
-                color: i < score ? color : const Color(0xFFDDE7E1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          )),
+          children: List.generate(
+              4,
+              (i) => Expanded(
+                    child: Container(
+                      height: 4,
+                      margin: EdgeInsets.only(right: i == 3 ? 0 : 4),
+                      decoration: BoxDecoration(
+                        color: i < score ? color : const Color(0xFFDDE7E1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  )),
         ),
         if (label.isNotEmpty) ...[
           const SizedBox(height: 5),
-          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7A72))),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF6B7A72))),
         ],
       ],
     );
