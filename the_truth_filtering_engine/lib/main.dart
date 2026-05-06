@@ -8,6 +8,7 @@ import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
+import 'features/0-1_auth/screens/login_screen.dart'; // ✅ 임포트 추가
 
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -76,6 +77,20 @@ class _MainShellState extends ConsumerState<MainShell> {
             ),
           ],
         ),
+        // ✅ 로그인 버튼 추가
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline_rounded),
+            color: AppColors.primary900,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginSignupScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Container(height: 0.5, color: AppColors.border),
@@ -100,7 +115,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
         child: BottomNavigationBar(
           currentIndex: ref.watch(mainTabIndexProvider),
-          onTap: (index) => ref.read(mainTabIndexProvider.notifier).state = index,
+          onTap: (index) =>
+              ref.read(mainTabIndexProvider.notifier).state = index,
           selectedLabelStyle:
               const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
@@ -131,4 +147,3 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 }
-
