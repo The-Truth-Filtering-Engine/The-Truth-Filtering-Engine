@@ -8,7 +8,7 @@ import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
-import 'features/0-1_auth/screens/login_screen.dart'; // ✅ 임포트 추가
+import 'features/auth/screens/login_signup_screen.dart'; // ← 추가
 
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -29,10 +29,12 @@ class TruthMouthApp extends StatelessWidget {
       title: 'Truth Filtering Engine',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const MainShell(),
+      home: const LoginSignupScreen(), // ← MainShell() 에서 변경
     );
   }
 }
+
+// ── 로그인 성공 후 이동할 메인 화면 ─────────────────────────────────────────
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
@@ -51,53 +53,41 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ── 추가된 공통 앱바 ───────────────────────
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        // 좌측: 로고 마크 + 서비스명
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/logo.png',
-              width: 32,
-              height: 32,
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              '진실의 입',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary900,
+        title: GestureDetector(
+          onTap: () {
+            // 탭 0번(탐색/홈)으로 이동
+            ref.read(mainTabIndexProvider.notifier).state = 0;
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/logo.png',
+                width: 32,
+                height: 32,
               ),
-            ),
-          ],
-        ),
-        // ✅ 로그인 버튼 추가
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline_rounded),
-            color: AppColors.primary900,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginSignupScreen()),
-              );
-            },
+              const SizedBox(width: 8),
+              const Text(
+                '진실의 입',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary900,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-        ],
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Container(height: 0.5, color: AppColors.border),
         ),
       ),
-      // ── 여기까지 추가 ──────────────────────────
-
       body: IndexedStack(
         index: ref.watch(mainTabIndexProvider),
         children: [
