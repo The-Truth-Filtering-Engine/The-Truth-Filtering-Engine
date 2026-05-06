@@ -263,7 +263,29 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
         _divider(),
         const SizedBox(height: 18),
         _googleButton(),
+        const SizedBox(height: 18),
+        _tempAdminLoginButton(),
       ],
+    );
+  }
+
+  Widget _tempAdminLoginButton() {
+    return TextButton.icon(
+      onPressed: () {
+        // 임시로 MainShell(MapScreen 포함)으로 바로 이동하는 버튼
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainShell()),
+        );
+      },
+      icon: const Icon(Icons.admin_panel_settings, color: Color(0xFF6B7A72), size: 20),
+      label: const Text(
+        '임시 관리자 로그인 (MapScreen 바로가기)',
+        style: TextStyle(
+          color: Color(0xFF6B7A72), 
+          fontSize: 13,
+          decoration: TextDecoration.underline,
+        ),
+      ),
     );
   }
 

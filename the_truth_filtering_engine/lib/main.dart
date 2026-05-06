@@ -8,7 +8,7 @@ import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
-import 'features/auth/screens/login_signup_screen.dart'; // ← 추가
+import 'features/0-1_auth/screens/login_screen.dart'; // ← 추가
 
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
 
