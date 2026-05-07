@@ -30,12 +30,19 @@ type MapPoint = {
 
 type Restaurant = {
   id: string
+  storeId: string
   name: string
   address: string
   category: string
+  categoryName: string
+  categoryGroupCode: string
+  categoryGroupName: string
   distance: number
   phone: string
   link: string
+  addressName: string
+  roadAddressName: string
+  placeUrl: string
   latitude: number
   longitude: number
 }
@@ -74,6 +81,10 @@ type AiRecommendItem = {
   placeName: string
   address: string
   category: string
+  categoryGroupCode: string
+  categoryGroupName: string
+  addressName: string
+  roadAddressName: string
   latitude: number | null
   longitude: number | null
   placeUrl: string
@@ -353,17 +364,24 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
   }
 
   const data = (await response.json()) as {
-    restaurants?: Array<{
-      id?: string
-      name?: string
-      address?: string
-      category?: string
-      distance?: number | string
-      phone?: string
-      link?: string
-      lat?: number | string
-      lng?: number | string
-    }>
+      restaurants?: Array<{
+        id?: string
+        storeId?: string
+        name?: string
+        address?: string
+        category?: string
+        categoryName?: string
+        categoryGroupCode?: string
+        categoryGroupName?: string
+        distance?: number | string
+        phone?: string
+        link?: string
+        addressName?: string
+        roadAddressName?: string
+        placeUrl?: string
+        lat?: number | string
+        lng?: number | string
+      }>
   }
 
   return (data.restaurants ?? [])
@@ -395,17 +413,24 @@ async function fetchSearchRestaurants(query: string, center: MapPoint) {
   }
 
   const data = (await response.json()) as {
-    restaurants?: Array<{
-      id?: string
-      name?: string
-      address?: string
-      category?: string
-      distance?: number | string
-      phone?: string
-      link?: string
-      lat?: number | string
-      lng?: number | string
-    }>
+      restaurants?: Array<{
+        id?: string
+        storeId?: string
+        name?: string
+        address?: string
+        category?: string
+        categoryName?: string
+        categoryGroupCode?: string
+        categoryGroupName?: string
+        distance?: number | string
+        phone?: string
+        link?: string
+        addressName?: string
+        roadAddressName?: string
+        placeUrl?: string
+        lat?: number | string
+        lng?: number | string
+      }>
   }
 
   return (data.restaurants ?? [])
@@ -422,23 +447,40 @@ async function fetchSearchRestaurants(query: string, center: MapPoint) {
 
 function parseRestaurantPayloadItem(item: {
   id?: string
+  storeId?: string
   name?: string
   address?: string
   category?: string
+  categoryName?: string
+  categoryGroupCode?: string
+  categoryGroupName?: string
   distance?: number | string
   phone?: string
   link?: string
+  addressName?: string
+  roadAddressName?: string
+  placeUrl?: string
   lat?: number | string
   lng?: number | string
 }): Restaurant {
+  const id = item.id?.toString() ?? ''
+  const categoryName = item.categoryName?.toString() ?? item.category?.toString() ?? ''
+  const placeUrl = (item.placeUrl ?? item.link)?.toString() ?? ''
   return {
-    id: item.id?.toString() ?? '',
+    id,
+    storeId: item.storeId?.toString() ?? id,
     name: item.name?.toString() ?? '',
     address: item.address?.toString() ?? '',
-    category: item.category?.toString() ?? '음식점',
+    category: (item.category?.toString() ?? categoryName) || '음식점',
+    categoryName,
+    categoryGroupCode: item.categoryGroupCode?.toString() ?? '',
+    categoryGroupName: item.categoryGroupName?.toString() ?? '',
     distance: Number(item.distance ?? 0),
     phone: item.phone?.toString() ?? '',
-    link: item.link?.toString() ?? '',
+    link: placeUrl,
+    addressName: item.addressName?.toString() ?? '',
+    roadAddressName: item.roadAddressName?.toString() ?? '',
+    placeUrl,
     latitude: Number(item.lat),
     longitude: Number(item.lng),
   }
@@ -574,12 +616,34 @@ function buildReviewSearchPath(
     refresh?: boolean
     limit?: number
     maxResults?: number
+    restaurant?: Restaurant
   } = {},
 ) {
   const params = new URLSearchParams({
     query,
     limit: String(options.limit ?? REVIEW_BATCH_SIZE),
   })
+  const restaurant = options.restaurant
+
+  if (restaurant) {
+    const storeId = restaurant.storeId || restaurant.id
+    if (storeId) params.set('storeId', storeId)
+    if (restaurant.categoryName) params.set('categoryName', restaurant.categoryName)
+    if (restaurant.categoryGroupCode) {
+      params.set('categoryGroupCode', restaurant.categoryGroupCode)
+    }
+    if (restaurant.categoryGroupName) {
+      params.set('categoryGroupName', restaurant.categoryGroupName)
+    }
+    if (restaurant.phone) params.set('phone', restaurant.phone)
+    if (restaurant.addressName) params.set('addressName', restaurant.addressName)
+    if (restaurant.roadAddressName) {
+      params.set('roadAddressName', restaurant.roadAddressName)
+    }
+    if (restaurant.placeUrl || restaurant.link) {
+      params.set('placeUrl', restaurant.placeUrl || restaurant.link)
+    }
+  }
 
   if (endpoint === '/api/search') {
     params.set('mode', options.mode ?? 'model')
@@ -620,6 +684,10 @@ function parseAiRecommendItem(item: Record<string, unknown>): AiRecommendItem {
     placeName: cleanText(item.placeName),
     address: cleanText(item.address),
     category: cleanText(item.category) || '음식점',
+    categoryGroupCode: cleanText(item.categoryGroupCode),
+    categoryGroupName: cleanText(item.categoryGroupName),
+    addressName: cleanText(item.addressName),
+    roadAddressName: cleanText(item.roadAddressName),
     latitude: Number.isFinite(Number(item.lat)) ? Number(item.lat) : null,
     longitude: Number.isFinite(Number(item.lng)) ? Number(item.lng) : null,
     placeUrl: cleanText(item.placeUrl),
@@ -632,12 +700,19 @@ function aiRecommendToRestaurant(item: AiRecommendItem): Restaurant | null {
 
   return {
     id: item.placeId || `review-${item.id}`,
+    storeId: item.placeId,
     name: item.placeName || item.name || '이름 없는 장소',
     address: item.address,
     category: item.category || '음식점',
+    categoryName: item.category,
+    categoryGroupCode: item.categoryGroupCode,
+    categoryGroupName: item.categoryGroupName,
     distance: 0,
     phone: item.phone,
     link: item.placeUrl,
+    addressName: item.addressName,
+    roadAddressName: item.roadAddressName,
+    placeUrl: item.placeUrl,
     latitude: item.latitude,
     longitude: item.longitude,
   }
@@ -663,12 +738,19 @@ function normalizeRestaurant(value: unknown): Restaurant | null {
 
   return {
     id,
+    storeId: item.storeId?.toString() ?? id,
     name,
     address: item.address?.toString() ?? '',
     category: item.category?.toString() ?? '음식점',
+    categoryName: item.categoryName?.toString() ?? item.category?.toString() ?? '',
+    categoryGroupCode: item.categoryGroupCode?.toString() ?? '',
+    categoryGroupName: item.categoryGroupName?.toString() ?? '',
     distance: Number(item.distance ?? 0),
     phone: item.phone?.toString() ?? '',
     link: (item.link ?? item.placeUrl)?.toString() ?? '',
+    addressName: item.addressName?.toString() ?? '',
+    roadAddressName: item.roadAddressName?.toString() ?? '',
+    placeUrl: (item.placeUrl ?? item.link)?.toString() ?? '',
     latitude,
     longitude,
   }
@@ -1083,7 +1165,9 @@ function App() {
 
       if (!forceFresh) {
         const cached = await fetchDetailJson(
-          buildReviewSearchPath('/api/search/cached', query),
+          buildReviewSearchPath('/api/search/cached', query, {
+            restaurant,
+          }),
           controller.signal,
         )
         if (requestId !== detailRequestIdRef.current) return
@@ -1094,7 +1178,10 @@ function App() {
           setDetailState('analyzing')
           try {
             detailJson = await fetchDetailJson(
-              buildReviewSearchPath('/api/search', query, { naverStart: 1 }),
+              buildReviewSearchPath('/api/search', query, {
+                naverStart: 1,
+                restaurant,
+              }),
               controller.signal,
             )
           } catch (error) {
@@ -1108,6 +1195,7 @@ function App() {
           buildReviewSearchPath('/api/search', query, {
             naverStart: 1,
             refresh: true,
+            restaurant,
           }),
           controller.signal,
         )
@@ -1175,6 +1263,7 @@ function App() {
       const detailJson = await fetchDetailJson(
         buildReviewSearchPath('/api/search', selectedRestaurant.name, {
           naverStart,
+          restaurant: selectedRestaurant,
         }),
         controller.signal,
       )
