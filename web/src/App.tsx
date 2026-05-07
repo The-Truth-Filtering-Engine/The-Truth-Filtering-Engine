@@ -1238,16 +1238,7 @@ function App() {
 
   return (
     <main className="map-page">
-      <div ref={mapContainerRef} className="map-container" />
-      {loadState === 'loading' && (
-        <div className="map-status">카카오맵을 불러오는 중입니다</div>
-      )}
-      {loadState === 'error' && (
-        <div className="map-status map-status-error">{errorMessage}</div>
-      )}
-      {loadState === 'ready' && placesErrorMessage && (
-        <div className="map-status map-status-error">{placesErrorMessage}</div>
-      )}
+      <section className="side-panel-column" aria-label="지도 사이드 패널">
       {activeSidePanel === 'search' && (
         <aside className="restaurant-panel search-panel" aria-label="장소 검색">
           <section className="search-panel-body">
@@ -1275,16 +1266,6 @@ function App() {
                   }}
                 />
               </label>
-              {searchInput || searchState !== 'idle' ? (
-                <button
-                  type="button"
-                  className="map-search-icon-button"
-                  aria-label="검색 초기화"
-                  onClick={clearRestaurantSearch}
-                >
-                  <X aria-hidden="true" size={17} strokeWidth={2.2} />
-                </button>
-              ) : null}
               <button
                 type="submit"
                 className="map-search-submit"
@@ -1881,6 +1862,18 @@ function App() {
           </section>
         </aside>
       )}
+      </section>
+      <section className="map-view" aria-label="지도">
+      <div ref={mapContainerRef} className="map-container" />
+      {loadState === 'loading' && (
+        <div className="map-status">카카오맵을 불러오는 중입니다</div>
+      )}
+      {loadState === 'error' && (
+        <div className="map-status map-status-error">{errorMessage}</div>
+      )}
+      {loadState === 'ready' && placesErrorMessage && (
+        <div className="map-status map-status-error">{placesErrorMessage}</div>
+      )}
       <nav className="map-tool-rail" aria-label="지도 메뉴">
         <button
           type="button"
@@ -1927,6 +1920,7 @@ function App() {
         </button>
       </nav>
       {toastMessage && <div className="map-toast">{toastMessage}</div>}
+      </section>
     </main>
   )
 }
