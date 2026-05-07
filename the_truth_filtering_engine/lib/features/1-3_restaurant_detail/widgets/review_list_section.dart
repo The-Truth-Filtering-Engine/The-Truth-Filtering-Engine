@@ -60,7 +60,7 @@ class _SkeletonBoxState extends State<_SkeletonBox>
 }
 
 class _BlogCardSkeleton extends StatelessWidget {
-  const _BlogCardSkeleton();
+  const _BlogCardSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -117,11 +117,17 @@ class _BlogCardSkeleton extends StatelessWidget {
 class ReviewListSection extends StatefulWidget {
   final ShopInfo shopInfo;
   final List<BlogReview> blogs;
+  final bool hasMoreReviews;
+  final bool isLoadingReviewBatch;
+  final ValueChanged<int>? onRequestReviewBatch;
 
   const ReviewListSection({
     super.key,
     required this.shopInfo,
     required this.blogs,
+    this.hasMoreReviews = false,
+    this.isLoadingReviewBatch = false,
+    this.onRequestReviewBatch,
   });
 
   @override
@@ -130,18 +136,39 @@ class ReviewListSection extends StatefulWidget {
 
 class _ReviewListSectionState extends State<ReviewListSection>
     with SingleTickerProviderStateMixin {
+  static const int _pageSize = 10;
+  static const int _maxReviewCount = 300;
+
   late TabController _tabController;
+  int _currentTabIndex = 0;
+  int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // 탭 전환 시 리스트 다시 그리기
-    _tabController.addListener(() => setState(() {}));
+    _tabController.addListener(_handleTabChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant ReviewListSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final shopChanged = oldWidget.shopInfo.name != widget.shopInfo.name;
+    final blogsChanged = !identical(oldWidget.blogs, widget.blogs) ||
+        oldWidget.blogs.length != widget.blogs.length;
+
+    if (shopChanged) {
+      _currentPage = 0;
+    } else if (blogsChanged ||
+        oldWidget.hasMoreReviews != widget.hasMoreReviews) {
+      _clampCurrentPage();
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     super.dispose();
   }
@@ -164,8 +191,85 @@ class _ReviewListSectionState extends State<ReviewListSection>
   List<BlogReview> get _currentBlogs =>
       _tabController.index == 0 ? _sortedByReal : _sortedByDate;
 
+  int get _totalPages {
+    if (_currentBlogs.isEmpty) return 0;
+    final loadedPages = (_currentBlogs.length / _pageSize).ceil();
+    if (!widget.hasMoreReviews) return loadedPages;
+
+    final maxPages = (_maxReviewCount / _pageSize).ceil();
+    return loadedPages < maxPages ? maxPages : loadedPages;
+  }
+
+  int get _lastPageIndex => _totalPages == 0 ? 0 : _totalPages - 1;
+
+  bool get _shouldShowPagination =>
+      _currentBlogs.length > _pageSize || widget.hasMoreReviews;
+
+  bool get _canGoPrevious => _currentPage > 0 && !widget.isLoadingReviewBatch;
+
+  bool get _canGoNext =>
+      _currentPage < _lastPageIndex && !widget.isLoadingReviewBatch;
+
+  bool get _isCurrentPageLoaded => _currentPageStart < _currentBlogs.length;
+
+  bool get _shouldShowPageSkeleton =>
+      widget.isLoadingReviewBatch && !_isCurrentPageLoaded;
+
+  int get _currentPageStart => _currentPage * _pageSize;
+
+  List<BlogReview> get _visibleBlogs {
+    final blogs = _currentBlogs;
+    final start = _currentPageStart;
+    if (start >= blogs.length) return const [];
+
+    final requestedEnd = start + _pageSize;
+    final end = requestedEnd > blogs.length ? blogs.length : requestedEnd;
+    return blogs.sublist(start, end);
+  }
+
+  void _handleTabChange() {
+    if (_currentTabIndex == _tabController.index) return;
+
+    setState(() {
+      _currentTabIndex = _tabController.index;
+      _currentPage = 0;
+    });
+  }
+
+  void _clampCurrentPage() {
+    if (_currentPage > _lastPageIndex) {
+      _currentPage = _lastPageIndex;
+    }
+  }
+
+  void _goToPreviousPage() {
+    if (!_canGoPrevious) return;
+    final nextPage = _currentPage - 1;
+    setState(() => _currentPage = nextPage);
+    _requestBatchIfNeeded(nextPage);
+  }
+
+  void _goToNextPage() {
+    if (!_canGoNext) return;
+    final nextPage = _currentPage + 1;
+    setState(() => _currentPage = nextPage);
+    _requestBatchIfNeeded(nextPage);
+  }
+
+  void _requestBatchIfNeeded(int page) {
+    final pageStart = page * _pageSize;
+    if (pageStart < _currentBlogs.length) return;
+    if (!widget.hasMoreReviews || widget.isLoadingReviewBatch) return;
+
+    widget.onRequestReviewBatch?.call(page);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentBlogs = _currentBlogs;
+    final visibleBlogs = _visibleBlogs;
+    final showSkeleton = _shouldShowPageSkeleton;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -188,7 +292,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(.06),
+                        color: Colors.black.withValues(alpha: .06),
                         blurRadius: 4,
                         offset: const Offset(0, 1),
                       ),
@@ -215,7 +319,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
         const Divider(height: 1),
 
-        if (_currentBlogs.isEmpty)
+        if (currentBlogs.isEmpty)
           Container(
             width: double.infinity,
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -238,15 +342,101 @@ class _ReviewListSectionState extends State<ReviewListSection>
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: Column(
               children: [
-                for (final blog in _currentBlogs)
-                  ReviewItem(
-                    blog: blog,
-                    onTap: () => _openUrl(blog),
-                  ),
+                if (showSkeleton)
+                  for (var i = 0; i < _pageSize; i++)
+                    _BlogCardSkeleton(key: ValueKey('review-page-skeleton-$i'))
+                else
+                  for (final blog in visibleBlogs)
+                    ReviewItem(
+                      blog: blog,
+                      onTap: () => _openUrl(blog),
+                    ),
+                _PaginationControls(
+                  currentPage: _currentPage,
+                  totalPages: _totalPages,
+                  show: _shouldShowPagination,
+                  canGoPrevious: _canGoPrevious,
+                  canGoNext: _canGoNext,
+                  onPrevious: _goToPreviousPage,
+                  onNext: _goToNextPage,
+                ),
               ],
             ),
           ),
       ],
+    );
+  }
+}
+
+class _PaginationControls extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  final bool show;
+  final bool canGoPrevious;
+  final bool canGoNext;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  const _PaginationControls({
+    required this.currentPage,
+    required this.totalPages,
+    required this.show,
+    required this.canGoPrevious,
+    required this.canGoNext,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!show) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: canGoPrevious ? onPrevious : null,
+              icon: const Icon(Icons.chevron_left_rounded, size: 18),
+              label: const Text('이전'),
+              style: _buttonStyle(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 74,
+            child: Text(
+              '${currentPage + 1} / $totalPages',
+              textAlign: TextAlign.center,
+              style: AppText.caption().copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: canGoNext ? onNext : null,
+              icon: const Icon(Icons.chevron_right_rounded, size: 18),
+              label: const Text('다음'),
+              style: _buttonStyle(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  ButtonStyle _buttonStyle() {
+    return OutlinedButton.styleFrom(
+      foregroundColor: AppColors.primary500,
+      disabledForegroundColor: AppColors.textHint,
+      side: const BorderSide(color: AppColors.border, width: 0.8),
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      textStyle: AppText.caption().copyWith(fontWeight: FontWeight.w600),
     );
   }
 }
