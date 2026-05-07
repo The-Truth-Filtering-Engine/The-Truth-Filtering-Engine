@@ -133,7 +133,7 @@ async def get_ai_recommendation_reviews(
     페이지네이션 포함.
     """
     if not SUPABASE_URL:
-        return {"items": [], "total": 0}
+        return {"items": [], "total": 0, "has_next": False}
 
     offset = (page - 1) * page_size
     end = offset + page_size - 1
@@ -155,12 +155,14 @@ async def get_ai_recommendation_reviews(
         )
 
     if resp.status_code not in (200, 206):
-        return {"items": [], "total": 0}
+        return {"items": [], "total": 0, "has_next": False}
 
     total_str = resp.headers.get("Content-Range", "*/0").split("/")[-1]
     total = int(total_str) if total_str.isdigit() else 0
+    items = resp.json() or []
+    has_next = offset + len(items) < total
 
-    return {"items": resp.json() or [], "total": total}
+    return {"items": items, "total": total, "has_next": has_next}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
