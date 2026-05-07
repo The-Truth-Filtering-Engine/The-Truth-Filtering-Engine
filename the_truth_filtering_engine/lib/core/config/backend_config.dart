@@ -1,7 +1,7 @@
 class BackendConfig {
   static const String _rawBaseUrl = String.fromEnvironment(
     'BACKEND_BASE_URL',
-    defaultValue: 'https://announced-provider-aus-allowed.trycloudflare.com',
+    defaultValue: 'https://equal-backed-plastics-franklin.trycloudflare.com',
   );
 
   static String get baseUrl => _rawBaseUrl.replaceFirst(RegExp(r'/+$'), '');
