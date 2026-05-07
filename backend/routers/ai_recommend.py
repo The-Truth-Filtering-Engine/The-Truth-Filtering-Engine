@@ -100,7 +100,7 @@ async def _load_region_filtered_items(
 
         for review in reviews:
             place = places_by_name.get((review.get("name") or "").strip())
-            if not _place_matches_region(place, region, region_scope):
+            if not _review_matches_region(review, place, region, region_scope):
                 continue
 
             filtered_items.append(_build_response_item(review, place))
@@ -117,6 +117,8 @@ async def _load_region_filtered_items(
 
 
 def _build_response_item(review: dict, place: dict | None) -> dict:
+    review_address = review.get("road_address_name") or review.get("address_name") or ""
+    review_place_url = review.get("place_url") or ""
     item = {
         "id": review.get("id"),
         "name": review.get("name") or "",
@@ -126,29 +128,48 @@ def _build_response_item(review: dict, place: dict | None) -> dict:
         "bloggerName": review.get("review_bloggername") or "",
         "postDate": review.get("review_postdate") or "",
         "adScore": review.get("is_ad_finetuned_pred"),
-        "placeId": "",
-        "placeName": "",
-        "address": "",
-        "category": "",
+        "placeId": review.get("store_id") or "",
+        "placeName": review.get("name") or "",
+        "address": review_address,
+        "category": review.get("category_name") or "",
+        "categoryGroupCode": review.get("category_group_code") or "",
+        "categoryGroupName": review.get("category_group_name") or "",
+        "addressName": review.get("address_name") or "",
+        "roadAddressName": review.get("road_address_name") or "",
         "lat": None,
         "lng": None,
-        "placeUrl": "",
-        "phone": "",
+        "placeUrl": review_place_url,
+        "phone": review.get("phone") or "",
     }
 
     if not place:
+        if not item["category"]:
+            item["category"] = "음식점"
         return item
 
     item.update(
         {
-            "placeId": place.get("id") or "",
-            "placeName": place.get("place_name") or "",
-            "address": place.get("road_address_name") or place.get("address_name") or "",
-            "category": place.get("category_name") or "음식점",
+            "placeId": item["placeId"] or place.get("id") or "",
+            "placeName": item["placeName"] or place.get("place_name") or "",
+            "address": item["address"]
+            or place.get("road_address_name")
+            or place.get("address_name")
+            or "",
+            "category": item["category"] or place.get("category_name") or "음식점",
+            "categoryGroupCode": item["categoryGroupCode"]
+            or place.get("category_group_code")
+            or "",
+            "categoryGroupName": item["categoryGroupName"]
+            or place.get("category_group_name")
+            or "",
+            "addressName": item["addressName"] or place.get("address_name") or "",
+            "roadAddressName": item["roadAddressName"]
+            or place.get("road_address_name")
+            or "",
             "lat": _safe_float(place.get("y")),
             "lng": _safe_float(place.get("x")),
-            "placeUrl": place.get("place_url") or "",
-            "phone": place.get("phone") or "",
+            "placeUrl": item["placeUrl"] or place.get("place_url") or "",
+            "phone": item["phone"] or place.get("phone") or "",
         }
     )
     return item
@@ -225,19 +246,19 @@ async def _get_region(lat: float, lng: float) -> dict[str, str] | None:
     }
 
 
-def _place_matches_region(
+def _review_matches_region(
+    review: dict,
     place: dict | None,
     region: dict[str, str],
     region_scope: RegionScope,
 ) -> bool:
-    if not place:
-        return False
-
     address_text = _normalize_region_text(
         " ".join(
             [
-                place.get("road_address_name") or "",
-                place.get("address_name") or "",
+                review.get("road_address_name") or "",
+                review.get("address_name") or "",
+                place.get("road_address_name") if place else "",
+                place.get("address_name") if place else "",
             ]
         )
     )

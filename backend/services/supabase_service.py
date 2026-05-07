@@ -29,22 +29,36 @@ def _h(prefer: str = "") -> dict:
 # 리뷰 저장 (검색 시 자동 호출)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def save_reviews(query: str, blogs: list[dict]) -> None:
+async def save_reviews(
+    query: str,
+    blogs: list[dict],
+    place_metadata: dict | None = None,
+) -> None:
     """
     Naver 블로그 수집 결과를 reviews 테이블에 저장.
-    이미 같은 query + link 가 있으면 upsert로 중복 방지.
+    장소 메타데이터가 있으면 같은 상호명의 다른 지점이 섞이지 않도록 함께 저장.
     """
     if not SUPABASE_URL or not blogs:
         return
 
+    metadata = _normalize_place_metadata(query, place_metadata)
+
     rows = [
         {
-            "name": query,
+            "name": metadata["name"],
             "review_title": b.get("title", ""),
             "review_description": b.get("description", ""),
             "review_bloggername": b.get("bloggername", ""),
             "review_url": b.get("link", ""),
             "review_postdate": b.get("postdate"),
+            "store_id": metadata["store_id"],
+            "category_name": metadata["category_name"],
+            "category_group_code": metadata["category_group_code"],
+            "category_group_name": metadata["category_group_name"],
+            "phone": metadata["phone"],
+            "address_name": metadata["address_name"],
+            "road_address_name": metadata["road_address_name"],
+            "place_url": metadata["place_url"],
             # 판별 결과는 초기에 null → 이후 update_* 함수로 채움
             "is_ad_electra_pred": None,
             "is_ad_finetuned_pred": None,
@@ -62,24 +76,56 @@ async def save_reviews(query: str, blogs: list[dict]) -> None:
         )
 
 
+def _normalize_place_metadata(query: str, place_metadata: dict | None) -> dict:
+    metadata = place_metadata or {}
+    return {
+        "name": _text_or_none(metadata.get("name")) or query,
+        "store_id": _text_or_none(metadata.get("store_id")),
+        "category_name": _text_or_none(metadata.get("category_name")),
+        "category_group_code": _text_or_none(metadata.get("category_group_code")),
+        "category_group_name": _text_or_none(metadata.get("category_group_name")),
+        "phone": _text_or_none(metadata.get("phone")),
+        "address_name": _text_or_none(metadata.get("address_name")),
+        "road_address_name": _text_or_none(metadata.get("road_address_name")),
+        "place_url": _text_or_none(metadata.get("place_url")),
+    }
+
+
+def _text_or_none(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 캐시 조회
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def get_cached_reviews(query: str, limit: int = MAX_REVIEW_RESULTS) -> list[dict]:
-    """같은 query 로 저장된 리뷰가 있으면 반환, 없으면 빈 리스트."""
+async def get_cached_reviews(
+    query: str,
+    limit: int = MAX_REVIEW_RESULTS,
+    store_id: str | None = None,
+) -> list[dict]:
+    """store_id가 있으면 장소 ID 기준으로, 없으면 기존 query 기준으로 캐시 조회."""
     if not SUPABASE_URL:
         return []
 
     review_limit = clamp_max_results(limit)
     end = review_limit - 1
+    store_id = _text_or_none(store_id)
+    lookup_params = (
+        {"store_id": f"eq.{store_id}"}
+        if store_id
+        else {"name": f"eq.{query}"}
+    )
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{SUPABASE_URL}/rest/v1/reviews",
             headers={**_h(), "Range": f"0-{end}", "Range-Unit": "items"},
             params={
-                "name": f"eq.{query}",
+                **lookup_params,
                 "order": "created_at.desc",
                 "limit": str(review_limit),
             },

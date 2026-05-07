@@ -100,23 +100,12 @@ async def get_nearby_restaurants(
         if not place_id or place_id in unique_by_id:
             continue
 
-        place_lat = float(item.get("y") or 0)
-        place_lng = float(item.get("x") or 0)
-        distance = int(float(item.get("distance") or 0))
-        if distance <= 0:
-            distance = int(haversine(lat, lng, place_lat, place_lng))
-
-        unique_by_id[place_id] = {
-            "id": place_id,
-            "name": item.get("place_name", ""),
-            "address": item.get("road_address_name") or item.get("address_name", ""),
-            "category": parse_kakao_category(item.get("category_name", "")),
-            "lat": place_lat,
-            "lng": place_lng,
-            "link": item.get("place_url", ""),
-            "distance": distance,
-            "phone": item.get("phone", ""),
-        }
+        unique_by_id[place_id] = _restaurant_from_kakao_document(
+            item,
+            lat=lat,
+            lng=lng,
+            has_location=True,
+        )
 
     restaurants = sorted(
         unique_by_id.values(),
@@ -202,6 +191,44 @@ def parse_kakao_category(category_name: str) -> str:
     return category_name.strip() if category_name.strip() else "음식점"
 
 
+def _restaurant_from_kakao_document(
+    item: dict,
+    lat: float | None,
+    lng: float | None,
+    has_location: bool,
+) -> dict:
+    place_id = str(item.get("id", "")).strip()
+    place_lat = float(item.get("y") or 0)
+    place_lng = float(item.get("x") or 0)
+    distance = int(float(item.get("distance") or 0))
+    if distance <= 0 and has_location and lat is not None and lng is not None:
+        distance = int(haversine(lat, lng, place_lat, place_lng))
+
+    category_name = item.get("category_name", "") or ""
+    address_name = item.get("address_name", "") or ""
+    road_address_name = item.get("road_address_name", "") or ""
+    place_url = item.get("place_url", "") or ""
+
+    return {
+        "id": place_id,
+        "storeId": place_id,
+        "name": item.get("place_name", ""),
+        "address": road_address_name or address_name,
+        "category": parse_kakao_category(category_name),
+        "categoryName": category_name,
+        "categoryGroupCode": item.get("category_group_code", "") or "",
+        "categoryGroupName": item.get("category_group_name", "") or "",
+        "lat": place_lat,
+        "lng": place_lng,
+        "link": place_url,
+        "placeUrl": place_url,
+        "distance": distance,
+        "phone": item.get("phone", "") or "",
+        "addressName": address_name,
+        "roadAddressName": road_address_name,
+    }
+
+
 def _restaurants_from_kakao_documents(
     documents: list[dict],
     lat: float | None,
@@ -216,23 +243,12 @@ def _restaurants_from_kakao_documents(
         if not place_id or place_id in unique_by_id:
             continue
 
-        place_lat = float(item.get("y") or 0)
-        place_lng = float(item.get("x") or 0)
-        distance = int(float(item.get("distance") or 0))
-        if distance <= 0 and has_location:
-            distance = int(haversine(lat, lng, place_lat, place_lng))
-
-        unique_by_id[place_id] = {
-            "id": place_id,
-            "name": item.get("place_name", ""),
-            "address": item.get("road_address_name") or item.get("address_name", ""),
-            "category": parse_kakao_category(item.get("category_name", "")),
-            "lat": place_lat,
-            "lng": place_lng,
-            "link": item.get("place_url", ""),
-            "distance": distance,
-            "phone": item.get("phone", ""),
-        }
+        unique_by_id[place_id] = _restaurant_from_kakao_document(
+            item,
+            lat=lat,
+            lng=lng,
+            has_location=has_location,
+        )
 
     restaurants = list(unique_by_id.values())
     if has_location:

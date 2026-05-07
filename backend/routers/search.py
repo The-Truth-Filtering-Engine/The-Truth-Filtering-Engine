@@ -25,9 +25,10 @@ router = APIRouter()
 async def search_cached(
     query: str,
     limit: int = Query(MAX_REVIEW_RESULTS, ge=1, le=MAX_REVIEW_RESULTS),
+    store_id: str | None = Query(None, alias="storeId"),
 ):
     review_limit = clamp_max_results(limit)
-    cached = await get_cached_reviews(query, limit=review_limit)
+    cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id)
     return {
         "source": "cache",
         "reviews": cached or [],
@@ -50,18 +51,41 @@ async def search(
         le=MAX_REVIEW_RESULTS,
     ),
     refresh: bool = False,
+    store_id: str | None = Query(None, alias="storeId"),
+    category_name: str | None = Query(None, alias="categoryName"),
+    category_group_code: str | None = Query(None, alias="categoryGroupCode"),
+    category_group_name: str | None = Query(None, alias="categoryGroupName"),
+    phone: str | None = None,
+    address_name: str | None = Query(None, alias="addressName"),
+    road_address_name: str | None = Query(None, alias="roadAddressName"),
+    place_url: str | None = Query(None, alias="placeUrl"),
 ):
     review_limit = clamp_review_limit(limit)
     max_review_results = clamp_max_results(max_results)
     normalized_start = normalize_naver_start(naver_start)
+    place_metadata = _build_place_metadata(
+        query=query,
+        store_id=store_id,
+        category_name=category_name,
+        category_group_code=category_group_code,
+        category_group_name=category_group_name,
+        phone=phone,
+        address_name=address_name,
+        road_address_name=road_address_name,
+        place_url=place_url,
+    )
 
     print(
         "[DEBUG] 검색 요청 | "
         f"query: {query} | mode: {mode} | naverStart: {normalized_start} | "
-        f"limit: {review_limit} | refresh: {refresh}"
+        f"limit: {review_limit} | refresh: {refresh} | storeId: {store_id or '-'}"
     )
 
-    cached = await get_cached_reviews(query, limit=max_review_results)
+    cached = await get_cached_reviews(
+        query,
+        limit=max_review_results,
+        store_id=store_id,
+    )
     cached_count = len(cached)
     requested_batch_end = normalized_start + review_limit - 1
     should_fetch = refresh or cached_count < requested_batch_end
@@ -77,12 +101,21 @@ async def search(
         fetched_count = len(blogs)
         print(f"[DEBUG] Naver 블로그 수집 완료 | count: {fetched_count}")
 
-        await save_reviews(query, blogs)
+        await save_reviews(query, blogs, place_metadata=place_metadata)
         print("[DEBUG] Supabase 저장 완료")
 
-        saved = await get_cached_reviews(query, limit=max_review_results)
+        saved = await get_cached_reviews(
+            query,
+            limit=max_review_results,
+            store_id=store_id,
+        )
         if not saved and blogs:
-            saved = _blogs_to_reviews(query, blogs, normalized_start)
+            saved = _blogs_to_reviews(
+                query,
+                blogs,
+                normalized_start,
+                place_metadata=place_metadata,
+            )
     else:
         print(f"[DEBUG] → Supabase 캐시 hit | count: {cached_count}")
         saved = cached
@@ -150,16 +183,54 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
         )
 
 
-def _blogs_to_reviews(query: str, blogs: list[dict], naver_start: int) -> list[dict]:
+def _build_place_metadata(
+    query: str,
+    store_id: str | None,
+    category_name: str | None,
+    category_group_code: str | None,
+    category_group_name: str | None,
+    phone: str | None,
+    address_name: str | None,
+    road_address_name: str | None,
+    place_url: str | None,
+) -> dict:
+    return {
+        "name": query,
+        "store_id": store_id,
+        "category_name": category_name,
+        "category_group_code": category_group_code,
+        "category_group_name": category_group_name,
+        "phone": phone,
+        "address_name": address_name,
+        "road_address_name": road_address_name,
+        "place_url": place_url,
+    }
+
+
+def _blogs_to_reviews(
+    query: str,
+    blogs: list[dict],
+    naver_start: int,
+    place_metadata: dict | None = None,
+) -> list[dict]:
+    metadata = place_metadata or {}
     return [
         {
             "id": naver_start + index,
-            "name": query,
+            "name": metadata.get("name") or query,
             "review_title": blog.get("title", ""),
             "review_description": blog.get("description", ""),
             "review_bloggername": blog.get("bloggername", ""),
             "review_url": blog.get("link", ""),
             "review_postdate": blog.get("postdate"),
+            "store_id": metadata.get("store_id"),
+            "category_name": metadata.get("category_name"),
+            "category_group_code": metadata.get("category_group_code"),
+            "category_group_name": metadata.get("category_group_name"),
+            "phone": metadata.get("phone"),
+            "address_name": metadata.get("address_name"),
+            "road_address_name": metadata.get("road_address_name"),
+            "place_url": metadata.get("place_url"),
             "is_ad_electra_pred": None,
             "is_ad_finetuned_pred": None,
             "is_ad_llm_pred": None,
