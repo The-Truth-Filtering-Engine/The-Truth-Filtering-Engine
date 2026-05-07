@@ -71,6 +71,112 @@ body {
   background: #ffffff;
 }
 
+.login-panel {
+  background: #f8fafc;
+}
+
+.login-panel-body {
+  display: flex;
+  min-height: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: center;
+  padding: 28px;
+}
+
+.login-panel-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 26px;
+}
+
+.login-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 14px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.login-panel-header p {
+  margin: 0 0 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-panel-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 25px;
+  line-height: 1.12;
+}
+
+.login-oauth-button,
+.login-temp-button {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  font: 800 14px/1.2 system-ui, sans-serif;
+}
+
+.login-oauth-button > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.login-oauth-button {
+  background: #111827;
+  color: #ffffff;
+}
+
+.login-oauth-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.login-error-message {
+  margin: 12px 0 0;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.login-divider {
+  height: 1px;
+  margin: 22px 0;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.login-temp-button {
+  color: #334155;
+}
+
 .panel-close-button {
   position: absolute;
   top: 16px;
@@ -94,6 +200,8 @@ body {
 .restaurant-actions button:focus-visible,
 .detail-button:focus-visible,
 .detail-secondary-button:focus-visible,
+.login-oauth-button:focus-visible,
+.login-temp-button:focus-visible,
 .ai-region-tabs button:focus-visible,
 .map-search-field:focus-within,
 .map-search-submit:focus-visible,
@@ -1092,6 +1200,15 @@ body {
 
   .search-panel-body {
     padding: 16px;
+  }
+
+  .login-panel-body {
+    justify-content: flex-start;
+    padding: 18px 16px;
+  }
+
+  .login-panel-header {
+    margin-bottom: 16px;
   }
 
   .search-panel-header {
