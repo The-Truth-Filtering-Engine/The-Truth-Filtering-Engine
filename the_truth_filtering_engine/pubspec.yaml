@@ -4,7 +4,7 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -18,6 +18,7 @@ dependencies:
   json_annotation: ^4.9.0
   shared_preferences: ^2.3.2
   cached_network_image: ^3.4.1
+  supabase_flutter: ^2.12.2
   
   # UI Components
   url_launcher: ^6.3.1

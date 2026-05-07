@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'features/1-1_map/models/restaurant_model.dart';
 import 'features/1-1_map/providers/map_provider.dart';
@@ -12,7 +14,16 @@ import 'features/0-1_auth/screens/login_screen.dart'; // ← 추가
 
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (SupabaseConfig.isConfigured) {
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      anonKey: SupabaseConfig.anonKey,
+    );
+  }
+
   runApp(
     const ProviderScope(
       child: TruthMouthApp(),
