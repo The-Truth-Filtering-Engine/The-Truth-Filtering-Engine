@@ -18,6 +18,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
+import { createClient, type Session } from '@supabase/supabase-js'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 
 type LoadState = 'loading' | 'ready' | 'error'
@@ -155,6 +156,13 @@ declare global {
 const BACKEND_BASE_URL =
   import.meta.env.VITE_BACKEND_BASE_URL?.replace(/\/$/, '') ??
   'http://localhost:8000'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() ?? ''
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? ''
+const GOOGLE_AUTH_REDIRECT_TO = 'https://truth-filtering-engine-web.vercel.app/'
+const supabase =
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null
 const KAKAO_SDK_ID = 'kakao-map-sdk'
 const INITIAL_CENTER = { latitude: 37.5245, longitude: 127.037 }
 const INITIAL_LEVEL = 4
@@ -165,6 +173,7 @@ const NEARBY_PLACE_DISPLAY_COUNT = 30
 const SEARCH_RADIUS_METERS = 5000
 const SEARCH_PLACE_DISPLAY_COUNT = 30
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
+const TEMP_ADMIN_AUTH_STORAGE_KEY = 'truth_filtering_temp_admin_auth'
 const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
   si: '시',
   gu: '구',
@@ -680,6 +689,12 @@ function App() {
     'idle' | 'loading' | 'loaded' | 'error'
   >('idle')
   const [searchErrorMessage, setSearchErrorMessage] = useState('')
+  const [authSession, setAuthSession] = useState<Session | null>(null)
+  const [isTemporaryAdmin, setIsTemporaryAdmin] = useState(false)
+  const [authStatus, setAuthStatus] = useState<
+    'checking' | 'signedOut' | 'signedIn'
+  >('checking')
+  const [authErrorMessage, setAuthErrorMessage] = useState('')
   const [aiRegionScope, setAiRegionScope] = useState<AiRegionScope>('si')
   const [aiRecommendState, setAiRecommendState] = useState<AiRecommendState>({
     items: [],
@@ -696,12 +711,82 @@ function App() {
     isRegionFiltered: false,
   })
   const [toastMessage, setToastMessage] = useState('')
+  const isLoggedIn = authSession !== null || isTemporaryAdmin
   const bookmarkedIds = bookmarkedRestaurants.map((restaurant) => restaurant.id)
   const detailRequestIdRef = useRef(0)
 
   function showToast(message: string) {
     setToastMessage(message)
     window.setTimeout(() => setToastMessage(''), 1800)
+  }
+
+  useEffect(() => {
+    setIsTemporaryAdmin(
+      window.localStorage.getItem(TEMP_ADMIN_AUTH_STORAGE_KEY) === 'true',
+    )
+
+    if (!supabase) {
+      setAuthStatus('signedOut')
+      return
+    }
+
+    let isMounted = true
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!isMounted) return
+
+      if (error) {
+        setAuthErrorMessage(error.message)
+      }
+      setAuthSession(data.session ?? null)
+      setAuthStatus(data.session ? 'signedIn' : 'signedOut')
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthSession(session)
+      setAuthStatus(session ? 'signedIn' : 'signedOut')
+      if (session) {
+        setIsTemporaryAdmin(false)
+        window.localStorage.removeItem(TEMP_ADMIN_AUTH_STORAGE_KEY)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  async function signInWithGoogle() {
+    if (!supabase) {
+      setAuthErrorMessage(
+        'Supabase 로그인 설정이 없습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해 주세요.',
+      )
+      return
+    }
+
+    setAuthErrorMessage('')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: GOOGLE_AUTH_REDIRECT_TO,
+      },
+    })
+
+    if (error) {
+      setAuthErrorMessage(error.message)
+      showToast('Google 로그인을 시작하지 못했습니다')
+    }
+  }
+
+  function signInAsTemporaryAdmin() {
+    window.localStorage.setItem(TEMP_ADMIN_AUTH_STORAGE_KEY, 'true')
+    setIsTemporaryAdmin(true)
+    setAuthErrorMessage('')
+    setAuthStatus('signedIn')
+    showToast('관리자 임시 로그인 상태입니다')
   }
 
   async function copyToClipboard(value: string, successMessage: string) {
@@ -1239,6 +1324,46 @@ function App() {
   return (
     <main className="map-page">
       <section className="side-panel-column" aria-label="지도 사이드 패널">
+      {!isLoggedIn ? (
+        <aside className="restaurant-panel login-panel" aria-label="로그인">
+          <section className="login-panel-body">
+            <div className="login-panel-header">
+              <div className="login-mark" aria-hidden="true">
+                T
+              </div>
+              <div>
+                <p>Sign in</p>
+                <h2>로그인이 필요합니다</h2>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="login-oauth-button"
+              disabled={!supabase || authStatus === 'checking'}
+              onClick={signInWithGoogle}
+            >
+              <span aria-hidden="true">G</span>
+              Google로 계속하기
+            </button>
+
+            {authErrorMessage && (
+              <p className="login-error-message">{authErrorMessage}</p>
+            )}
+
+            <div className="login-divider" aria-hidden="true" />
+
+            <button
+              type="button"
+              className="login-temp-button"
+              onClick={signInAsTemporaryAdmin}
+            >
+              관리자용 임시 로그인
+            </button>
+          </section>
+        </aside>
+      ) : (
+        <>
       {activeSidePanel === 'search' && (
         <aside className="restaurant-panel search-panel" aria-label="장소 검색">
           <section className="search-panel-body">
@@ -1861,6 +1986,8 @@ function App() {
             )}
           </section>
         </aside>
+      )}
+        </>
       )}
       </section>
       <section className="map-view" aria-label="지도">
