@@ -40,9 +40,9 @@ class AiAnalysisCard extends StatelessWidget {
           const SizedBox(height: 24),
 
           // ── 신뢰도 원형 + 바 ──
-          Row(
-            children: [
-              Container(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final scoreCircle = Container(
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
@@ -69,26 +69,43 @@ class AiAnalysisCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+              );
+
+              final statBars = Column(
+                children: [
+                  _StatBar(
+                    label: '광고 의심 게재',
+                    value: 100 - truthScore,
+                    color: const Color(0xFFE85C5C),
+                  ),
+                  const SizedBox(height: 8),
+                  _StatBar(
+                    label: '진성 리뷰 비율',
+                    value: truthScore,
+                    color: const Color(0xFF4CBB87),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 260) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _StatBar(
-                      label: '광고 의심 게재',
-                      value: 100 - truthScore,
-                      color: const Color(0xFFE85C5C),
-                    ),
-                    const SizedBox(height: 8),
-                    _StatBar(
-                      label: '진성 리뷰 비율',
-                      value: truthScore,
-                      color: const Color(0xFF4CBB87),
-                    ),
+                    scoreCircle,
+                    const SizedBox(height: 14),
+                    statBars,
                   ],
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  scoreCircle,
+                  const SizedBox(width: 16),
+                  Expanded(child: statBars),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 24),

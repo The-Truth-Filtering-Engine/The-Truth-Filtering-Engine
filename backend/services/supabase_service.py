@@ -38,12 +38,11 @@ async def save_reviews(query: str, blogs: list[dict]) -> None:
 
     rows = [
         {
-            "query": query,
+            "name": query,
             "review_title": b.get("title", ""),
             "review_description": b.get("description", ""),
             "review_bloggername": b.get("bloggername", ""),
-            "review_bloggerlink": b.get("bloggerlink", ""),
-            "review_link": b.get("link", ""),
+            "review_url": b.get("link", ""),
             "review_postdate": b.get("postdate"),
             # 판별 결과는 초기에 null → 이후 update_* 함수로 채움
             "is_ad_electra_pred": None,
@@ -76,7 +75,7 @@ async def get_cached_reviews(query: str) -> list[dict]:
             f"{SUPABASE_URL}/rest/v1/reviews",
             headers=_h(),
             params={
-                "query": f"eq.{query}",
+                "name": f"eq.{query}",
                 "order": "created_at.desc",
             },
             timeout=10,
@@ -93,7 +92,7 @@ async def get_cached_reviews(query: str) -> list[dict]:
 
 async def update_electra_pred(review_id: str, is_ad: int) -> None:
     """Electra 이진 판별 결과 저장."""
-    await _patch_review(review_id, {"is_ad_electra_pred": bool(is_ad)})
+    await _patch_review(review_id, {"is_ad_electra_pred": int(is_ad)})
 
 
 async def update_finetuned_pred(review_id: str, score: float) -> None:

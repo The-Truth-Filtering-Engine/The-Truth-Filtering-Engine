@@ -18,6 +18,8 @@ class WordCloudCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasWords = wordFreqs.isNotEmpty;
+
     return Container(
       // 높이를 부모(IntrinsicHeight Row)에 맞게 stretch
       width: double.infinity,
@@ -53,14 +55,30 @@ class WordCloudCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // ── 말풍선 워드클라우드 ──
-          Flexible(
-            child: SizedBox(
-              width: double.infinity,
-              child: CustomPaint(
-                painter: BubbleWordCloudPainter(wordFreqs),
-                size: Size.infinite,
-              ),
-            ),
+          SizedBox(
+            width: double.infinity,
+            height: 126,
+            child: hasWords
+                ? CustomPaint(
+                    painter: BubbleWordCloudPainter(wordFreqs),
+                    size: Size.infinite,
+                  )
+                : Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE4E4EC)),
+                    ),
+                    child: const Text(
+                      '표시할 키워드가 없습니다',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9090A8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -277,9 +295,10 @@ class WordFreqBuilder {
     final sorted = freq.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    // C방식: 빈도 2회 이상 + 상위 8개
-    return sorted
-        .where((e) => e.value >= 2)
+    final repeatedWords = sorted.where((e) => e.value >= 2).toList();
+    final source = repeatedWords.isNotEmpty ? repeatedWords : sorted;
+
+    return source
         .take(8)
         .map((e) => WordFreq(e.key, e.value))
         .toList();
