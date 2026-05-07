@@ -83,8 +83,12 @@ body {
 .detail-button:focus-visible,
 .detail-secondary-button:focus-visible,
 .ai-region-tabs button:focus-visible,
+.map-search-field:focus-within,
+.map-search-icon-button:focus-visible,
+.map-search-submit:focus-visible,
 .review-tabs button:focus-visible,
-.review-card:focus-visible {
+.review-card:focus-visible,
+.search-result-card:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
@@ -327,6 +331,228 @@ body {
   place-items: center;
   border-radius: 13px;
   color: #2b54e8;
+}
+
+.search-panel {
+  background: #f8fafc;
+}
+
+.search-panel-body {
+  padding: 22px;
+}
+
+.search-panel-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.search-panel-header > svg {
+  width: 42px;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 13px;
+  background: #111827;
+  color: #ffffff;
+}
+
+.search-panel-header p {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.search-panel-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.map-search-form {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 38px;
+  gap: 8px;
+  padding-bottom: 14px;
+  background: #f8fafc;
+}
+
+.map-search-form:has(.map-search-icon-button) {
+  grid-template-columns: 1fr 38px 38px;
+}
+
+.map-search-field,
+.map-search-icon-button,
+.map-search-submit {
+  min-height: 42px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+}
+
+.map-search-field {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: #64748b;
+}
+
+.map-search-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font: 700 14px/1.2 system-ui, sans-serif;
+}
+
+.map-search-field input::placeholder {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.map-search-icon-button,
+.map-search-submit {
+  display: grid;
+  width: 38px;
+  padding: 0;
+  place-items: center;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.map-search-icon-button {
+  color: #64748b;
+}
+
+.map-search-submit {
+  border-color: transparent;
+  background: #111827;
+  color: #ffffff;
+}
+
+.map-search-submit:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.search-empty-state {
+  display: grid;
+  min-height: 180px;
+  gap: 10px;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.search-empty-state > svg {
+  color: #94a3b8;
+}
+
+.search-state-card {
+  margin-top: 0;
+}
+
+.search-results {
+  display: grid;
+  gap: 12px;
+}
+
+.search-results-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.search-results-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #2563eb;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.search-result-card {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-result-thumb {
+  background: #e8f6ee;
+}
+
+.search-result-copy {
+  display: block;
+  min-width: 0;
+}
+
+.search-result-copy strong,
+.search-result-copy small,
+.search-result-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-copy strong {
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.search-result-copy small {
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.search-result-copy span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .detail-panel {

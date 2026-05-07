@@ -12,12 +12,13 @@ import {
   Navigation,
   Phone,
   RefreshCw,
+  Search,
   Settings,
   Share2,
   Sparkles,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -105,11 +106,16 @@ type KakaoBounds = {
   getNorthEast: () => KakaoLatLng
 }
 
+type KakaoLatLngBounds = {
+  extend: (latLng: KakaoLatLng) => void
+}
+
 type KakaoMap = {
   getBounds: () => KakaoBounds
   getCenter: () => KakaoLatLng
   getLevel: () => number
   relayout: () => void
+  setBounds: (bounds: KakaoLatLngBounds) => void
   setCenter: (latLng: KakaoLatLng) => void
   setLevel: (level: number) => void
 }
@@ -121,6 +127,7 @@ type KakaoCustomOverlay = {
 
 type KakaoMaps = {
   LatLng: new (latitude: number, longitude: number) => KakaoLatLng
+  LatLngBounds: new () => KakaoLatLngBounds
   Map: new (
     container: HTMLElement,
     options: { center: KakaoLatLng; level: number },
@@ -155,6 +162,8 @@ const FOCUSED_LEVEL = 1
 const VIEWPORT_DEBOUNCE_MS = 600
 const REFRESH_DISTANCE_METERS = 150
 const NEARBY_PLACE_DISPLAY_COUNT = 30
+const SEARCH_RADIUS_METERS = 5000
+const SEARCH_PLACE_DISPLAY_COUNT = 30
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
 const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
   si: '시',
@@ -346,17 +355,7 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
   }
 
   return (data.restaurants ?? [])
-    .map((item) => ({
-      id: item.id?.toString() ?? '',
-      name: item.name?.toString() ?? '',
-      address: item.address?.toString() ?? '',
-      category: item.category?.toString() ?? '음식점',
-      distance: Number(item.distance ?? 0),
-      phone: item.phone?.toString() ?? '',
-      link: item.link?.toString() ?? '',
-      latitude: Number(item.lat),
-      longitude: Number(item.lng),
-    }))
+    .map(parseRestaurantPayloadItem)
     .filter(
       (restaurant) =>
         restaurant.id &&
@@ -365,6 +364,72 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
         Number.isFinite(restaurant.longitude) &&
         Number.isFinite(restaurant.distance),
     )
+}
+
+async function fetchSearchRestaurants(query: string, center: MapPoint) {
+  const params = new URLSearchParams({
+    query,
+    lat: center.latitude.toString(),
+    lng: center.longitude.toString(),
+    radius: SEARCH_RADIUS_METERS.toString(),
+    display: SEARCH_PLACE_DISPLAY_COUNT.toString(),
+  })
+  const response = await fetch(
+    `${BACKEND_BASE_URL}/places/search-restaurants?${params.toString()}`,
+  )
+
+  if (!response.ok) {
+    throw new Error(`검색 요청 실패: ${response.status}`)
+  }
+
+  const data = (await response.json()) as {
+    restaurants?: Array<{
+      id?: string
+      name?: string
+      address?: string
+      category?: string
+      distance?: number | string
+      phone?: string
+      link?: string
+      lat?: number | string
+      lng?: number | string
+    }>
+  }
+
+  return (data.restaurants ?? [])
+    .map(parseRestaurantPayloadItem)
+    .filter(
+      (restaurant) =>
+        restaurant.id &&
+        restaurant.name &&
+        Number.isFinite(restaurant.latitude) &&
+        Number.isFinite(restaurant.longitude) &&
+        Number.isFinite(restaurant.distance),
+    )
+}
+
+function parseRestaurantPayloadItem(item: {
+  id?: string
+  name?: string
+  address?: string
+  category?: string
+  distance?: number | string
+  phone?: string
+  link?: string
+  lat?: number | string
+  lng?: number | string
+}): Restaurant {
+  return {
+    id: item.id?.toString() ?? '',
+    name: item.name?.toString() ?? '',
+    address: item.address?.toString() ?? '',
+    category: item.category?.toString() ?? '음식점',
+    distance: Number(item.distance ?? 0),
+    phone: item.phone?.toString() ?? '',
+    link: item.link?.toString() ?? '',
+    latitude: Number(item.lat),
+    longitude: Number(item.lng),
+  }
 }
 
 function formatDistance(distance: number) {
@@ -583,6 +648,10 @@ function App() {
   const kakaoMapsRef = useRef<KakaoMaps | null>(null)
   const kakaoMapRef = useRef<KakaoMap | null>(null)
   const currentLocationOverlayRef = useRef<KakaoCustomOverlay | null>(null)
+  const restaurantOverlaysRef = useRef<KakaoCustomOverlay[]>([])
+  const viewportRestaurantsRef = useRef<Restaurant[]>([])
+  const searchModeRef = useRef(false)
+  const searchRequestIdRef = useRef(0)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [placesErrorMessage, setPlacesErrorMessage] = useState('')
@@ -595,15 +664,22 @@ function App() {
     loadBookmarkedRestaurants(),
   )
   const [activeSidePanel, setActiveSidePanel] = useState<
-    'restaurant' | 'bookmarks' | 'detail' | 'ai' | null
+    'search' | 'restaurant' | 'bookmarks' | 'detail' | 'ai'
   >(
-    null,
+    'search',
   )
   const [detailState, setDetailState] = useState<DetailState>('idle')
   const [detailData, setDetailData] = useState<DetailData | null>(null)
   const [detailErrorMessage, setDetailErrorMessage] = useState('')
   const [reviewSort, setReviewSort] = useState<'real' | 'latest'>('real')
   const [currentPosition, setCurrentPosition] = useState<MapPoint | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Restaurant[]>([])
+  const [searchState, setSearchState] = useState<
+    'idle' | 'loading' | 'loaded' | 'error'
+  >('idle')
+  const [searchErrorMessage, setSearchErrorMessage] = useState('')
   const [aiRegionScope, setAiRegionScope] = useState<AiRegionScope>('si')
   const [aiRecommendState, setAiRecommendState] = useState<AiRecommendState>({
     items: [],
@@ -648,6 +724,126 @@ function App() {
       showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
       return next
     })
+  }
+
+  function clearRestaurantOverlays() {
+    for (const overlay of restaurantOverlaysRef.current) {
+      overlay.setMap(null)
+    }
+    restaurantOverlaysRef.current = []
+  }
+
+  function displayRestaurantsOnMap(restaurants: Restaurant[]) {
+    viewportRestaurantsRef.current =
+      searchModeRef.current ? viewportRestaurantsRef.current : restaurants
+
+    const kakaoMaps = kakaoMapsRef.current
+    const map = kakaoMapRef.current
+    if (!kakaoMaps || !map) return
+
+    clearRestaurantOverlays()
+    restaurantOverlaysRef.current = restaurants.map((restaurant) => {
+      const overlay = new kakaoMaps.CustomOverlay({
+        content: createRestaurantMarker(restaurant, (selected) => {
+          setSelectedRestaurant(selected)
+          setActiveSidePanel('restaurant')
+        }),
+        position: new kakaoMaps.LatLng(
+          restaurant.latitude,
+          restaurant.longitude,
+        ),
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+      })
+      overlay.setMap(map)
+      return overlay
+    })
+  }
+
+  function fitMapToRestaurants(restaurants: Restaurant[]) {
+    const kakaoMaps = kakaoMapsRef.current
+    const map = kakaoMapRef.current
+    if (!kakaoMaps || !map || restaurants.length === 0) return
+
+    if (restaurants.length === 1) {
+      map.setCenter(
+        new kakaoMaps.LatLng(
+          restaurants[0].latitude,
+          restaurants[0].longitude,
+        ),
+      )
+      map.setLevel(FOCUSED_LEVEL)
+      return
+    }
+
+    const bounds = new kakaoMaps.LatLngBounds()
+    for (const restaurant of restaurants) {
+      bounds.extend(
+        new kakaoMaps.LatLng(restaurant.latitude, restaurant.longitude),
+      )
+    }
+    map.setBounds(bounds)
+  }
+
+  function getSearchCenter(): MapPoint {
+    const map = kakaoMapRef.current
+    if (map) return pointFromLatLng(map.getCenter())
+    return currentPosition ?? INITIAL_CENTER
+  }
+
+  function clearRestaurantSearch() {
+    searchRequestIdRef.current += 1
+    searchModeRef.current = false
+    setSearchInput('')
+    setSearchQuery('')
+    setSearchResults([])
+    setSearchErrorMessage('')
+    setSearchState('idle')
+    setSelectedRestaurant(null)
+    setActiveSidePanel('search')
+    displayRestaurantsOnMap(viewportRestaurantsRef.current)
+  }
+
+  async function submitRestaurantSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
+    const query = searchInput.trim()
+    if (!query) {
+      showToast('검색어를 입력해 주세요')
+      return
+    }
+
+    const requestId = ++searchRequestIdRef.current
+    const center = getSearchCenter()
+    searchModeRef.current = true
+    setSelectedRestaurant(null)
+    setActiveSidePanel('search')
+    setSearchQuery(query)
+    setSearchResults([])
+    setSearchErrorMessage('')
+    setSearchState('loading')
+    displayRestaurantsOnMap([])
+
+    try {
+      const restaurants = await fetchSearchRestaurants(query, center)
+      if (requestId !== searchRequestIdRef.current) return
+
+      setSearchResults(restaurants)
+      setSearchState('loaded')
+      displayRestaurantsOnMap(restaurants)
+      fitMapToRestaurants(restaurants)
+    } catch (error) {
+      if (requestId !== searchRequestIdRef.current) return
+
+      setSearchErrorMessage(
+        error instanceof Error ? error.message : '검색 결과를 불러오지 못했습니다',
+      )
+      setSearchState('error')
+      displayRestaurantsOnMap([])
+    }
+  }
+
+  function selectSearchResult(restaurant: Restaurant) {
+    focusRestaurantOnMap(restaurant)
   }
 
   function focusRestaurantOnMap(restaurant: Restaurant) {
@@ -874,7 +1070,7 @@ function App() {
   function openAiPanel() {
     setSelectedRestaurant(null)
     setActiveSidePanel((current) => {
-      const next = current === 'ai' ? null : 'ai'
+      const next = current === 'ai' ? 'search' : 'ai'
       if (next === 'ai' && !aiRecommendState.hasLoaded) {
         loadAiRecommendations(1)
       }
@@ -903,43 +1099,10 @@ function App() {
     let canceled = false
 
     async function initializeMap() {
-      let restaurantOverlays: KakaoCustomOverlay[] = []
       let viewportSearchTimer = 0
       let viewportSearchRequestId = 0
       let lastSearchedCenter: MapPoint | null = null
       let lastSearchedLevel: number | null = null
-
-      function clearRestaurantOverlays() {
-        for (const overlay of restaurantOverlays) {
-          overlay.setMap(null)
-        }
-        restaurantOverlays = []
-      }
-
-      function syncRestaurantOverlays(
-        kakaoMaps: KakaoMaps,
-        map: KakaoMap,
-        restaurants: Restaurant[],
-      ) {
-        clearRestaurantOverlays()
-
-        restaurantOverlays = restaurants.map((restaurant) => {
-          const overlay = new kakaoMaps.CustomOverlay({
-            content: createRestaurantMarker(restaurant, (selected) => {
-              setSelectedRestaurant(selected)
-              setActiveSidePanel('restaurant')
-            }),
-            position: new kakaoMaps.LatLng(
-              restaurant.latitude,
-              restaurant.longitude,
-            ),
-            xAnchor: 0.5,
-            yAnchor: 0.5,
-          })
-          overlay.setMap(map)
-          return overlay
-        })
-      }
 
       function shouldRefreshViewport(center: MapPoint, level: number) {
         if (!lastSearchedCenter || lastSearchedLevel === null) return true
@@ -950,7 +1113,9 @@ function App() {
         )
       }
 
-      function scheduleViewportSearch(kakaoMaps: KakaoMaps, map: KakaoMap) {
+      function scheduleViewportSearch(map: KakaoMap) {
+        if (searchModeRef.current) return
+
         const center = pointFromLatLng(map.getCenter())
         const level = map.getLevel()
         if (!shouldRefreshViewport(center, level)) return
@@ -966,7 +1131,10 @@ function App() {
             const restaurants = await fetchNearbyRestaurants(center, radius)
             if (canceled || requestId !== viewportSearchRequestId) return
 
-            syncRestaurantOverlays(kakaoMaps, map, restaurants)
+            viewportRestaurantsRef.current = restaurants
+            if (!searchModeRef.current) {
+              displayRestaurantsOnMap(restaurants)
+            }
             lastSearchedCenter = center
             lastSearchedLevel = level
             setPlacesErrorMessage('')
@@ -1000,12 +1168,10 @@ function App() {
         kakaoMapRef.current = map
 
         setLoadState('ready')
-        kakaoMaps.event.addListener(map, 'idle', () =>
-          scheduleViewportSearch(kakaoMaps, map),
-        )
+        kakaoMaps.event.addListener(map, 'idle', () => scheduleViewportSearch(map))
         kakaoMaps.event.addListener(map, 'click', () => {
           setSelectedRestaurant(null)
-          setActiveSidePanel(null)
+          setActiveSidePanel('search')
         })
 
         for (const delay of [100, 300, 700]) {
@@ -1040,7 +1206,7 @@ function App() {
           // 위치 권한 거부나 브라우저 제한이 있어도 기본 위치의 지도를 유지합니다.
         }
 
-        scheduleViewportSearch(kakaoMaps, map)
+        scheduleViewportSearch(map)
       } catch (error) {
         if (canceled) return
 
@@ -1057,6 +1223,7 @@ function App() {
 
     return () => {
       canceled = true
+      clearRestaurantOverlays()
     }
   }, [])
 
@@ -1081,6 +1248,137 @@ function App() {
       {loadState === 'ready' && placesErrorMessage && (
         <div className="map-status map-status-error">{placesErrorMessage}</div>
       )}
+      {activeSidePanel === 'search' && (
+        <aside className="restaurant-panel search-panel" aria-label="장소 검색">
+          <section className="search-panel-body">
+            <div className="search-panel-header">
+              <Search aria-hidden="true" size={22} strokeWidth={2.2} />
+              <div>
+                <p>Search</p>
+                <h2>장소 검색</h2>
+              </div>
+            </div>
+
+            <form className="map-search-form" onSubmit={submitRestaurantSearch}>
+              <label className="map-search-field">
+                <Search aria-hidden="true" size={18} strokeWidth={2.2} />
+                <input
+                  type="search"
+                  value={searchInput}
+                  placeholder="음식점 또는 메뉴를 검색"
+                  onChange={(event) => {
+                    const nextValue = event.target.value
+                    setSearchInput(nextValue)
+                    if (!nextValue.trim() && searchModeRef.current) {
+                      clearRestaurantSearch()
+                    }
+                  }}
+                />
+              </label>
+              {searchInput || searchState !== 'idle' ? (
+                <button
+                  type="button"
+                  className="map-search-icon-button"
+                  aria-label="검색 초기화"
+                  onClick={clearRestaurantSearch}
+                >
+                  <X aria-hidden="true" size={17} strokeWidth={2.2} />
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                className="map-search-submit"
+                aria-label="검색"
+                disabled={searchState === 'loading'}
+              >
+                {searchState === 'loading' ? (
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="spinning-icon"
+                    size={18}
+                    strokeWidth={2.2}
+                  />
+                ) : (
+                  <Search aria-hidden="true" size={18} strokeWidth={2.2} />
+                )}
+              </button>
+            </form>
+
+            {searchState === 'idle' && (
+              <div className="search-empty-state">
+                <Search aria-hidden="true" size={26} strokeWidth={2.1} />
+                <strong>검색어를 입력하세요</strong>
+              </div>
+            )}
+
+            {searchState === 'loading' && (
+              <div className="detail-state-card search-state-card">
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="spinning-icon"
+                  size={24}
+                  strokeWidth={2.2}
+                />
+                <strong>검색 결과를 불러오는 중입니다</strong>
+              </div>
+            )}
+
+            {searchState === 'error' && (
+              <div className="detail-state-card detail-state-error search-state-card">
+                <AlertCircle aria-hidden="true" size={24} strokeWidth={2.2} />
+                <strong>검색 결과를 불러오지 못했어요</strong>
+                <p>{searchErrorMessage}</p>
+                <button
+                  type="button"
+                  className="detail-secondary-button"
+                  onClick={() => submitRestaurantSearch()}
+                >
+                  <RefreshCw aria-hidden="true" size={16} strokeWidth={2.2} />
+                  다시 시도
+                </button>
+              </div>
+            )}
+
+            {searchState === 'loaded' && searchResults.length === 0 && (
+              <div className="bookmark-empty">
+                "{searchQuery}" 검색 결과가 없습니다
+              </div>
+            )}
+
+            {searchState === 'loaded' && searchResults.length > 0 && (
+              <div className="search-results">
+                <div className="search-results-summary">
+                  <strong>"{searchQuery}"</strong>
+                  <span>{searchResults.length}개 결과</span>
+                </div>
+                <ul className="search-result-list">
+                  {searchResults.map((restaurant) => (
+                    <li key={restaurant.id}>
+                      <button
+                        type="button"
+                        className="search-result-card"
+                        onClick={() => selectSearchResult(restaurant)}
+                      >
+                        <span className="bookmark-thumb search-result-thumb">
+                          {isCafe(restaurant) ? '☕' : '🍽'}
+                        </span>
+                        <span className="search-result-copy">
+                          <strong>{restaurant.name}</strong>
+                          <small>{restaurant.category}</small>
+                          <span>
+                            {restaurant.address || '주소 정보 없음'} ·{' '}
+                            {formatDistance(restaurant.distance)}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        </aside>
+      )}
       {selectedRestaurant && activeSidePanel === 'restaurant' && (
         <aside className="restaurant-panel" aria-label="선택한 가게 정보">
           <button
@@ -1089,7 +1387,7 @@ function App() {
             aria-label="가게 정보 닫기"
             onClick={() => {
               setSelectedRestaurant(null)
-              setActiveSidePanel(null)
+              setActiveSidePanel('search')
             }}
           >
             <X aria-hidden="true" size={19} strokeWidth={2.2} />
@@ -1167,7 +1465,7 @@ function App() {
               aria-label="상세 정보 닫기"
               onClick={() => {
                 setSelectedRestaurant(null)
-                setActiveSidePanel(null)
+                setActiveSidePanel('search')
               }}
             >
               <X aria-hidden="true" size={19} strokeWidth={2.2} />
@@ -1357,7 +1655,7 @@ function App() {
             type="button"
             className="panel-close-button"
             aria-label="북마크 닫기"
-            onClick={() => setActiveSidePanel(null)}
+            onClick={() => setActiveSidePanel('search')}
           >
             <X aria-hidden="true" size={19} strokeWidth={2.2} />
           </button>
@@ -1418,7 +1716,7 @@ function App() {
             type="button"
             className="panel-close-button"
             aria-label="AI 추천 닫기"
-            onClick={() => setActiveSidePanel(null)}
+            onClick={() => setActiveSidePanel('search')}
           >
             <X aria-hidden="true" size={19} strokeWidth={2.2} />
           </button>
@@ -1587,6 +1885,17 @@ function App() {
         <button
           type="button"
           className="map-tool-button"
+          aria-label="장소 검색"
+          onClick={() => {
+            setSelectedRestaurant(null)
+            setActiveSidePanel('search')
+          }}
+        >
+          <Search aria-hidden="true" size={20} strokeWidth={2.2} />
+        </button>
+        <button
+          type="button"
+          className="map-tool-button"
           aria-label="내 위치로 이동"
           onClick={focusCurrentLocationOnMap}
         >
@@ -1599,7 +1908,7 @@ function App() {
           onClick={() => {
             setSelectedRestaurant(null)
             setActiveSidePanel((current) =>
-              current === 'bookmarks' ? null : 'bookmarks',
+              current === 'bookmarks' ? 'search' : 'bookmarks',
             )
           }}
         >
