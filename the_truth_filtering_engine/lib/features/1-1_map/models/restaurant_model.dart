@@ -1,43 +1,69 @@
 class RestaurantModel {
   final String id;
+  final String? storeId;
   final String name;
   final String address;
   final String category;
+  final String? categoryName;
+  final String? categoryGroupCode;
+  final String? categoryGroupName;
   final int truthScore;
   final int distance;
   final String reviewSummary;
   final String? phone;
   final String? placeUrl;
+  final String? addressName;
+  final String? roadAddressName;
   final String? imageUrl;
   final double latitude;
   final double longitude;
 
   const RestaurantModel({
     required this.id,
+    this.storeId,
     required this.name,
     required this.address,
     required this.category,
+    this.categoryName,
+    this.categoryGroupCode,
+    this.categoryGroupName,
     required this.truthScore,
     this.distance = 0,
     this.phone,
     this.placeUrl,
+    this.addressName,
+    this.roadAddressName,
     required this.reviewSummary,
     this.imageUrl,
     required this.latitude,
     required this.longitude,
   });
 
+  String get effectiveStoreId {
+    final normalizedStoreId = storeId?.trim();
+    if (normalizedStoreId != null && normalizedStoreId.isNotEmpty) {
+      return normalizedStoreId;
+    }
+    return id;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'storeId': effectiveStoreId,
       'name': name,
       'address': address,
       'category': category,
+      'categoryName': categoryName,
+      'categoryGroupCode': categoryGroupCode,
+      'categoryGroupName': categoryGroupName,
       'truthScore': truthScore,
       'distance': distance,
       'reviewSummary': reviewSummary,
       'phone': phone,
       'placeUrl': placeUrl,
+      'addressName': addressName,
+      'roadAddressName': roadAddressName,
       'imageUrl': imageUrl,
       'latitude': latitude,
       'longitude': longitude,
@@ -47,14 +73,20 @@ class RestaurantModel {
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {
     return RestaurantModel(
       id: json['id']?.toString() ?? '',
+      storeId: json['storeId']?.toString() ?? json['id']?.toString(),
       name: json['name']?.toString() ?? '',
       address: json['address']?.toString() ?? '',
       category: json['category']?.toString() ?? '',
+      categoryName: json['categoryName']?.toString(),
+      categoryGroupCode: json['categoryGroupCode']?.toString(),
+      categoryGroupName: json['categoryGroupName']?.toString(),
       truthScore: _asInt(json['truthScore'], fallback: 0),
       distance: _asInt(json['distance'], fallback: 0),
       reviewSummary: json['reviewSummary']?.toString() ?? '',
       phone: json['phone']?.toString(),
       placeUrl: json['placeUrl']?.toString(),
+      addressName: json['addressName']?.toString(),
+      roadAddressName: json['roadAddressName']?.toString(),
       imageUrl: json['imageUrl']?.toString(),
       latitude: _asDouble(json['latitude'], fallback: 0),
       longitude: _asDouble(json['longitude'], fallback: 0),

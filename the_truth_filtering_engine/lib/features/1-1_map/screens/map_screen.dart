@@ -410,13 +410,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final restaurants = items
           .map((item) => RestaurantModel(
                 id: item['id']?.toString() ?? '',
+                storeId:
+                    item['storeId']?.toString() ?? item['id']?.toString() ?? '',
                 name: item['name'] ?? '',
                 category: item['category'] ?? '음식점',
+                categoryName: item['categoryName']?.toString(),
+                categoryGroupCode: item['categoryGroupCode']?.toString(),
+                categoryGroupName: item['categoryGroupName']?.toString(),
                 address: item['address'] ?? '',
                 truthScore: _mockTrustScore(item['id']?.toString() ?? ''),
                 distance: item['distance'] ?? 0,
                 phone: item['phone']?.toString(),
-                placeUrl: item['link'],
+                placeUrl:
+                    item['placeUrl']?.toString() ?? item['link']?.toString(),
+                addressName: item['addressName']?.toString(),
+                roadAddressName: item['roadAddressName']?.toString(),
                 reviewSummary: item['name'] ?? '검색 결과',
                 imageUrl: null,
                 latitude: (item['lat'] as num).toDouble(),

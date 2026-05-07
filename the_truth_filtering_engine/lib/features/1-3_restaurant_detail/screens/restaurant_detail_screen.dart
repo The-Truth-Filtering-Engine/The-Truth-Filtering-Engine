@@ -44,12 +44,16 @@ class _ReviewFetchResult {
 // ── API: Supabase 캐시 조회 ───────────────────────────────────────────────────
 
 Future<_ReviewFetchResult> _fetchCachedReviews(
-    String name, String address, AnalysisMode mode) async {
-  final uri = BackendConfig.apiUri('/search/cached', queryParameters: {
-    'query': name,
-    'address': address,
-    'limit': '$_maxReviewResults',
-  });
+  RestaurantModel restaurant,
+  AnalysisMode mode,
+) async {
+  final uri = BackendConfig.apiUri(
+    '/search/cached',
+    queryParameters: _reviewQueryParameters(
+      restaurant,
+      limit: '$_maxReviewResults',
+    ),
+  );
 
   final res = await http.get(uri).timeout(const Duration(seconds: 15));
   if (res.statusCode != 200) {
@@ -73,16 +77,20 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
 // ── API: 신규 크롤링 + AI 분석 ────────────────────────────────────────────────
 
 Future<_ReviewFetchResult> _fetchFreshReviews(
-    String name, String address, AnalysisMode mode,
-    {bool refresh = false, int naverStart = 1}) async {
-  final queryParameters = {
-    'query': name,
-    'address': address,
-    'mode': mode.name,
-    'naverStart': '$naverStart',
-    'limit': '$_reviewBatchSize',
-    'maxResults': '$_maxReviewResults',
-  };
+  RestaurantModel restaurant,
+  AnalysisMode mode, {
+  bool refresh = false,
+  int naverStart = 1,
+}) async {
+  final queryParameters = _reviewQueryParameters(
+    restaurant,
+    extra: {
+      'mode': mode.name,
+      'naverStart': '$naverStart',
+      'limit': '$_reviewBatchSize',
+      'maxResults': '$_maxReviewResults',
+    },
+  );
   if (refresh) queryParameters['refresh'] = 'true';
 
   final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
@@ -99,6 +107,35 @@ Future<_ReviewFetchResult> _fetchFreshReviews(
         .toList(),
     hasMore: body['hasMore'] as bool? ?? false,
   );
+}
+
+Map<String, String> _reviewQueryParameters(
+  RestaurantModel restaurant, {
+  String? limit,
+  Map<String, String> extra = const {},
+}) {
+  final params = <String, String>{
+    'query': restaurant.name,
+    'address': restaurant.address,
+    ...extra,
+  };
+  if (limit != null) params['limit'] = limit;
+
+  void addIfNotBlank(String key, String? value) {
+    final trimmed = value?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) params[key] = trimmed;
+  }
+
+  addIfNotBlank('storeId', restaurant.effectiveStoreId);
+  addIfNotBlank('categoryName', restaurant.categoryName ?? restaurant.category);
+  addIfNotBlank('categoryGroupCode', restaurant.categoryGroupCode);
+  addIfNotBlank('categoryGroupName', restaurant.categoryGroupName);
+  addIfNotBlank('phone', restaurant.phone);
+  addIfNotBlank('addressName', restaurant.addressName);
+  addIfNotBlank('roadAddressName', restaurant.roadAddressName);
+  addIfNotBlank('placeUrl', restaurant.placeUrl);
+
+  return params;
 }
 
 // ── 화면 ─────────────────────────────────────────────────────────────────────
@@ -135,7 +172,7 @@ class _RestaurantDetailScreenState
 
     try {
       final mode = ref.read(analysisModeProvider);
-      final cached = await _fetchCachedReviews(_r.name, _r.address, mode);
+      final cached = await _fetchCachedReviews(_r, mode);
       final shouldLoadFirstBatch =
           cached.reviews.isEmpty || cached.reviews.length < _reviewBatchSize;
 
@@ -143,8 +180,7 @@ class _RestaurantDetailScreenState
         // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
         try {
           final fresh = await _fetchFreshReviews(
-            _r.name,
-            _r.address,
+            _r,
             mode,
             naverStart: 1,
           );
@@ -173,8 +209,7 @@ class _RestaurantDetailScreenState
     try {
       final mode = ref.read(analysisModeProvider);
       final fresh = await _fetchFreshReviews(
-        _r.name,
-        _r.address,
+        _r,
         mode,
         refresh: true,
         naverStart: 1,
@@ -200,8 +235,7 @@ class _RestaurantDetailScreenState
     try {
       final mode = ref.read(analysisModeProvider);
       final fresh = await _fetchFreshReviews(
-        _r.name,
-        _r.address,
+        _r,
         mode,
         naverStart: naverStart,
       );

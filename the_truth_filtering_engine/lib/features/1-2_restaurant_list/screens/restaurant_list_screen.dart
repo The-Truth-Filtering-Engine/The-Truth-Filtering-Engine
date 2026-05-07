@@ -163,8 +163,12 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         _results = uniqueById.values.map((map) {
           return RestaurantModel(
             id: map['id']?.toString() ?? '',
+            storeId: map['id']?.toString() ?? '',
             name: map['place_name']?.toString() ?? '',
             category: _parseCategory(map['category_name']?.toString() ?? ''),
+            categoryName: map['category_name']?.toString(),
+            categoryGroupCode: map['category_group_code']?.toString(),
+            categoryGroupName: map['category_group_name']?.toString(),
             address: (map['road_address_name']?.toString().isNotEmpty == true
                         ? map['road_address_name']
                         : map['address_name'])
@@ -176,6 +180,8 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
             distance: int.tryParse(map['distance']?.toString() ?? '0') ?? 0,
             phone: map['phone']?.toString(),
             placeUrl: map['place_url']?.toString(),
+            addressName: map['address_name']?.toString(),
+            roadAddressName: map['road_address_name']?.toString(),
             reviewSummary: map['place_name']?.toString() ?? '검색 결과',
           );
         }).toList();

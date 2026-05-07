@@ -13,6 +13,10 @@ class AiRecommendItem {
   final String placeName;
   final String address;
   final String category;
+  final String categoryGroupCode;
+  final String categoryGroupName;
+  final String addressName;
+  final String roadAddressName;
   final double? latitude;
   final double? longitude;
   final String placeUrl;
@@ -31,6 +35,10 @@ class AiRecommendItem {
     required this.placeName,
     required this.address,
     required this.category,
+    required this.categoryGroupCode,
+    required this.categoryGroupName,
+    required this.addressName,
+    required this.roadAddressName,
     required this.latitude,
     required this.longitude,
     required this.placeUrl,
@@ -51,6 +59,10 @@ class AiRecommendItem {
       placeName: json['placeName']?.toString() ?? '',
       address: json['address']?.toString() ?? '',
       category: json['category']?.toString() ?? '',
+      categoryGroupCode: json['categoryGroupCode']?.toString() ?? '',
+      categoryGroupName: json['categoryGroupName']?.toString() ?? '',
+      addressName: json['addressName']?.toString() ?? '',
+      roadAddressName: json['roadAddressName']?.toString() ?? '',
       latitude: _asNullableDouble(json['lat']),
       longitude: _asNullableDouble(json['lng']),
       placeUrl: json['placeUrl']?.toString() ?? '',
@@ -66,13 +78,19 @@ class AiRecommendItem {
     final percent = adPercent;
     return RestaurantModel(
       id: placeId.isNotEmpty ? placeId : 'review-$id',
+      storeId: placeId,
       name: placeName.isNotEmpty ? placeName : name,
       address: address,
       category: category.isNotEmpty ? category : '음식점',
+      categoryName: category,
+      categoryGroupCode: categoryGroupCode,
+      categoryGroupName: categoryGroupName,
       truthScore: (100 - percent).clamp(0, 100),
       distance: 0,
       phone: phone,
       placeUrl: placeUrl,
+      addressName: addressName,
+      roadAddressName: roadAddressName,
       reviewSummary: reviewTitle.isNotEmpty ? reviewTitle : reviewDescription,
       imageUrl: null,
       latitude: latitude ?? 0,
