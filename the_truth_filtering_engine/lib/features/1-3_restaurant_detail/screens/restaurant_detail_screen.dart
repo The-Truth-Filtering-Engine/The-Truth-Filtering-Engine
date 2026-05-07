@@ -145,6 +145,16 @@ class _RestaurantDetailScreenState
   }
 
   void _applyReviews(List<BlogReview> reviews) {
+    if (reviews.isEmpty) {
+      setState(() {
+        _reviews = const [];
+        _shopInfo = null;
+        _wordFreqs = const [];
+        _state = _ScreenState.noData;
+      });
+      return;
+    }
+
     final shopInfo = ShopInfo.fromApiResponse(
       name: _r.name,
       category: '${_r.category} · ${_r.address}',
@@ -294,28 +304,37 @@ class _RestaurantDetailScreenState
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                height: 200, // 고정 높이 → 워드클라우드 충분한 공간 확보
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 왼쪽: AI 진실 분석 (40%)
-                    Expanded(
-                      flex: 4,
-                      child: AiAnalysisCard(
-                        truthScore: _shopInfo?.trustScore ?? _r.truthScore,
-                      ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final aiCard = AiAnalysisCard(
+                    truthScore: _shopInfo?.trustScore ?? _r.truthScore,
+                  );
+                  final wordCloud = WordCloudCard(wordFreqs: _wordFreqs);
+                  final isNarrow = constraints.maxWidth < 640;
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        aiCard,
+                        const SizedBox(height: 12),
+                        wordCloud,
+                      ],
+                    );
+                  }
+
+                  return SizedBox(
+                    height: 220,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(flex: 4, child: aiCard),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 6, child: wordCloud),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    // 오른쪽: 리뷰 키워드 워드클라우드 (60%)
-                    Expanded(
-                      flex: 6,
-                      child: _wordFreqs.isNotEmpty
-                          ? WordCloudCard(wordFreqs: _wordFreqs)
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),

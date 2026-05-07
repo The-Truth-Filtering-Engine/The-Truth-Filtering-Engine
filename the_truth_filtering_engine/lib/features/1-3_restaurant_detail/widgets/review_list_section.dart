@@ -215,17 +215,37 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
         const Divider(height: 1),
 
-        // ── 리스트 (shrinkWrap → 외부 CustomScrollView에 스크롤 위임) ──
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          itemCount: _currentBlogs.length,
-          itemBuilder: (_, i) => ReviewItem(
-            blog: _currentBlogs[i],
-            onTap: () => _openUrl(_currentBlogs[i]),
+        if (_currentBlogs.isEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border, width: 0.5),
+            ),
+            child: Text(
+              '표시할 블로그 리뷰가 없습니다.',
+              textAlign: TextAlign.center,
+              style: AppText.caption().copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              children: [
+                for (final blog in _currentBlogs)
+                  ReviewItem(
+                    blog: blog,
+                    onTap: () => _openUrl(blog),
+                  ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
