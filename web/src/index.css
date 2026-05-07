@@ -207,7 +207,10 @@ body {
 .map-search-submit:focus-visible,
 .review-tabs button:focus-visible,
 .review-card:focus-visible,
-.search-result-card:focus-visible {
+.search-result-card:focus-visible,
+.settings-primary-button:focus-visible,
+.settings-coin-buttons button:focus-visible,
+.settings-logout-button:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
@@ -1059,6 +1062,151 @@ body {
 
 .ai-panel .bookmark-panel-header > svg {
   background: #3b2f71;
+}
+
+.settings-panel {
+  background: #f8fafc;
+}
+
+.settings-panel-header > svg {
+  background: #111827;
+}
+
+.settings-panel-body {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.settings-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+}
+
+.settings-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.settings-card-heading > svg {
+  flex: 0 0 auto;
+  color: #2563eb;
+  margin-top: 2px;
+}
+
+.settings-card-heading strong,
+.settings-card-heading span {
+  display: block;
+}
+
+.settings-card-heading strong {
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.settings-card-heading span {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.settings-stat-grid div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.settings-stat-grid span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.settings-stat-grid strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-primary-button,
+.settings-coin-buttons button,
+.settings-logout-button,
+.settings-disabled-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  font: 800 13px/1 system-ui, sans-serif;
+}
+
+.settings-primary-button {
+  background: #111827;
+  color: #ffffff;
+}
+
+.settings-coin-buttons,
+.settings-disabled-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.settings-coin-buttons button {
+  background: #eef0ff;
+  color: #2b54e8;
+}
+
+.settings-disabled-actions button {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.settings-primary-button:disabled,
+.settings-coin-buttons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.settings-logout-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+.settings-error-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7f7;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .ai-panel-description {

@@ -4,10 +4,13 @@ import {
   Bookmark,
   BookmarkCheck,
   Clock,
+  Coins,
+  Crown,
   ExternalLink,
   Info,
   LocateFixed,
   LoaderCircle,
+  LogOut,
   MapPin,
   Navigation,
   Phone,
@@ -16,6 +19,7 @@ import {
   Settings,
   Share2,
   Sparkles,
+  UserRound,
   X,
 } from 'lucide-react'
 import { createClient, type Session } from '@supabase/supabase-js'
@@ -107,6 +111,32 @@ type AiRecommendState = {
 }
 
 type AiRegionScope = 'dong' | 'gu' | 'si'
+
+type ActiveSidePanel =
+  | 'search'
+  | 'restaurant'
+  | 'bookmarks'
+  | 'detail'
+  | 'ai'
+  | 'settings'
+
+type UserProfile = {
+  email: string
+  premium: number
+  coin: number
+  freecount: number
+  premiumcount: number
+  store: unknown
+  bookmark: string | null
+}
+
+type UserProfileState = {
+  profile: UserProfile | null
+  isLoading: boolean
+  isSaving: boolean
+  errorMessage: string
+  hasLoaded: boolean
+}
 
 type KakaoLatLng = {
   getLat: () => number
@@ -723,6 +753,80 @@ function formatAdScore(adScore: number) {
   return `${Math.round(Math.max(0, Math.min(1, adScore)) * 100)}%`
 }
 
+function parseProfileNumber(value: unknown) {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function parseUserProfile(item: Record<string, unknown>): UserProfile {
+  return {
+    email: cleanText(item.email),
+    premium: parseProfileNumber(item.premium),
+    coin: parseProfileNumber(item.coin),
+    freecount: parseProfileNumber(item.freecount),
+    premiumcount: parseProfileNumber(item.premiumcount),
+    store: item.store ?? null,
+    bookmark: item.bookmark === null ? null : cleanText(item.bookmark),
+  }
+}
+
+async function readErrorMessage(response: Response) {
+  try {
+    const data = (await response.json()) as { detail?: unknown }
+    return cleanText(data.detail) || `요청 실패: ${response.status}`
+  } catch {
+    return `요청 실패: ${response.status}`
+  }
+}
+
+async function fetchUserProfile(accessToken: string) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/user/me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseUserProfile((await response.json()) as Record<string, unknown>)
+}
+
+async function updateUserPremium(accessToken: string, premium: boolean) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/premium`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ premium }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseUserProfile((await response.json()) as Record<string, unknown>)
+}
+
+async function chargeUserCoins(accessToken: string, amount: number) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/coins`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ amount }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseUserProfile((await response.json()) as Record<string, unknown>)
+}
+
 function normalizeRestaurant(value: unknown): Restaurant | null {
   if (!value || typeof value !== 'object') return null
 
@@ -799,9 +903,7 @@ function App() {
   >(() =>
     loadBookmarkedRestaurants(),
   )
-  const [activeSidePanel, setActiveSidePanel] = useState<
-    'search' | 'restaurant' | 'bookmarks' | 'detail' | 'ai'
-  >(
+  const [activeSidePanel, setActiveSidePanel] = useState<ActiveSidePanel>(
     'search',
   )
   const [detailState, setDetailState] = useState<DetailState>('idle')
@@ -825,6 +927,13 @@ function App() {
     'checking' | 'signedOut' | 'signedIn'
   >('checking')
   const [authErrorMessage, setAuthErrorMessage] = useState('')
+  const [userProfileState, setUserProfileState] = useState<UserProfileState>({
+    profile: null,
+    isLoading: false,
+    isSaving: false,
+    errorMessage: '',
+    hasLoaded: false,
+  })
   const [aiRegionScope, setAiRegionScope] = useState<AiRegionScope>('si')
   const [aiRecommendState, setAiRecommendState] = useState<AiRecommendState>({
     items: [],
@@ -851,6 +960,16 @@ function App() {
     window.setTimeout(() => setToastMessage(''), 1800)
   }
 
+  function resetUserProfileState() {
+    setUserProfileState({
+      profile: null,
+      isLoading: false,
+      isSaving: false,
+      errorMessage: '',
+      hasLoaded: false,
+    })
+  }
+
   useEffect(() => {
     setIsTemporaryAdmin(
       window.localStorage.getItem(TEMP_ADMIN_AUTH_STORAGE_KEY) === 'true',
@@ -858,6 +977,7 @@ function App() {
 
     if (!supabase) {
       setAuthStatus('signedOut')
+      resetUserProfileState()
       return
     }
 
@@ -871,6 +991,9 @@ function App() {
       }
       setAuthSession(data.session ?? null)
       setAuthStatus(data.session ? 'signedIn' : 'signedOut')
+      if (!data.session) {
+        resetUserProfileState()
+      }
     })
 
     const {
@@ -881,6 +1004,8 @@ function App() {
       if (session) {
         setIsTemporaryAdmin(false)
         window.localStorage.removeItem(TEMP_ADMIN_AUTH_STORAGE_KEY)
+      } else {
+        resetUserProfileState()
       }
     })
 
@@ -917,7 +1042,127 @@ function App() {
     setIsTemporaryAdmin(true)
     setAuthErrorMessage('')
     setAuthStatus('signedIn')
+    resetUserProfileState()
     showToast('관리자 임시 로그인 상태입니다')
+  }
+
+  async function loadUserProfile() {
+    const token = authSession?.access_token
+    if (!token) {
+      resetUserProfileState()
+      return
+    }
+
+    setUserProfileState((previous) => ({
+      ...previous,
+      isLoading: true,
+      errorMessage: '',
+    }))
+
+    try {
+      const profile = await fetchUserProfile(token)
+      setUserProfileState({
+        profile,
+        isLoading: false,
+        isSaving: false,
+        errorMessage: '',
+        hasLoaded: true,
+      })
+    } catch (error) {
+      setUserProfileState((previous) => ({
+        ...previous,
+        isLoading: false,
+        isSaving: false,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : '사용자 정보를 불러오지 못했습니다',
+        hasLoaded: true,
+      }))
+    }
+  }
+
+  async function toggleUserPremium() {
+    const token = authSession?.access_token
+    const profile = userProfileState.profile
+    if (!token || !profile) return
+
+    setUserProfileState((previous) => ({
+      ...previous,
+      isSaving: true,
+      errorMessage: '',
+    }))
+
+    try {
+      const updated = await updateUserPremium(token, profile.premium !== 1)
+      setUserProfileState({
+        profile: updated,
+        isLoading: false,
+        isSaving: false,
+        errorMessage: '',
+        hasLoaded: true,
+      })
+      showToast(updated.premium === 1 ? '프리미엄이 설정되었습니다' : '프리미엄이 해제되었습니다')
+    } catch (error) {
+      setUserProfileState((previous) => ({
+        ...previous,
+        isSaving: false,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : '프리미엄 상태를 변경하지 못했습니다',
+      }))
+    }
+  }
+
+  async function chargeCoins(amount: number) {
+    const token = authSession?.access_token
+    if (!token) return
+
+    setUserProfileState((previous) => ({
+      ...previous,
+      isSaving: true,
+      errorMessage: '',
+    }))
+
+    try {
+      const updated = await chargeUserCoins(token, amount)
+      setUserProfileState({
+        profile: updated,
+        isLoading: false,
+        isSaving: false,
+        errorMessage: '',
+        hasLoaded: true,
+      })
+      showToast(`${amount.toLocaleString()} 코인이 충전되었습니다`)
+    } catch (error) {
+      setUserProfileState((previous) => ({
+        ...previous,
+        isSaving: false,
+        errorMessage:
+          error instanceof Error ? error.message : '코인을 충전하지 못했습니다',
+      }))
+    }
+  }
+
+  async function signOut() {
+    try {
+      if (supabase && authSession) {
+        const { error } = await supabase.auth.signOut()
+        if (error) throw error
+      }
+
+      window.localStorage.removeItem(TEMP_ADMIN_AUTH_STORAGE_KEY)
+      setIsTemporaryAdmin(false)
+      setAuthSession(null)
+      setAuthStatus('signedOut')
+      resetUserProfileState()
+      setSelectedRestaurant(null)
+      setActiveSidePanel('search')
+      showToast('로그아웃되었습니다')
+    } catch {
+      showToast('로그아웃하지 못했습니다')
+    }
   }
 
   async function copyToClipboard(value: string, successMessage: string) {
@@ -1374,6 +1619,21 @@ function App() {
       }
       return next
     })
+  }
+
+  function openSettingsPanel() {
+    const shouldOpen = activeSidePanel !== 'settings'
+    setSelectedRestaurant(null)
+    setActiveSidePanel(shouldOpen ? 'settings' : 'search')
+
+    if (
+      shouldOpen &&
+      authSession &&
+      !userProfileState.hasLoaded &&
+      !userProfileState.isLoading
+    ) {
+      void loadUserProfile()
+    }
   }
 
   function changeAiRegionScope(regionScope: AiRegionScope) {
@@ -2273,6 +2533,191 @@ function App() {
           </section>
         </aside>
       )}
+      {activeSidePanel === 'settings' && (
+        <aside className="restaurant-panel settings-panel" aria-label="설정">
+          <button
+            type="button"
+            className="panel-close-button"
+            aria-label="설정 닫기"
+            onClick={() => setActiveSidePanel('search')}
+          >
+            <X aria-hidden="true" size={19} strokeWidth={2.2} />
+          </button>
+
+          <section className="bookmark-panel-body settings-panel-body">
+            <div className="bookmark-panel-header settings-panel-header">
+              <Settings aria-hidden="true" size={22} strokeWidth={2.2} />
+              <div>
+                <p>Account</p>
+                <h2>설정</h2>
+              </div>
+            </div>
+
+            {isTemporaryAdmin ? (
+              <div className="settings-card">
+                <div className="settings-card-heading">
+                  <UserRound aria-hidden="true" size={19} strokeWidth={2.2} />
+                  <div>
+                    <strong>임시 관리자 로그인</strong>
+                    <span>Google 로그인 사용자가 아니어서 결제 설정은 비활성화됩니다.</span>
+                  </div>
+                </div>
+                <div className="settings-disabled-actions">
+                  <button type="button" disabled>
+                    프리미엄 설정
+                  </button>
+                  <button type="button" disabled>
+                    1,000 코인 충전
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="settings-logout-button"
+                  onClick={signOut}
+                >
+                  <LogOut aria-hidden="true" size={16} strokeWidth={2.2} />
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <>
+                {userProfileState.isLoading && !userProfileState.profile && (
+                  <div className="detail-state-card">
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="spinning-icon"
+                      size={24}
+                      strokeWidth={2.2}
+                    />
+                    <strong>계정 정보를 불러오는 중입니다</strong>
+                    <p>로그인된 이메일 기준으로 설정을 확인하고 있어요.</p>
+                  </div>
+                )}
+
+                {userProfileState.errorMessage && !userProfileState.profile && (
+                  <div className="detail-state-card detail-state-error">
+                    <AlertCircle aria-hidden="true" size={24} strokeWidth={2.2} />
+                    <strong>계정 정보를 불러오지 못했어요</strong>
+                    <p>{userProfileState.errorMessage}</p>
+                    <button
+                      type="button"
+                      className="detail-secondary-button"
+                      onClick={loadUserProfile}
+                    >
+                      <RefreshCw aria-hidden="true" size={16} strokeWidth={2.2} />
+                      다시 시도
+                    </button>
+                  </div>
+                )}
+
+                {userProfileState.profile && (
+                  <>
+                    <div className="settings-card">
+                      <div className="settings-card-heading">
+                        <UserRound
+                          aria-hidden="true"
+                          size={19}
+                          strokeWidth={2.2}
+                        />
+                        <div>
+                          <strong>{userProfileState.profile.email}</strong>
+                          <span>
+                            {userProfileState.profile.premium === 1
+                              ? '프리미엄 사용자'
+                              : '일반 사용자'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="settings-stat-grid">
+                        <div>
+                          <span>Coin</span>
+                          <strong>
+                            {userProfileState.profile.coin.toLocaleString()}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Free</span>
+                          <strong>{userProfileState.profile.freecount}</strong>
+                        </div>
+                        <div>
+                          <span>Premium</span>
+                          <strong>{userProfileState.profile.premiumcount}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="settings-card">
+                      <div className="settings-card-heading">
+                        <Crown aria-hidden="true" size={19} strokeWidth={2.2} />
+                        <div>
+                          <strong>프리미엄</strong>
+                          <span>현재 계정의 premium 값을 1 또는 0으로 저장합니다.</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="settings-primary-button"
+                        disabled={userProfileState.isSaving}
+                        onClick={toggleUserPremium}
+                      >
+                        {userProfileState.profile.premium === 1
+                          ? '프리미엄 해제'
+                          : '프리미엄 설정'}
+                      </button>
+                    </div>
+
+                    <div className="settings-card">
+                      <div className="settings-card-heading">
+                        <Coins aria-hidden="true" size={19} strokeWidth={2.2} />
+                        <div>
+                          <strong>코인 충전</strong>
+                          <span>테스트용 충전 버튼입니다.</span>
+                        </div>
+                      </div>
+                      <div className="settings-coin-buttons">
+                        {[1000, 2000, 3000].map((amount) => (
+                          <button
+                            type="button"
+                            key={amount}
+                            disabled={userProfileState.isSaving}
+                            onClick={() => chargeCoins(amount)}
+                          >
+                            {amount.toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {userProfileState.errorMessage && (
+                      <p className="settings-error-message">
+                        {userProfileState.errorMessage}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {!userProfileState.isLoading &&
+                  !userProfileState.profile &&
+                  !userProfileState.errorMessage && (
+                    <div className="bookmark-empty">
+                      Google 로그인 정보를 확인할 수 없습니다
+                    </div>
+                  )}
+
+                <button
+                  type="button"
+                  className="settings-logout-button"
+                  onClick={signOut}
+                >
+                  <LogOut aria-hidden="true" size={16} strokeWidth={2.2} />
+                  로그아웃
+                </button>
+              </>
+            )}
+          </section>
+        </aside>
+      )}
         </>
       )}
       </section>
@@ -2328,7 +2773,12 @@ function App() {
         >
           <Sparkles aria-hidden="true" size={20} strokeWidth={2.2} />
         </button>
-        <button type="button" className="map-tool-button" aria-label="설정">
+        <button
+          type="button"
+          className="map-tool-button"
+          aria-label="설정"
+          onClick={openSettingsPanel}
+        >
           <Settings aria-hidden="true" size={20} strokeWidth={2.2} />
         </button>
       </nav>

@@ -10,7 +10,11 @@ from typing import Optional
 from services.review_limits import MAX_REVIEW_RESULTS, clamp_max_results
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_KEY", "")
+)
+USER_PROFILE_SELECT = "email,premium,coin,freecount,premiumcount,store,bookmark"
 
 # ── 공통 헤더 ────────────────────────────────────────────────────────────────
 
@@ -96,6 +100,173 @@ def _text_or_none(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _int_or_zero(value) -> int:
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _require_supabase_config() -> None:
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase 설정이 없습니다")
+
+
+def _normalize_user_profile(row: dict) -> dict:
+    return {
+        "email": _text_or_none(row.get("email")) or "",
+        "premium": _int_or_zero(row.get("premium")),
+        "coin": _int_or_zero(row.get("coin")),
+        "freecount": _int_or_zero(row.get("freecount")),
+        "premiumcount": _int_or_zero(row.get("premiumcount")),
+        "store": row.get("store"),
+        "bookmark": _text_or_none(row.get("bookmark")),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 사용자 프로필 (Supabase Auth 토큰 기반)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def get_auth_email(access_token: str) -> str | None:
+    """Supabase access token으로 인증된 사용자의 email을 조회."""
+    _require_supabase_config()
+    token = _text_or_none(access_token)
+    if not token:
+        return None
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/auth/v1/user",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {token}",
+            },
+            timeout=10,
+        )
+
+    if resp.status_code != 200:
+        return None
+
+    data = resp.json() or {}
+    return _text_or_none(data.get("email"))
+
+
+async def ensure_user_profile(email: str) -> dict:
+    """email 기준으로 users row를 조회하고, 없으면 기본값으로 생성."""
+    _require_supabase_config()
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+
+    async with httpx.AsyncClient() as client:
+        existing = await _fetch_user_profile_by_email(client, normalized_email)
+        if existing:
+            return existing
+
+        resp = await client.post(
+            f"{SUPABASE_URL}/rest/v1/users",
+            headers=_h("resolution=merge-duplicates,return=representation"),
+            params={
+                "on_conflict": "email",
+                "select": USER_PROFILE_SELECT,
+            },
+            json={"email": normalized_email},
+            timeout=10,
+        )
+
+        if resp.status_code not in (200, 201):
+            raise RuntimeError(
+                f"사용자 프로필을 생성하지 못했습니다: "
+                f"{resp.status_code} {resp.text[:240]}"
+            )
+
+        rows = resp.json() or []
+        if rows:
+            return _normalize_user_profile(rows[0])
+
+        created = await _fetch_user_profile_by_email(client, normalized_email)
+        if created:
+            return created
+
+    raise RuntimeError("사용자 프로필을 조회하지 못했습니다")
+
+
+async def set_user_premium(email: str, enabled: bool) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+
+    await ensure_user_profile(normalized_email)
+    return await _patch_user_profile(
+        normalized_email,
+        {"premium": 1 if enabled else 0},
+    )
+
+
+async def add_user_coins(email: str, amount: int) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+
+    profile = await ensure_user_profile(normalized_email)
+    next_coin = _int_or_zero(profile.get("coin")) + int(amount)
+    return await _patch_user_profile(normalized_email, {"coin": next_coin})
+
+
+async def _fetch_user_profile_by_email(
+    client: httpx.AsyncClient,
+    email: str,
+) -> dict | None:
+    resp = await client.get(
+        f"{SUPABASE_URL}/rest/v1/users",
+        headers=_h(),
+        params={
+            "email": f"eq.{email}",
+            "select": USER_PROFILE_SELECT,
+            "limit": "1",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"사용자 프로필을 조회하지 못했습니다: "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() or []
+    return _normalize_user_profile(rows[0]) if rows else None
+
+
+async def _patch_user_profile(email: str, data: dict) -> dict:
+    _require_supabase_config()
+    async with httpx.AsyncClient() as client:
+        resp = await client.patch(
+            f"{SUPABASE_URL}/rest/v1/users",
+            headers=_h("return=representation"),
+            params={
+                "email": f"eq.{email}",
+                "select": USER_PROFILE_SELECT,
+            },
+            json=data,
+            timeout=10,
+        )
+
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(
+            f"사용자 프로필을 업데이트하지 못했습니다: "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() or []
+    if not rows:
+        return await ensure_user_profile(email)
+    return _normalize_user_profile(rows[0])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
