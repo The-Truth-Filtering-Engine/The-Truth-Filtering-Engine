@@ -42,7 +42,7 @@ async def ai_recommendations(
             page=page,
             page_size=page_size,
         )
-        reviews = result["items"]
+        reviews = result.get("items", [])
         places_by_name = await _find_places_by_names([review.get("name") for review in reviews])
 
         items = [
@@ -52,7 +52,7 @@ async def ai_recommendations(
             )
             for review in reviews
         ]
-        has_next = result["has_next"]
+        has_next = result.get("has_next", False)
 
     region_label = _format_region_label(region, region_scope) if region else ""
 
@@ -93,7 +93,7 @@ async def _load_region_filtered_items(
             page=scan_page,
             page_size=page_size,
         )
-        reviews = result["items"]
+        reviews = result.get("items", [])
         places_by_name = await _find_places_by_names(
             [review.get("name") for review in reviews],
         )
@@ -107,7 +107,7 @@ async def _load_region_filtered_items(
             if len(filtered_items) >= target_count:
                 break
 
-        source_has_next = result["has_next"]
+        source_has_next = result.get("has_next", False)
         scan_page += 1
 
     start_index = (page - 1) * page_size
