@@ -10,7 +10,7 @@ import '../../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../../1-1_map/providers/map_provider.dart';
-import '../providers/blog_review.dart';
+import 'package:truth_mouth/models/blog_review_model.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
 import '../widgets/restaurant_header_widget.dart';
 import '../widgets/ai_analysis_card.dart';
@@ -18,7 +18,7 @@ import '../widgets/word_cloud_card.dart';
 import '../widgets/no_data_card.dart';
 import '../widgets/review_list_section.dart';
 
-// â”€â”€ í™”ë©´ ìƒíƒœ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?”ë©´ ?íƒœ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 enum _ScreenState {
   initial,
@@ -28,9 +28,9 @@ enum _ScreenState {
   loaded,
 }
 
-// â”€â”€ API: Supabase ìºì‹œ ì¡°íšŒ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ API: Supabase ìºì‹œ ì¡°íšŒ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
-Future<List<BlogReview>> _fetchCachedReviews(
+Future<List<BlogReviewModel>> _fetchCachedReviews(
     String name, String address, AnalysisMode mode) async {
   final uri = BackendConfig.apiUri('/search/cached', queryParameters: {
     'query': name,
@@ -45,13 +45,13 @@ Future<List<BlogReview>> _fetchCachedReviews(
   if (list.isEmpty) return [];
 
   return list
-      .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
+      .map((e) => BlogReviewModel.fromApiWithMode(e as Map<String, dynamic>, mode))
       .toList();
 }
 
-// â”€â”€ API: ì‹ ê·œ í¬ë¡¤ë§ + AI ë¶„ì„ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ API: ? ê·œ ?¬ë¡¤ë§?+ AI ë¶„ì„ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
-Future<List<BlogReview>> _fetchFreshReviews(
+Future<List<BlogReviewModel>> _fetchFreshReviews(
     String name, String address, AnalysisMode mode,
     {bool refresh = false}) async {
   final queryParameters = {
@@ -64,17 +64,17 @@ Future<List<BlogReview>> _fetchFreshReviews(
   final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
 
   final res = await http.get(uri).timeout(const Duration(seconds: 60));
-  if (res.statusCode != 200) throw Exception('ì„œë²„ ì˜¤ë¥˜ (${res.statusCode})');
+  if (res.statusCode != 200) throw Exception('?œë²„ ?¤ë¥˜ (${res.statusCode})');
 
   final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   final list = body['reviews'] as List<dynamic>? ?? [];
 
   return list
-      .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
+      .map((e) => BlogReviewModel.fromApiWithMode(e as Map<String, dynamic>, mode))
       .toList();
 }
 
-// â”€â”€ í™”ë©´ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?”ë©´ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 class RestaurantDetailScreen extends ConsumerStatefulWidget {
   final RestaurantModel restaurant;
@@ -89,7 +89,7 @@ class RestaurantDetailScreen extends ConsumerStatefulWidget {
 class _RestaurantDetailScreenState
     extends ConsumerState<RestaurantDetailScreen> {
   _ScreenState _state = _ScreenState.initial;
-  List<BlogReview> _reviews = [];
+  List<BlogReviewModel> _reviews = [];
   List<WordFreq> _wordFreqs = [];
   ShopInfo? _shopInfo;
 
@@ -102,27 +102,27 @@ class _RestaurantDetailScreenState
   }
 
   Future<void> _onDetailTap() async {
-    setState(() => _state = _ScreenState.checking); // ë¡œë”© ìŠ¤í”¼ë„ˆë§Œ í‘œì‹œ
+    setState(() => _state = _ScreenState.checking); // ë¡œë”© ?¤í”¼?ˆë§Œ ?œì‹œ
 
     try {
       final mode = ref.read(analysisModeProvider);
       final cached = await _fetchCachedReviews(_r.name, _r.address, mode);
 
       if (cached.isEmpty) {
-        // _onAnalyzeTap() í˜¸ì¶œ ëŒ€ì‹  ì§ì ‘ ì¸ë¼ì¸ ì²˜ë¦¬ (noData/analyzing ìƒíƒœ ìŠ¤í‚µ)
+        // _onAnalyzeTap() ?¸ì¶œ ?€??ì§ì ‘ ?¸ë¼??ì²˜ë¦¬ (noData/analyzing ?íƒœ ?¤í‚µ)
         try {
           final fresh = await _fetchFreshReviews(_r.name, _r.address, mode);
           _applyReviews(fresh);
         } catch (e) {
           setState(() => _state = _ScreenState.noData);
-          _showError('ë¶„ì„ ì¤‘ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆì–´ìš”: $e');
+          _showError('ë¶„ì„ ì¤??¤ë¥˜ê°€ ë°œìƒ?ˆì–´?? $e');
         }
       } else {
         _applyReviews(cached);
       }
     } catch (e) {
       setState(() => _state = _ScreenState.noData);
-      _showError('ë°ì´í„° ì¡°íšŒ ì¤‘ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆì–´ìš”: $e');
+      _showError('?°ì´??ì¡°íšŒ ì¤??¤ë¥˜ê°€ ë°œìƒ?ˆì–´?? $e');
     }
   }
 
@@ -140,11 +140,11 @@ class _RestaurantDetailScreenState
       _applyReviews(fresh);
     } catch (e) {
       setState(() => _state = _ScreenState.noData);
-      _showError('ë¶„ì„ ì¤‘ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆì–´ìš”: $e');
+      _showError('ë¶„ì„ ì¤??¤ë¥˜ê°€ ë°œìƒ?ˆì–´?? $e');
     }
   }
 
-  void _applyReviews(List<BlogReview> reviews) {
+  void _applyReviews(List<BlogReviewModel> reviews) {
     final shopInfo = ShopInfo.fromApiResponse(
       name: _r.name,
       category: '${_r.category} Â· ${_r.address}',
@@ -172,7 +172,7 @@ class _RestaurantDetailScreenState
     );
   }
 
-  // â”€â”€ ë¹Œë“œ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?€?€ ë¹Œë“œ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
   @override
   Widget build(BuildContext context) {
@@ -201,12 +201,12 @@ class _RestaurantDetailScreenState
             BottomNavigationBarItem(
               icon: Icon(Icons.map_outlined),
               activeIcon: Icon(Icons.map_rounded),
-              label: 'íƒìƒ‰',
+              label: '?ìƒ‰',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bookmark_border_rounded),
               activeIcon: Icon(Icons.bookmark_rounded),
-              label: 'ë¶ë§ˆí¬',
+              label: 'ë¶ë§ˆ??,
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),
@@ -216,14 +216,14 @@ class _RestaurantDetailScreenState
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
               activeIcon: Icon(Icons.settings_rounded),
-              label: 'ì„¤ì •',
+              label: '?¤ì •',
             ),
           ],
         ),
       ),
       body: CustomScrollView(
         slivers: [
-          // â”€â”€ ë ˆìŠ¤í† ë‘ í—¤ë” â”€â”€
+          // ?€?€ ?ˆìŠ¤? ë‘ ?¤ë” ?€?€
           SliverToBoxAdapter(
             child: Column(
               children: [
@@ -242,17 +242,17 @@ class _RestaurantDetailScreenState
             ),
           ),
 
-          // â”€â”€ ìƒíƒœë³„ ì½˜í…ì¸  â”€â”€
+          // ?€?€ ?íƒœë³?ì½˜í…ì¸??€?€
           ..._buildSliverBody(),
 
-          // â”€â”€ í•˜ë‹¨ ì—¬ë°± â”€â”€
+          // ?€?€ ?˜ë‹¨ ?¬ë°± ?€?€
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
     );
   }
 
-  // â”€â”€ Sliver ê¸°ë°˜ ìƒíƒœë³„ ë³¸ë¬¸ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?€?€ Sliver ê¸°ë°˜ ?íƒœë³?ë³¸ë¬¸ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
   List<Widget> _buildSliverBody() {
     switch (_state) {
@@ -290,39 +290,39 @@ class _RestaurantDetailScreenState
 
       case _ScreenState.loaded:
         return [
-          // â”€â”€ AI ë¶„ì„ + ì›Œë“œí´ë¼ìš°ë“œ (ìŠ¤í¬ë¡¤í•˜ë©´ ì‚¬ë¼ì§) â”€â”€
+          // ?€?€ AI ë¶„ì„ + ?Œë“œ?´ë¼?°ë“œ (ê°€ë¡?ë°°ì¹˜ ë³µêµ¬) ?€?€
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                height: 200, // ê³ ì • ë†’ì´ â†’ ì›Œë“œí´ë¼ìš°ë“œ ì¶©ë¶„í•œ ê³µê°„ í™•ë³´
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ì™¼ìª½: AI ì§„ì‹¤ ë¶„ì„ (40%)
-                    Expanded(
-                      flex: 4,
-                      child: AiAnalysisCard(
-                        truthScore: _shopInfo?.trustScore ?? _r.truthScore,
-                      ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ?¼ìª½: AI ì§„ì‹¤ ë¶„ì„ (40% ë¹„ìœ¨)
+                  Expanded(
+                    flex: 4,
+                    child: AiAnalysisCard(
+                      truthScore: _shopInfo?.trustScore ?? _r.truthScore,
                     ),
-                    const SizedBox(width: 12),
-                    // ì˜¤ë¥¸ìª½: ë¦¬ë·° í‚¤ì›Œë“œ ì›Œë“œí´ë¼ìš°ë“œ (60%)
-                    Expanded(
-                      flex: 6,
-                      child: _wordFreqs.isNotEmpty
-                          ? WordCloudCard(wordFreqs: _wordFreqs)
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  // ?¤ë¥¸ìª? ë¦¬ë·° ?¤ì›Œ???Œë“œ?´ë¼?°ë“œ (60% ë¹„ìœ¨)
+                  Expanded(
+                    flex: 6,
+                    child: _wordFreqs.isNotEmpty
+                        ? SizedBox(
+                            height: 260, // AiAnalysisCard ?’ì´??ë§ì¶¤
+                            child: WordCloudCard(wordFreqs: _wordFreqs),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
               ),
             ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-          // â”€â”€ ë¸”ë¡œê·¸ ë¦¬ìŠ¤íŠ¸ (ìŠ¤í¬ë¡¤ ì´ì–´ì§) â”€â”€
+          // ?€?€ ë¸”ë¡œê·?ë¦¬ìŠ¤??(?¤í¬ë¡??´ì–´ì§? ?€?€
           if (_shopInfo != null)
             SliverToBoxAdapter(
               child: Padding(
@@ -337,39 +337,39 @@ class _RestaurantDetailScreenState
     }
   }
 
-  // â”€â”€ ìœ í‹¸ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?€?€ ? í‹¸ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
   Future<void> _copyPhone() async {
     final phone = _r.phone?.trim();
     if (phone == null || phone.isEmpty) {
-      _showSnack('ë“±ë¡ëœ ì „í™”ë²ˆí˜¸ê°€ ì—†ìŠµë‹ˆë‹¤');
+      _showSnack('?±ë¡???„í™”ë²ˆí˜¸ê°€ ?†ìŠµ?ˆë‹¤');
       return;
     }
     await Clipboard.setData(ClipboardData(text: phone));
-    _showSnack('ì „í™”ë²ˆí˜¸ê°€ ë³µì‚¬ë˜ì—ˆìŠµë‹ˆë‹¤');
+    _showSnack('?„í™”ë²ˆí˜¸ê°€ ë³µì‚¬?˜ì—ˆ?µë‹ˆ??);
   }
 
   void _toggleBookmark() {
     final previous = ref.read(bookmarkRestaurantsProvider);
     final alreadyBookmarked = previous.any((item) => item.id == _r.id);
     ref.read(bookmarkRestaurantsProvider.notifier).toggle(_r);
-    _showSnack(alreadyBookmarked ? 'ë¶ë§ˆí¬ì—ì„œ í•´ì œë˜ì—ˆìŠµë‹ˆë‹¤' : 'ë¶ë§ˆí¬ì— ì €ì¥í–ˆìŠµë‹ˆë‹¤');
+    _showSnack(alreadyBookmarked ? 'ë¶ë§ˆ?¬ì—???´ì œ?˜ì—ˆ?µë‹ˆ?? : 'ë¶ë§ˆ?¬ì— ?€?¥í–ˆ?µë‹ˆ??);
   }
 
   Future<void> _copyPlaceUrl() async {
     final link = _r.placeUrl?.trim();
     if (link == null || link.isEmpty) {
-      _showSnack('ê³µìœ  ê°€ëŠ¥í•œ ë§í¬ê°€ ì—†ìŠµë‹ˆë‹¤');
+      _showSnack('ê³µìœ  ê°€?¥í•œ ë§í¬ê°€ ?†ìŠµ?ˆë‹¤');
       return;
     }
     await Clipboard.setData(ClipboardData(text: link));
-    _showSnack('ë§í¬ê°€ ë³µì‚¬ë˜ì—ˆìŠµë‹ˆë‹¤');
+    _showSnack('ë§í¬ê°€ ë³µì‚¬?˜ì—ˆ?µë‹ˆ??);
   }
 
   Future<void> _openPlaceUrl() async {
     final link = _r.placeUrl?.trim();
     if (link == null || link.isEmpty) {
-      _showSnack('ê¸¸ì°¾ê¸° ë§í¬ê°€ ì—†ìŠµë‹ˆë‹¤');
+      _showSnack('ê¸¸ì°¾ê¸?ë§í¬ê°€ ?†ìŠµ?ˆë‹¤');
       return;
     }
     await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
@@ -385,7 +385,7 @@ class _RestaurantDetailScreenState
     );
   }
 
-  // â”€â”€ AppBar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?€?€ AppBar ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
   AppBar _buildAppBar() {
     return AppBar(
@@ -424,7 +424,7 @@ class _RestaurantDetailScreenState
   }
 }
 
-// â”€â”€ ë¡œë”© ì¸ë””ì¼€ì´í„° â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ë¡œë”© ?¸ë””ì¼€?´í„° ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 class _LoadingIndicator extends StatelessWidget {
   const _LoadingIndicator();
@@ -439,3 +439,4 @@ class _LoadingIndicator extends StatelessWidget {
     );
   }
 }
+

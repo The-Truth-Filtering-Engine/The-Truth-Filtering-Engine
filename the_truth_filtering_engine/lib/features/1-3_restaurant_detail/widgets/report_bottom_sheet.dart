@@ -69,9 +69,8 @@ class _ReportBottomSheetState extends State<ReportBottomSheet> {
         body: jsonEncode({
           'review_id': widget.reviewId,
           'reason': _selected!.value,
-          'detail': _detailCtrl.text.trim().isEmpty
-              ? null
-              : _detailCtrl.text.trim(),
+          'detail':
+              _detailCtrl.text.trim().isEmpty ? null : _detailCtrl.text.trim(),
         }),
       );
 

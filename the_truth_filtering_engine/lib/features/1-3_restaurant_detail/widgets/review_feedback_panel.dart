@@ -71,11 +71,12 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
           .timeout(const Duration(seconds: 5));
       if (resp.statusCode == 200) {
         final d = jsonDecode(resp.body);
-        if (mounted)
+        if (mounted) {
           setState(() {
             _trust = d['trust'] ?? 0;
             _doubt = d['doubt'] ?? 0;
           });
+        }
       }
     } catch (_) {}
   }
@@ -139,9 +140,8 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
         body: jsonEncode({
           'review_id': widget.reviewId,
           'ai_was_correct': correct,
-          'user_label': !correct
-              ? (widget.aiPredIsAd == true ? 'not_ad' : 'ad')
-              : null,
+          'user_label':
+              !correct ? (widget.aiPredIsAd == true ? 'not_ad' : 'ad') : null,
         }),
       );
       setState(() => _aiCorrect = correct);
@@ -430,15 +430,15 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
                   color: isMine
                       ? _green.withOpacity(.12)
                       : hasCount
-                      ? Colors.white
-                      : _bg,
+                          ? Colors.white
+                          : _bg,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isMine
                         ? _green
                         : hasCount
-                        ? _border
-                        : _border.withOpacity(.6),
+                            ? _border
+                            : _border.withOpacity(.6),
                     width: isMine ? 1.5 : 1,
                   ),
                 ),
@@ -452,8 +452,8 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
                         color: isMine
                             ? _green
                             : hasCount
-                            ? const Color(0xFF1E2A24)
-                            : _gray,
+                                ? const Color(0xFF1E2A24)
+                                : _gray,
                         fontWeight: isMine || hasCount
                             ? FontWeight.w500
                             : FontWeight.w400,

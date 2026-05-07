@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../core/theme/app_theme.dart';
 
 class TrustCircle extends StatelessWidget {
@@ -7,9 +8,9 @@ class TrustCircle extends StatelessWidget {
   const TrustCircle(this.score, {super.key});
 
   Color getColor() {
-    if (score >= 80) return AppColors.success400;
-    if (score >= 40) return AppColors.warning400;
-    return AppColors.danger400;
+    if (score >= 80) return AppColors.success;
+    if (score >= 40) return AppColors.warning;
+    return AppColors.danger;
   }
 
   @override

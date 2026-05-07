@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../1-3_restaurant_detail/providers/blog_review.dart';
+import 'package:truth_mouth/models/blog_review_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../1-1_map/widgets/common_widgets.dart';
 import 'blog_list_screen.dart';
@@ -21,7 +21,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _goToList(String query) async {
     if (query.trim().isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('가게명 또는 링크를 입력해 주세요.')));
+          .showSnackBar(const SnackBar(content: Text('가게명 ?�는 링크�??�력??주세??')));
       return;
     }
 
@@ -30,13 +30,13 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final result = await _apiService.search(query.trim());
 
-      // ReviewItem → BlogReview 변환
+      // ReviewItem ??BlogReviewModel 변??
       final blogs = result.reviews.map((r) {
         final adProb = (r.isAdLlmPred == 1) ? 90 : 10;
         final status =
             (r.isAdLlmPred == 1) ? ReviewStatus.ad : ReviewStatus.real;
 
-        return BlogReview(
+        return BlogReviewModel(
           id: r.id,
           title: r.reviewTitle ?? '',
           author: r.reviewBloggername ?? '',
@@ -50,10 +50,10 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }).toList();
 
-      // ShopInfo 생성
+      // ShopInfo ?�성
       final shopInfo = ShopInfo(
         name: query.trim(),
-        category: '블로그 리뷰 분석',
+        category: '블로�?리뷰 분석',
         trustScore: result.total > 0
             ? ((result.realCount / result.total) * 100).round()
             : 0,
@@ -76,7 +76,7 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
+          .showSnackBar(SnackBar(content: Text('?�류가 발생?�습?�다: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -116,14 +116,14 @@ class _SearchScreenState extends State<SearchScreen> {
                               Border.all(color: AppColors.border, width: 0.5),
                         ),
                         child: const Center(
-                          child: Text('🏛️', style: TextStyle(fontSize: 28)),
+                          child: Text('?���?, style: TextStyle(fontSize: 28)),
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Text('맛집 분석하기', style: AppText.display()),
+                      Text('맛집 분석?�기', style: AppText.display()),
                       const SizedBox(height: 6),
                       Text(
-                        '네이버 지도 링크 또는 가게명을 입력하면\nAI가 블로그 리뷰의 광고 여부를 분석해드려요',
+                        '?�이�?지??링크 ?�는 가게명???�력?�면\nAI가 블로�?리뷰??광고 ?��?�?분석?�드?�요',
                         textAlign: TextAlign.center,
                         style: AppText.caption().copyWith(height: 1.6),
                       ),
@@ -136,7 +136,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   style: AppText.body(),
                   onSubmitted: _goToList,
                   decoration: const InputDecoration(
-                    hintText: '예: 오모테나시 스시 / https://map.naver.com/...',
+                    hintText: '?? ?�모?�나???�시 / https://map.naver.com/...',
                     prefixIcon: Icon(Icons.search_rounded,
                         color: AppColors.textHint, size: 20),
                   ),
@@ -145,10 +145,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 ElevatedButton(
                   onPressed:
                       _isLoading ? null : () => _goToList(_controller.text),
-                  child: const Text('🔍  분석 시작'),
+                  child: const Text('?��  분석 ?�작'),
                 ),
                 const SizedBox(height: 28),
-                const SectionTitle('최근 검색'),
+                const SectionTitle('최근 검??),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -185,7 +185,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
 
-          // 로딩 오버레이
+          // 로딩 ?�버?�이
           if (_isLoading)
             Container(
               color: Colors.black.withOpacity(0.3),
@@ -195,7 +195,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     CircularProgressIndicator(color: Colors.white),
                     SizedBox(height: 16),
-                    Text('AI가 리뷰를 분석 중이에요...',
+                    Text('AI가 리뷰�?분석 중이?�요...',
                         style: TextStyle(color: Colors.white, fontSize: 15)),
                   ],
                 ),
@@ -212,3 +212,4 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 }
+

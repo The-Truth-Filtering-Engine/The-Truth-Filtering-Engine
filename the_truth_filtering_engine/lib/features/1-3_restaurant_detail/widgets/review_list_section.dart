@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../providers/blog_review.dart';
+import 'package:truth_mouth/models/blog_review_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/review_item.dart';
 
-// â”€â”€ ìŠ¤ì¼ˆë ˆí†¤ shimmer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?¤ì¼ˆ?ˆí†¤ shimmer ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 class _SkeletonBox extends StatefulWidget {
   final double width;
@@ -112,11 +112,11 @@ class _BlogCardSkeleton extends StatelessWidget {
   }
 }
 
-// â”€â”€ ë¦¬ë·° ë¦¬ìŠ¤íŠ¸ ì„¹ì…˜ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ë¦¬ë·° ë¦¬ìŠ¤???¹ì…˜ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 class ReviewListSection extends StatefulWidget {
   final ShopInfo shopInfo;
-  final List<BlogReview> blogs;
+  final List<BlogReviewModel> blogs;
 
   const ReviewListSection({
     super.key,
@@ -136,7 +136,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // íƒ­ ì „í™˜ ì‹œ ë¦¬ìŠ¤íŠ¸ ë‹¤ì‹œ ê·¸ë¦¬ê¸°
+    // ???„í™˜ ??ë¦¬ìŠ¤???¤ì‹œ ê·¸ë¦¬ê¸?
     _tabController.addListener(() => setState(() {}));
   }
 
@@ -146,22 +146,28 @@ class _ReviewListSectionState extends State<ReviewListSection>
     super.dispose();
   }
 
-  List<BlogReview> get _sortedByReal => [...widget.blogs]
+  List<BlogReviewModel> get _sortedByReal => [...widget.blogs]
     ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
-  List<BlogReview> get _sortedByDate =>
+  List<BlogReviewModel> get _sortedByDate =>
       [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
 
-  Future<void> _openUrl(BlogReview blog) async {
-    final uri = Uri.parse(blog.url);
+  Future<void> _openUrl(BlogReviewModel blog) async {
+    String finalUrl = blog.url;
+    if (finalUrl.contains('blog.naver.com') &&
+        !finalUrl.contains('m.blog.naver.com')) {
+      finalUrl = finalUrl.replaceFirst('blog.naver.com', 'm.blog.naver.com');
+    }
+
+    final uri = Uri.parse(finalUrl);
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      debugPrint('Could not launch ${blog.url}: $e');
+      debugPrint('Could not launch $finalUrl: $e');
     }
   }
 
-  List<BlogReview> get _currentBlogs =>
+  List<BlogReviewModel> get _currentBlogs =>
       _tabController.index == 0 ? _sortedByReal : _sortedByDate;
 
   @override
@@ -169,7 +175,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // â”€â”€ íƒ­ë°” â”€â”€
+        // ?€?€ ??°” ?€?€
         Container(
           color: AppColors.surface,
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -203,8 +209,8 @@ class _ReviewListSectionState extends State<ReviewListSection>
                   unselectedLabelStyle: AppText.caption(),
                   dividerColor: Colors.transparent,
                   tabs: const [
-                    Tab(text: 'âœ…  ì§„ì„±ìˆœ'),
-                    Tab(text: 'ğŸ•  ìµœì‹ ìˆœ'),
+                    Tab(text: '?? ì§„ì„±??),
+                    Tab(text: '?•  ìµœì‹ ??),
                   ],
                 ),
               ),
@@ -215,7 +221,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
         const Divider(height: 1),
 
-        // â”€â”€ ë¦¬ìŠ¤íŠ¸ (shrinkWrap â†’ ì™¸ë¶€ CustomScrollViewì— ìŠ¤í¬ë¡¤ ìœ„ì„) â”€â”€
+        // ?€?€ ë¦¬ìŠ¤??(shrinkWrap ???¸ë? CustomScrollView???¤í¬ë¡??„ì„) ?€?€
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -230,3 +236,4 @@ class _ReviewListSectionState extends State<ReviewListSection>
     );
   }
 }
+

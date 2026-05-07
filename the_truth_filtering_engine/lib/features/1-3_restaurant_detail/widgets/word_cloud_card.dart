@@ -45,11 +45,6 @@ class WordCloudCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          const Text(
-            '블로그 제목에서 추출한 주요 키워드',
-            style: TextStyle(fontSize: 11, color: Color(0xFF9090A8)),
-          ),
           const SizedBox(height: 12),
 
           // ── 말풍선 워드클라우드 ──

@@ -40,7 +40,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
 
-  static const _initialCenter = MapPoint(37.5245, 127.0370);
+  static const _initialCenter =
+      MapPoint(latitude: 37.5245, longitude: 127.0370);
   static const _initialLevel = 4;
 
   List<RestaurantModel>? _viewportRestaurants;
@@ -81,7 +82,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _mapViewKey.currentState?.moveTo(
-          MapPoint(next.latitude, next.longitude),
+          MapPoint(latitude: next.latitude, longitude: next.longitude),
           level: 3,
         );
       });
@@ -354,8 +355,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _calculateViewportRadius(MapBounds bounds, MapPoint center) {
     final northEast = bounds.northEast;
     final southWest = bounds.southWest;
-    final northWest = MapPoint(northEast.latitude, southWest.longitude);
-    final southEast = MapPoint(southWest.latitude, northEast.longitude);
+    final northWest =
+        MapPoint(latitude: northEast.latitude, longitude: southWest.longitude);
+    final southEast =
+        MapPoint(latitude: southWest.latitude, longitude: northEast.longitude);
 
     final candidates = [
       distanceMeters(center, northWest),
@@ -566,7 +569,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final location = MapPoint(position.latitude, position.longitude);
+      final location =
+          MapPoint(latitude: position.latitude, longitude: position.longitude);
       ref.read(currentLocationProvider.notifier).state = location;
       _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}

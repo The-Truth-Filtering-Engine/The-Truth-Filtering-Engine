@@ -3,12 +3,22 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../services/api_service.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 
-// 레스토랑 목록 provider (더미 데이터)
-final restaurantListProvider = Provider<List<RestaurantModel>>((ref) {
-  return RestaurantDummyData.restaurants;
+// 레스토랑 목록 provider (실제 API)
+final restaurantListProvider =
+    FutureProvider<List<RestaurantModel>>((ref) async {
+  final api = ApiService();
+
+  return api.fetchNearbyRestaurants(
+    center: const MapPoint(
+      latitude: 37.5245,
+      longitude: 127.037,
+    ),
+    radius: 1200,
+  );
 });
 
 // 선택된 레스토랑 provider (바텀시트 표시용)

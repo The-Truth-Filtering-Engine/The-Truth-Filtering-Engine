@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../1-1_map/models/restaurant_model.dart';
+import '../models/ai_recommend_item.dart';
 import '../providers/ai_recommend_provider.dart';
 import '../widgets/recommend_card.dart';
 
@@ -19,9 +21,9 @@ class AiRecommendScreen extends ConsumerWidget {
     final state = ref.watch(aiRecommendProvider);
     final notifier = ref.read(aiRecommendProvider.notifier);
 
-    return Container(
-      color: AppColors.bg,
-      child: Builder(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Builder(
         builder: (context) {
           if (state.isLoading && state.items.isEmpty) {
             return const Center(child: CircularProgressIndicator());
@@ -97,7 +99,7 @@ class _Header extends StatelessWidget {
             ),
             Text(
               '$page 페이지',
-              style: AppText.caption().copyWith(color: AppColors.textHint),
+              style: AppText.caption().copyWith(color: AppColors.muted),
             ),
           ],
         ),
@@ -172,7 +174,7 @@ class _EmptyState extends StatelessWidget {
           const Icon(
             Icons.auto_awesome_outlined,
             size: 48,
-            color: AppColors.textHint,
+            color: AppColors.muted,
           ),
           const SizedBox(height: 14),
           Text(
@@ -214,7 +216,7 @@ class _ErrorState extends StatelessWidget {
             const Icon(
               Icons.error_outline,
               size: 44,
-              color: AppColors.danger400,
+              color: AppColors.danger,
             ),
             const SizedBox(height: 12),
             Text(message, style: AppText.title(), textAlign: TextAlign.center),
@@ -222,7 +224,7 @@ class _ErrorState extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 detail!,
-                style: AppText.caption().copyWith(color: AppColors.textHint),
+                style: AppText.caption().copyWith(color: AppColors.muted),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

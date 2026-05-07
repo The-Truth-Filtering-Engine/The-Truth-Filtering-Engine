@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../providers/blog_review.dart';
+import 'package:truth_mouth/models/blog_review_model.dart';
 
 class ReviewItem extends StatelessWidget {
-  final BlogReview blog;
+  final BlogReviewModel blog;
   final VoidCallback onTap;
 
   const ReviewItem({
@@ -26,7 +26,7 @@ class ReviewItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // â”€â”€ ë±ƒì§€ + ì œëª© â”€â”€
+          // ?€?€ ë±ƒì? + ?œëª© ?€?€
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -46,16 +46,16 @@ class ReviewItem extends StatelessWidget {
           ),
           const SizedBox(height: 6),
 
-          // â”€â”€ ë¯¸ë¦¬ë³´ê¸° â”€â”€
+          // ?€?€ ë¯¸ë¦¬ë³´ê¸° ?€?€
           Text(
-            blog.preview.isNotEmpty ? blog.preview : 'ìš”ì•½ ì—†ìŒ',
+            blog.preview.isNotEmpty ? blog.preview : '?”ì•½ ?†ìŒ',
             style: AppText.caption(),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 10),
 
-          // â”€â”€ ì‘ì„±ì Â· ë‚ ì§œ â”€â”€
+          // ?€?€ ?‘ì„±??Â· ? ì§œ ?€?€
           Row(
             children: [
               Text(
@@ -89,7 +89,7 @@ class ReviewItem extends StatelessWidget {
   }
 }
 
-// â”€â”€ Hover ì¹´ë“œ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ Hover ì¹´ë“œ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 class _HoverCard extends StatefulWidget {
   final Color bgColor;
@@ -113,7 +113,7 @@ class _HoverCardState extends State<_HoverCard> {
 
   @override
   Widget build(BuildContext context) {
-    // hover ì‹œ ë°°ê²½Â·í…Œë‘ë¦¬ë¥¼ ì•½ê°„ ì§„í•˜ê²Œ
+    // hover ??ë°°ê²½Â·?Œë‘ë¦¬ë? ?½ê°„ ì§„í•˜ê²?
     final bg = _hovered
         ? Color.alphaBlend(
             const Color.fromARGB(255, 255, 255, 255).withOpacity(0.3),
@@ -156,7 +156,7 @@ class _HoverCardState extends State<_HoverCard> {
   }
 }
 
-// â”€â”€ ê´‘ê³  ë“±ê¸‰ ë±ƒì§€ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ê´‘ê³  ?±ê¸‰ ë±ƒì? ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 class _AdGradeBadge extends StatelessWidget {
   final AdGrade grade;
@@ -183,3 +183,4 @@ class _AdGradeBadge extends StatelessWidget {
     );
   }
 }
+

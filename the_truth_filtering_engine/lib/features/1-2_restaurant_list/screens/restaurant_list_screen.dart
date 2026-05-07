@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 
 const _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
@@ -359,7 +360,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
@@ -373,14 +374,14 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
           height: 38,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: AppColors.bg,
+            color: AppColors.background,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppColors.border, width: 0.5),
           ),
           child: Row(
             children: [
               const Icon(Icons.search_rounded,
-                  size: 16, color: AppColors.textHint),
+                  size: 16, color: AppColors.muted),
               const SizedBox(width: 6),
               Expanded(
                 child: TextField(
@@ -392,17 +393,17 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                     hintText: 'Search restaurants or cafes',
-                    hintStyle: TextStyle(color: AppColors.textHint),
+                    hintStyle: TextStyle(color: AppColors.muted),
                   ),
                   style: const TextStyle(
                     fontSize: 14,
-                    color: AppColors.textPrimary,
+                    color: AppColors.text,
                   ),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.search_rounded,
-                    size: 16, color: AppColors.primary500),
+                    size: 16, color: AppColors.primary),
                 onPressed: () => _submitSearch(_queryController.text),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -448,8 +449,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.wifi_off_rounded,
-              size: 52, color: AppColors.textHint),
+          const Icon(Icons.wifi_off_rounded, size: 52, color: AppColors.muted),
           const SizedBox(height: 14),
           Text(
             _errorMessage!,
@@ -487,7 +487,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary500,
+                        color: AppColors.primary,
                       ),
                     ),
                     TextSpan(
@@ -509,7 +509,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                     color: AppColors.textSecondary,
                   ),
                   icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                      size: 16, color: AppColors.textHint),
+                      size: 16, color: AppColors.muted),
                   items: _sortOptions
                       .map((o) => DropdownMenuItem<String>(
                             value: o,
@@ -550,7 +550,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.search_off_rounded,
-              size: 52, color: AppColors.textHint),
+              size: 52, color: AppColors.muted),
           const SizedBox(height: 14),
           Text(
             '"$_query" 검색 결과가 없습니다',
@@ -562,7 +562,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
           const SizedBox(height: 6),
           const Text(
             '다른 키워드로 다시 시도해보세요',
-            style: TextStyle(fontSize: 12, color: AppColors.textHint),
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
           ),
         ],
       ),
@@ -620,7 +620,7 @@ class _RestaurantCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: AppColors.text,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -637,14 +637,14 @@ class _RestaurantCard extends StatelessWidget {
                   Row(
                     children: [
                       const Icon(Icons.location_on_outlined,
-                          size: 11, color: AppColors.textHint),
+                          size: 11, color: AppColors.muted),
                       const SizedBox(width: 2),
                       Text(
                         restaurant.distance > 0
                             ? '${restaurant.distance}m'
                             : restaurant.address,
                         style: const TextStyle(
-                            fontSize: 11, color: AppColors.textHint),
+                            fontSize: 11, color: AppColors.muted),
                       ),
                     ],
                   ),

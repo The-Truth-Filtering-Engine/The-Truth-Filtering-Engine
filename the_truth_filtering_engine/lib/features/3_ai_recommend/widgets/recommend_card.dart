@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../models/ai_recommend_item.dart';
 
 class RecommendCard extends StatelessWidget {
@@ -61,7 +62,7 @@ class RecommendCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   _metaText,
-                  style: AppText.caption().copyWith(color: AppColors.textHint),
+                  style: AppText.caption().copyWith(color: AppColors.muted),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../main.dart'; // MainShell
+import '../../1-1_map/screens/truth_map_screen.dart';
 
 class LoginSignupScreen extends StatefulWidget {
   const LoginSignupScreen({super.key});
@@ -79,7 +79,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
 
     // 메인 화면으로 이동 (뒤로가기 불가)
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShell()),
+      MaterialPageRoute(builder: (_) => const TruthMapScreen()),
     );
     // TODO: Supabase 로그인 연결
   }
@@ -272,9 +272,9 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
   Widget _tempAdminLoginButton() {
     return TextButton.icon(
       onPressed: () {
-        // 임시로 MainShell(MapScreen 포함)으로 바로 이동하는 버튼
+        // 임시로 TruthMapScreen로 바로 이동하는 버튼
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainShell()),
+          MaterialPageRoute(builder: (_) => const TruthMapScreen()),
         );
       },
       icon: const Icon(Icons.admin_panel_settings, color: Color(0xFF6B7A72), size: 20),

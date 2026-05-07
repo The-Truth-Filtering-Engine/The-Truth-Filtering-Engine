@@ -1,4 +1,4 @@
-import '../../1-1_map/models/restaurant_model.dart';
+import '../features/1-1_map/models/restaurant_model.dart';
 
 class AiRecommendItem {
   final int id;

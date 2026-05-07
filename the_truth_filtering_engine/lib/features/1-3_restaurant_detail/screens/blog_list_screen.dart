@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../providers/blog_review.dart';
+import 'package:truth_mouth/models/blog_review_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../common/app_bar_logo.dart';
 import '../../../common/stat_progress_bar.dart';
 import '../../../common/trust_circle.dart';
 import '../widgets/review_item.dart';
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ìŠ¤ì¼ˆë ˆí†¤ shimmer ìœ„ì ¯
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ?¤ì¼ˆ?ˆí†¤ shimmer ?„ì ¯
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class _SkeletonBox extends StatefulWidget {
   final double width;
   final double height;
@@ -129,12 +129,12 @@ class _SkeletonList extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ë¸”ë¡œê·¸ ë¦¬ë·° ë¦¬ìŠ¤íŠ¸ í™”ë©´
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ë¸”ë¡œê·?ë¦¬ë·° ë¦¬ìŠ¤???”ë©´
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class BlogListScreen extends StatefulWidget {
   final ShopInfo shopInfo;
-  final List<BlogReview> blogs;
+  final List<BlogReviewModel> blogs;
   const BlogListScreen(
       {super.key, required this.shopInfo, required this.blogs});
 
@@ -155,7 +155,7 @@ class _BlogListScreenState extends State<BlogListScreen>
     // _simulateLoading();
   }
 
-  // ì‹¤ì œ API ì—°ë™ ì‹œ ì´ ë¶€ë¶„ì„ API í˜¸ì¶œë¡œ êµì²´í•˜ì„¸ìš”
+  // ?¤ì œ API ?°ë™ ????ë¶€ë¶„ì„ API ?¸ì¶œë¡?êµì²´?˜ì„¸??
   // Future<void> _simulateLoading() async {
   //   await Future.delayed(const Duration(milliseconds: 1800));
   //   if (mounted) setState(() => _isLoading = false);
@@ -167,13 +167,13 @@ class _BlogListScreenState extends State<BlogListScreen>
     super.dispose();
   }
 
-  List<BlogReview> get _sortedByReal => [...widget.blogs]
+  List<BlogReviewModel> get _sortedByReal => [...widget.blogs]
     ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
-  List<BlogReview> get _sortedByDate =>
+  List<BlogReviewModel> get _sortedByDate =>
       [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
 
-  Future<void> _openWebview(BlogReview blog) async {
+  Future<void> _openWebview(BlogReviewModel blog) async {
     final uri = Uri.parse(blog.url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -194,7 +194,7 @@ class _BlogListScreenState extends State<BlogListScreen>
       ),
       body: Column(
         children: [
-          // â”€â”€ ê°€ê²Œ ìš”ì•½ ì¹´ë“œ â”€â”€
+          // ?€?€ ê°€ê²??”ì•½ ì¹´ë“œ ?€?€
           Container(
             color: AppColors.surface,
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -210,7 +210,7 @@ class _BlogListScreenState extends State<BlogListScreen>
                 //           Text(shop.name, style: AppText.title()),
                 //           const SizedBox(height: 3),
                 //           Text(
-                //               '${shop.category} Â· ë¸”ë¡œê·¸ ë¦¬ë·° ${shop.totalReviews}ê°œ',
+                //               '${shop.category} Â· ë¸”ë¡œê·?ë¦¬ë·° ${shop.totalReviews}ê°?,
                 //               style: AppText.caption()),
                 //         ],
                 //       ),
@@ -232,7 +232,7 @@ class _BlogListScreenState extends State<BlogListScreen>
                 // ),
                 // const SizedBox(height: 14),
 
-                // â”€â”€ íƒ­ë°” â”€â”€
+                // ?€?€ ??°” ?€?€
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.bg,
@@ -259,8 +259,8 @@ class _BlogListScreenState extends State<BlogListScreen>
                     unselectedLabelStyle: AppText.caption(),
                     dividerColor: Colors.transparent,
                     tabs: const [
-                      Tab(text: 'âœ…  ì§„ì„±ìˆœ'),
-                      Tab(text: 'ğŸ•  ìµœì‹ ìˆœ'),
+                      Tab(text: '?? ì§„ì„±??),
+                      Tab(text: '?•  ìµœì‹ ??),
                     ],
                   ),
                 ),
@@ -270,7 +270,7 @@ class _BlogListScreenState extends State<BlogListScreen>
           ),
           const Divider(),
 
-          // â”€â”€ ë¦¬ë·° ë¦¬ìŠ¤íŠ¸ or ìŠ¤ì¼ˆë ˆí†¤ â”€â”€
+          // ?€?€ ë¦¬ë·° ë¦¬ìŠ¤??or ?¤ì¼ˆ?ˆí†¤ ?€?€
           Expanded(
             child: _isLoading
                 ? const _SkeletonList()
@@ -289,8 +289,8 @@ class _BlogListScreenState extends State<BlogListScreen>
 }
 
 class _BlogList extends StatelessWidget {
-  final List<BlogReview> blogs;
-  final void Function(BlogReview) onTap;
+  final List<BlogReviewModel> blogs;
+  final void Function(BlogReviewModel) onTap;
   const _BlogList({required this.blogs, required this.onTap});
 
   @override
@@ -303,3 +303,4 @@ class _BlogList extends StatelessWidget {
     );
   }
 }
+

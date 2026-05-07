@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../1-3_restaurant_detail/providers/blog_review.dart';
+import 'package:truth_mouth/models/blog_review_model.dart';
 import '../../../core/theme/app_theme.dart';
 
-// â”€â”€ ì•±ë°” ë¡œê³  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?±ë°” ë¡œê³  ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class AppBarLogo extends StatelessWidget {
   const AppBarLogo({super.key});
   @override
@@ -16,7 +16,7 @@ class AppBarLogo extends StatelessWidget {
           height: 32,
         ),
         const SizedBox(width: 7),
-        Text('ì§„ì‹¤ì˜ ì…',
+        Text('ì§„ì‹¤????,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
@@ -27,7 +27,7 @@ class AppBarLogo extends StatelessWidget {
   }
 }
 
-// â”€â”€ ì‹ ë¢°ë„ ë°°ì§€ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ? ë¢°??ë°°ì? ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class StatusBadge extends StatelessWidget {
   final ReviewStatus status;
   const StatusBadge(this.status, {super.key});
@@ -37,7 +37,7 @@ class StatusBadge extends StatelessWidget {
     final (label, bg, fg) = switch (status) {
       ReviewStatus.real => ('ì§„ì„±', AppColors.success50, AppColors.success700),
       ReviewStatus.suspicious => (
-          'ì˜ì‹¬',
+          '?˜ì‹¬',
           AppColors.warning50,
           AppColors.warning700
         ),
@@ -54,7 +54,7 @@ class StatusBadge extends StatelessWidget {
   }
 }
 
-// â”€â”€ Trust ì›í˜• ì ìˆ˜ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ Trust ?í˜• ?ìˆ˜ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class TrustCircle extends StatelessWidget {
   final int score;
   const TrustCircle(this.score, {super.key});
@@ -96,7 +96,7 @@ class TrustCircle extends StatelessWidget {
   }
 }
 
-// â”€â”€ ì§„í–‰ ë°” â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ì§„í–‰ ë°??€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class StatProgressBar extends StatelessWidget {
   final String label;
   final int value; // 0~100
@@ -137,9 +137,9 @@ class StatProgressBar extends StatelessWidget {
   }
 }
 
-// â”€â”€ ë¸”ë¡œê·¸ ì¹´ë“œ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ë¸”ë¡œê·?ì¹´ë“œ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class BlogCard extends StatelessWidget {
-  final BlogReview blog;
+  final BlogReviewModel blog;
   final VoidCallback onTap;
   const BlogCard({super.key, required this.blog, required this.onTap});
 
@@ -194,9 +194,9 @@ class BlogCard extends StatelessWidget {
   }
 }
 
-// â”€â”€ ê´‘ê³  ê²½ê³  ë°°ë„ˆ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ê´‘ê³  ê²½ê³  ë°°ë„ˆ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class AdWarningBanner extends StatelessWidget {
-  final BlogReview blog;
+  final BlogReviewModel blog;
   const AdWarningBanner(this.blog, {super.key});
 
   @override
@@ -229,14 +229,14 @@ class AdWarningBanner extends StatelessWidget {
                     color: isAd ? AppColors.danger700 : AppColors.warning700,
                     height: 1.5),
                 children: [
-                  const TextSpan(text: 'ì´ í¬ìŠ¤íŒ…ì€ '),
+                  const TextSpan(text: '???¬ìŠ¤?…ì? '),
                   TextSpan(
-                      text: 'ê´‘ê³  í™•ë¥  ${blog.adProbability}%',
+                      text: 'ê´‘ê³  ?•ë¥  ${blog.adProbability}%',
                       style: const TextStyle(fontWeight: FontWeight.w600)),
                   TextSpan(
                       text: isAd
-                          ? 'ë¡œ ë¶„ì„ë˜ì—ˆìŠµë‹ˆë‹¤.\ní˜‘ì°¬Â·ì›ê³ ë£Œ íŒ¨í„´ì´ ê°ì§€ë˜ì—ˆì–´ìš”.'
-                          : 'ë¡œ ë¶„ì„ë˜ì—ˆìŠµë‹ˆë‹¤.\nì¼ë¶€ í™ë³´ì„± í‘œí˜„ì´ ê°ì§€ë˜ì—ˆì–´ìš”.'),
+                          ? 'ë¡?ë¶„ì„?˜ì—ˆ?µë‹ˆ??\n?‘ì°¬Â·?ê³ ë£??¨í„´??ê°ì??˜ì—ˆ?´ìš”.'
+                          : 'ë¡?ë¶„ì„?˜ì—ˆ?µë‹ˆ??\n?¼ë? ?ë³´???œí˜„??ê°ì??˜ì—ˆ?´ìš”.'),
                 ],
               ),
             ),
@@ -247,7 +247,7 @@ class AdWarningBanner extends StatelessWidget {
   }
 }
 
-// â”€â”€ ì„¹ì…˜ íƒ€ì´í‹€ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?¹ì…˜ ?€?´í? ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 class SectionTitle extends StatelessWidget {
   final String text;
   const SectionTitle(this.text, {super.key});
@@ -264,3 +264,4 @@ class SectionTitle extends StatelessWidget {
     );
   }
 }
+
