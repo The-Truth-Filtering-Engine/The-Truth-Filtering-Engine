@@ -60,7 +60,7 @@ class _SkeletonBoxState extends State<_SkeletonBox>
 }
 
 class _BlogCardSkeleton extends StatelessWidget {
-  const _BlogCardSkeleton();
+  const _BlogCardSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -117,11 +117,17 @@ class _BlogCardSkeleton extends StatelessWidget {
 class ReviewListSection extends StatefulWidget {
   final ShopInfo shopInfo;
   final List<BlogReview> blogs;
+  final bool hasMoreReviews;
+  final bool isLoadingReviewBatch;
+  final ValueChanged<int>? onRequestReviewBatch;
 
   const ReviewListSection({
     super.key,
     required this.shopInfo,
     required this.blogs,
+    this.hasMoreReviews = false,
+    this.isLoadingReviewBatch = false,
+    this.onRequestReviewBatch,
   });
 
   @override
@@ -131,6 +137,7 @@ class ReviewListSection extends StatefulWidget {
 class _ReviewListSectionState extends State<ReviewListSection>
     with SingleTickerProviderStateMixin {
   static const int _pageSize = 10;
+  static const int _maxReviewCount = 300;
 
   late TabController _tabController;
   int _currentTabIndex = 0;
@@ -151,9 +158,10 @@ class _ReviewListSectionState extends State<ReviewListSection>
     final blogsChanged = !identical(oldWidget.blogs, widget.blogs) ||
         oldWidget.blogs.length != widget.blogs.length;
 
-    if (shopChanged || blogsChanged) {
+    if (shopChanged) {
       _currentPage = 0;
-    } else {
+    } else if (blogsChanged ||
+        oldWidget.hasMoreReviews != widget.hasMoreReviews) {
       _clampCurrentPage();
     }
   }
@@ -185,20 +193,33 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
   int get _totalPages {
     if (_currentBlogs.isEmpty) return 0;
-    return (_currentBlogs.length / _pageSize).ceil();
+    final loadedPages = (_currentBlogs.length / _pageSize).ceil();
+    if (!widget.hasMoreReviews) return loadedPages;
+
+    final maxPages = (_maxReviewCount / _pageSize).ceil();
+    return loadedPages < maxPages ? maxPages : loadedPages;
   }
 
   int get _lastPageIndex => _totalPages == 0 ? 0 : _totalPages - 1;
 
-  bool get _shouldShowPagination => _currentBlogs.length > _pageSize;
+  bool get _shouldShowPagination =>
+      _currentBlogs.length > _pageSize || widget.hasMoreReviews;
 
-  bool get _canGoPrevious => _currentPage > 0;
+  bool get _canGoPrevious => _currentPage > 0 && !widget.isLoadingReviewBatch;
 
-  bool get _canGoNext => _currentPage < _lastPageIndex;
+  bool get _canGoNext =>
+      _currentPage < _lastPageIndex && !widget.isLoadingReviewBatch;
+
+  bool get _isCurrentPageLoaded => _currentPageStart < _currentBlogs.length;
+
+  bool get _shouldShowPageSkeleton =>
+      widget.isLoadingReviewBatch && !_isCurrentPageLoaded;
+
+  int get _currentPageStart => _currentPage * _pageSize;
 
   List<BlogReview> get _visibleBlogs {
     final blogs = _currentBlogs;
-    final start = _currentPage * _pageSize;
+    final start = _currentPageStart;
     if (start >= blogs.length) return const [];
 
     final requestedEnd = start + _pageSize;
@@ -223,18 +244,31 @@ class _ReviewListSectionState extends State<ReviewListSection>
 
   void _goToPreviousPage() {
     if (!_canGoPrevious) return;
-    setState(() => _currentPage -= 1);
+    final nextPage = _currentPage - 1;
+    setState(() => _currentPage = nextPage);
+    _requestBatchIfNeeded(nextPage);
   }
 
   void _goToNextPage() {
     if (!_canGoNext) return;
-    setState(() => _currentPage += 1);
+    final nextPage = _currentPage + 1;
+    setState(() => _currentPage = nextPage);
+    _requestBatchIfNeeded(nextPage);
+  }
+
+  void _requestBatchIfNeeded(int page) {
+    final pageStart = page * _pageSize;
+    if (pageStart < _currentBlogs.length) return;
+    if (!widget.hasMoreReviews || widget.isLoadingReviewBatch) return;
+
+    widget.onRequestReviewBatch?.call(page);
   }
 
   @override
   Widget build(BuildContext context) {
     final currentBlogs = _currentBlogs;
     final visibleBlogs = _visibleBlogs;
+    final showSkeleton = _shouldShowPageSkeleton;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,11 +342,15 @@ class _ReviewListSectionState extends State<ReviewListSection>
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: Column(
               children: [
-                for (final blog in visibleBlogs)
-                  ReviewItem(
-                    blog: blog,
-                    onTap: () => _openUrl(blog),
-                  ),
+                if (showSkeleton)
+                  for (var i = 0; i < _pageSize; i++)
+                    _BlogCardSkeleton(key: ValueKey('review-page-skeleton-$i'))
+                else
+                  for (final blog in visibleBlogs)
+                    ReviewItem(
+                      blog: blog,
+                      onTap: () => _openUrl(blog),
+                    ),
                 _PaginationControls(
                   currentPage: _currentPage,
                   totalPages: _totalPages,

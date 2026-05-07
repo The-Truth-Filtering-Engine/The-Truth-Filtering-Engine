@@ -172,6 +172,9 @@ const REFRESH_DISTANCE_METERS = 150
 const NEARBY_PLACE_DISPLAY_COUNT = 30
 const SEARCH_RADIUS_METERS = 5000
 const SEARCH_PLACE_DISPLAY_COUNT = 30
+const REVIEW_BATCH_SIZE = 100
+const REVIEW_PAGE_SIZE = 10
+const MAX_REVIEW_RESULTS = 300
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
 const TEMP_ADMIN_AUTH_STORAGE_KEY = 'truth_filtering_temp_admin_auth'
 const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
@@ -558,7 +561,49 @@ async function fetchDetailJson(path: string, signal: AbortSignal) {
   }
   return (await response.json()) as {
     reviews?: Record<string, unknown>[]
+    hasMore?: boolean
   }
+}
+
+function buildReviewSearchPath(
+  endpoint: '/api/search' | '/api/search/cached',
+  query: string,
+  options: {
+    mode?: string
+    naverStart?: number
+    refresh?: boolean
+    limit?: number
+    maxResults?: number
+  } = {},
+) {
+  const params = new URLSearchParams({
+    query,
+    limit: String(options.limit ?? REVIEW_BATCH_SIZE),
+  })
+
+  if (endpoint === '/api/search') {
+    params.set('mode', options.mode ?? 'model')
+    params.set('naverStart', String(options.naverStart ?? 1))
+    params.set('maxResults', String(options.maxResults ?? MAX_REVIEW_RESULTS))
+    if (options.refresh) params.set('refresh', 'true')
+  } else {
+    params.set('limit', String(options.maxResults ?? MAX_REVIEW_RESULTS))
+  }
+
+  return `${endpoint}?${params.toString()}`
+}
+
+function mergeReviews(current: BlogReview[], incoming: BlogReview[]) {
+  const byKey = new Map<string, BlogReview>()
+
+  for (const review of current) {
+    byKey.set(review.url || `id:${review.id}`, review)
+  }
+  for (const review of incoming) {
+    byKey.set(review.url || `id:${review.id}`, review)
+  }
+
+  return [...byKey.values()]
 }
 
 function parseAiRecommendItem(item: Record<string, unknown>): AiRecommendItem {
@@ -681,6 +726,9 @@ function App() {
   const [detailData, setDetailData] = useState<DetailData | null>(null)
   const [detailErrorMessage, setDetailErrorMessage] = useState('')
   const [reviewSort, setReviewSort] = useState<'real' | 'latest'>('real')
+  const [reviewPage, setReviewPage] = useState(0)
+  const [detailHasMoreReviews, setDetailHasMoreReviews] = useState(false)
+  const [isReviewBatchLoading, setIsReviewBatchLoading] = useState(false)
   const [currentPosition, setCurrentPosition] = useState<MapPoint | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -714,6 +762,7 @@ function App() {
   const isLoggedIn = authSession !== null || isTemporaryAdmin
   const bookmarkedIds = bookmarkedRestaurants.map((restaurant) => restaurant.id)
   const detailRequestIdRef = useRef(0)
+  const reviewBatchRequestIdRef = useRef(0)
 
   function showToast(message: string) {
     setToastMessage(message)
@@ -1019,11 +1068,14 @@ function App() {
   async function loadRestaurantDetail(restaurant: Restaurant, forceFresh = false) {
     const requestId = ++detailRequestIdRef.current
     const controller = new AbortController()
-    const query = encodeURIComponent(restaurant.name)
+    const query = restaurant.name
 
     setDetailErrorMessage('')
     setDetailData(null)
     setReviewSort('real')
+    setReviewPage(0)
+    setDetailHasMoreReviews(false)
+    setIsReviewBatchLoading(false)
     setDetailState(forceFresh ? 'analyzing' : 'loading')
 
     try {
@@ -1031,23 +1083,32 @@ function App() {
 
       if (!forceFresh) {
         const cached = await fetchDetailJson(
-          `/api/search/cached?query=${query}`,
+          buildReviewSearchPath('/api/search/cached', query),
           controller.signal,
         )
         if (requestId !== detailRequestIdRef.current) return
 
-        if ((cached.reviews ?? []).length > 0) {
+        if ((cached.reviews ?? []).length >= REVIEW_BATCH_SIZE) {
           detailJson = cached
         } else {
           setDetailState('analyzing')
-          detailJson = await fetchDetailJson(
-            `/api/search?query=${query}&mode=model`,
-            controller.signal,
-          )
+          try {
+            detailJson = await fetchDetailJson(
+              buildReviewSearchPath('/api/search', query, { naverStart: 1 }),
+              controller.signal,
+            )
+          } catch (error) {
+            if ((cached.reviews ?? []).length === 0) throw error
+            detailJson = cached
+            showToast('추가 리뷰를 불러오지 못해 저장된 리뷰만 표시합니다')
+          }
         }
       } else {
         detailJson = await fetchDetailJson(
-          `/api/search?query=${query}&mode=model`,
+          buildReviewSearchPath('/api/search', query, {
+            naverStart: 1,
+            refresh: true,
+          }),
           controller.signal,
         )
       }
@@ -1064,6 +1125,9 @@ function App() {
         reviews,
         keywords: buildKeywords(reviews),
       })
+      setDetailHasMoreReviews(
+        Boolean(detailJson.hasMore) && reviews.length < MAX_REVIEW_RESULTS,
+      )
       setDetailState('loaded')
     } catch (error) {
       if (requestId !== detailRequestIdRef.current) return
@@ -1080,6 +1144,66 @@ function App() {
     setSelectedRestaurant(restaurant)
     setActiveSidePanel('detail')
     loadRestaurantDetail(restaurant, forceFresh)
+  }
+
+  async function loadReviewBatchForPage(pageIndex: number) {
+    if (
+      !selectedRestaurant ||
+      !detailData ||
+      !detailHasMoreReviews ||
+      isReviewBatchLoading
+    ) {
+      return
+    }
+
+    const pageStart = pageIndex * REVIEW_PAGE_SIZE
+    if (
+      pageStart < detailData.reviews.length ||
+      detailData.reviews.length >= MAX_REVIEW_RESULTS
+    ) {
+      return
+    }
+
+    const requestId = ++reviewBatchRequestIdRef.current
+    const controller = new AbortController()
+    const naverStart =
+      Math.floor(pageStart / REVIEW_BATCH_SIZE) * REVIEW_BATCH_SIZE + 1
+
+    setIsReviewBatchLoading(true)
+
+    try {
+      const detailJson = await fetchDetailJson(
+        buildReviewSearchPath('/api/search', selectedRestaurant.name, {
+          naverStart,
+        }),
+        controller.signal,
+      )
+      if (requestId !== reviewBatchRequestIdRef.current) return
+
+      const nextReviews = (detailJson.reviews ?? []).map(parseBlogReview)
+      const reviews = mergeReviews(detailData.reviews, nextReviews)
+
+      setDetailData({
+        reviews,
+        keywords: buildKeywords(reviews),
+      })
+      setDetailHasMoreReviews(
+        Boolean(detailJson.hasMore) && reviews.length < MAX_REVIEW_RESULTS,
+      )
+    } catch {
+      if (requestId !== reviewBatchRequestIdRef.current) return
+      const lastLoadedPage = Math.max(
+        0,
+        Math.ceil(detailData.reviews.length / REVIEW_PAGE_SIZE) - 1,
+      )
+      setReviewPage((current) => Math.min(current, lastLoadedPage))
+      setDetailHasMoreReviews(false)
+      showToast('추가 리뷰를 불러오지 못했습니다')
+    } finally {
+      if (requestId === reviewBatchRequestIdRef.current) {
+        setIsReviewBatchLoading(false)
+      }
+    }
   }
 
   async function loadAiRecommendations(page: number, regionScope = aiRegionScope) {
@@ -1320,6 +1444,40 @@ function App() {
         return a.adProbability - b.adProbability || b.id - a.id
       })
     : []
+  const loadedReviewPages =
+    sortedDetailReviews.length === 0
+      ? 0
+      : Math.ceil(sortedDetailReviews.length / REVIEW_PAGE_SIZE)
+  const reviewTotalPages = detailHasMoreReviews
+    ? Math.ceil(MAX_REVIEW_RESULTS / REVIEW_PAGE_SIZE)
+    : loadedReviewPages
+  const reviewPageStart = reviewPage * REVIEW_PAGE_SIZE
+  const isReviewPageLoaded = reviewPageStart < sortedDetailReviews.length
+  const showReviewPageSkeleton =
+    isReviewBatchLoading && !isReviewPageLoaded && reviewTotalPages > 0
+  const visibleDetailReviews = showReviewPageSkeleton
+    ? []
+    : sortedDetailReviews.slice(
+        reviewPageStart,
+        reviewPageStart + REVIEW_PAGE_SIZE,
+      )
+
+  function changeReviewPage(nextPage: number) {
+    const normalizedPage = Math.max(0, Math.min(nextPage, reviewTotalPages - 1))
+    setReviewPage(normalizedPage)
+
+    if (
+      normalizedPage * REVIEW_PAGE_SIZE >= sortedDetailReviews.length &&
+      detailHasMoreReviews
+    ) {
+      loadReviewBatchForPage(normalizedPage)
+    }
+  }
+
+  function changeReviewSort(nextSort: 'real' | 'latest') {
+    setReviewSort(nextSort)
+    setReviewPage(0)
+  }
 
   return (
     <main className="map-page">
@@ -1702,20 +1860,35 @@ function App() {
                     <button
                       type="button"
                       className={reviewSort === 'real' ? 'active' : ''}
-                      onClick={() => setReviewSort('real')}
+                      onClick={() => changeReviewSort('real')}
                     >
                       진성순
                     </button>
                     <button
                       type="button"
                       className={reviewSort === 'latest' ? 'active' : ''}
-                      onClick={() => setReviewSort('latest')}
+                      onClick={() => changeReviewSort('latest')}
                     >
                       최신순
                     </button>
                   </div>
                   <ul className="review-list">
-                    {sortedDetailReviews.map((review) => (
+                    {showReviewPageSkeleton
+                      ? Array.from({ length: REVIEW_PAGE_SIZE }, (_, index) => (
+                          <li key={`review-skeleton-${index}`}>
+                            <article
+                              className="review-card review-card-skeleton"
+                              aria-hidden="true"
+                            >
+                              <span className="skeleton-pill" />
+                              <span className="skeleton-line skeleton-title" />
+                              <span className="skeleton-line" />
+                              <span className="skeleton-line skeleton-short" />
+                              <span className="skeleton-line skeleton-meta" />
+                            </article>
+                          </li>
+                        ))
+                      : visibleDetailReviews.map((review) => (
                       <li key={`${review.id}-${review.url}`}>
                         <button
                           type="button"
@@ -1747,8 +1920,32 @@ function App() {
                           </span>
                         </button>
                       </li>
-                    ))}
+                        ))}
                   </ul>
+                  {reviewTotalPages > 1 && (
+                    <div className="review-pagination">
+                      <button
+                        type="button"
+                        disabled={reviewPage <= 0 || isReviewBatchLoading}
+                        onClick={() => changeReviewPage(reviewPage - 1)}
+                      >
+                        이전
+                      </button>
+                      <span>
+                        {reviewPage + 1} / {reviewTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={
+                          reviewPage >= reviewTotalPages - 1 ||
+                          isReviewBatchLoading
+                        }
+                        onClick={() => changeReviewPage(reviewPage + 1)}
+                      >
+                        다음
+                      </button>
+                    </div>
+                  )}
                 </section>
               </>
             )}

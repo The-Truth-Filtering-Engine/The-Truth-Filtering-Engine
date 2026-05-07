@@ -7,6 +7,7 @@ supabase_service.py
 import os
 import httpx
 from typing import Optional
+from services.review_limits import MAX_REVIEW_RESULTS, clamp_max_results
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
@@ -65,23 +66,27 @@ async def save_reviews(query: str, blogs: list[dict]) -> None:
 # 캐시 조회
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def get_cached_reviews(query: str) -> list[dict]:
+async def get_cached_reviews(query: str, limit: int = MAX_REVIEW_RESULTS) -> list[dict]:
     """같은 query 로 저장된 리뷰가 있으면 반환, 없으면 빈 리스트."""
     if not SUPABASE_URL:
         return []
 
+    review_limit = clamp_max_results(limit)
+    end = review_limit - 1
+
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{SUPABASE_URL}/rest/v1/reviews",
-            headers=_h(),
+            headers={**_h(), "Range": f"0-{end}", "Range-Unit": "items"},
             params={
                 "name": f"eq.{query}",
                 "order": "created_at.desc",
+                "limit": str(review_limit),
             },
             timeout=10,
         )
 
-    if resp.status_code != 200:
+    if resp.status_code not in (200, 206):
         return []
     return resp.json() or []
 

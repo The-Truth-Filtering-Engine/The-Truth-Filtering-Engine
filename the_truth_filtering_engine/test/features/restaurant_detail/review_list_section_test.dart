@@ -9,8 +9,11 @@ void main() {
 
   Future<void> pumpReviewList(
     WidgetTester tester,
-    List<BlogReview> blogs,
-  ) async {
+    List<BlogReview> blogs, {
+    bool hasMoreReviews = false,
+    bool isLoadingReviewBatch = false,
+    ValueChanged<int>? onRequestReviewBatch,
+  }) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
@@ -26,6 +29,9 @@ void main() {
                 totalReviews: blogs.length,
               ),
               blogs: blogs,
+              hasMoreReviews: hasMoreReviews,
+              isLoadingReviewBatch: isLoadingReviewBatch,
+              onRequestReviewBatch: onRequestReviewBatch,
             ),
           ),
         ),
@@ -106,5 +112,40 @@ void main() {
     expect(find.text('리뷰 10'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '이전'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '다음'), findsNothing);
+  });
+
+  testWidgets('shows skeletons when moving to an unloaded batch page',
+      (tester) async {
+    int? requestedPage;
+    final reviews = buildReviews(100);
+
+    await pumpReviewList(
+      tester,
+      reviews,
+      hasMoreReviews: true,
+      onRequestReviewBatch: (page) => requestedPage = page,
+    );
+
+    for (var i = 0; i < 10; i++) {
+      await tester.ensureVisible(find.widgetWithText(OutlinedButton, '다음'));
+      await tester.tap(find.widgetWithText(OutlinedButton, '다음'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(requestedPage, 10);
+
+    await pumpReviewList(
+      tester,
+      reviews,
+      hasMoreReviews: true,
+      isLoadingReviewBatch: true,
+    );
+
+    expect(
+        find.byKey(const ValueKey('review-page-skeleton-0')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('review-page-skeleton-9')), findsOneWidget);
+    expect(find.text('리뷰 100'), findsNothing);
+    expect(find.text('11 / 30'), findsOneWidget);
   });
 }

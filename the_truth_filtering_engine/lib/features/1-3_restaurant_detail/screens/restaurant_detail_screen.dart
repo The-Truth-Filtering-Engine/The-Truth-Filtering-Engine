@@ -28,50 +28,77 @@ enum _ScreenState {
   loaded,
 }
 
+const int _reviewBatchSize = 100;
+const int _maxReviewResults = 300;
+
+class _ReviewFetchResult {
+  final List<BlogReview> reviews;
+  final bool hasMore;
+
+  const _ReviewFetchResult({
+    required this.reviews,
+    required this.hasMore,
+  });
+}
+
 // ── API: Supabase 캐시 조회 ───────────────────────────────────────────────────
 
-Future<List<BlogReview>> _fetchCachedReviews(
+Future<_ReviewFetchResult> _fetchCachedReviews(
     String name, String address, AnalysisMode mode) async {
   final uri = BackendConfig.apiUri('/search/cached', queryParameters: {
     'query': name,
     'address': address,
+    'limit': '$_maxReviewResults',
   });
 
   final res = await http.get(uri).timeout(const Duration(seconds: 15));
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    return const _ReviewFetchResult(reviews: [], hasMore: false);
+  }
 
   final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   final list = body['reviews'] as List<dynamic>? ?? [];
-  if (list.isEmpty) return [];
+  if (list.isEmpty) {
+    return const _ReviewFetchResult(reviews: [], hasMore: false);
+  }
 
-  return list
-      .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
-      .toList();
+  return _ReviewFetchResult(
+    reviews: list
+        .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
+        .toList(),
+    hasMore: body['hasMore'] as bool? ?? list.length >= _reviewBatchSize,
+  );
 }
 
 // ── API: 신규 크롤링 + AI 분석 ────────────────────────────────────────────────
 
-Future<List<BlogReview>> _fetchFreshReviews(
+Future<_ReviewFetchResult> _fetchFreshReviews(
     String name, String address, AnalysisMode mode,
-    {bool refresh = false}) async {
+    {bool refresh = false, int naverStart = 1}) async {
   final queryParameters = {
     'query': name,
     'address': address,
     'mode': mode.name,
+    'naverStart': '$naverStart',
+    'limit': '$_reviewBatchSize',
+    'maxResults': '$_maxReviewResults',
   };
   if (refresh) queryParameters['refresh'] = 'true';
 
   final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
 
-  final res = await http.get(uri).timeout(const Duration(seconds: 60));
+  final res = await http.get(uri).timeout(const Duration(seconds: 90));
   if (res.statusCode != 200) throw Exception('서버 오류 (${res.statusCode})');
 
   final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   final list = body['reviews'] as List<dynamic>? ?? [];
 
-  return list
-      .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
-      .toList();
+  return _ReviewFetchResult(
+    reviews: list
+        .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
+        .toList(),
+    hasMore: body['hasMore'] as bool? ?? false,
+  );
 }
 
 // ── 화면 ─────────────────────────────────────────────────────────────────────
@@ -92,6 +119,8 @@ class _RestaurantDetailScreenState
   List<BlogReview> _reviews = [];
   List<WordFreq> _wordFreqs = [];
   ShopInfo? _shopInfo;
+  bool _hasMoreReviewBatches = false;
+  bool _isLoadingReviewBatch = false;
 
   RestaurantModel get _r => widget.restaurant;
 
@@ -107,15 +136,27 @@ class _RestaurantDetailScreenState
     try {
       final mode = ref.read(analysisModeProvider);
       final cached = await _fetchCachedReviews(_r.name, _r.address, mode);
+      final shouldLoadFirstBatch =
+          cached.reviews.isEmpty || cached.reviews.length < _reviewBatchSize;
 
-      if (cached.isEmpty) {
+      if (shouldLoadFirstBatch) {
         // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
         try {
-          final fresh = await _fetchFreshReviews(_r.name, _r.address, mode);
+          final fresh = await _fetchFreshReviews(
+            _r.name,
+            _r.address,
+            mode,
+            naverStart: 1,
+          );
           _applyReviews(fresh);
         } catch (e) {
-          setState(() => _state = _ScreenState.noData);
-          _showError('분석 중 오류가 발생했어요: $e');
+          if (cached.reviews.isNotEmpty) {
+            _applyReviews(cached);
+            _showError('추가 리뷰를 불러오지 못해 저장된 리뷰만 표시합니다: $e');
+          } else {
+            setState(() => _state = _ScreenState.noData);
+            _showError('분석 중 오류가 발생했어요: $e');
+          }
         }
       } else {
         _applyReviews(cached);
@@ -136,6 +177,7 @@ class _RestaurantDetailScreenState
         _r.address,
         mode,
         refresh: true,
+        naverStart: 1,
       );
       _applyReviews(fresh);
     } catch (e) {
@@ -144,12 +186,63 @@ class _RestaurantDetailScreenState
     }
   }
 
-  void _applyReviews(List<BlogReview> reviews) {
+  Future<void> _loadReviewBatchForPage(int pageIndex) async {
+    if (_isLoadingReviewBatch || !_hasMoreReviewBatches) return;
+
+    final pageStart = pageIndex * 10;
+    if (pageStart < _reviews.length || _reviews.length >= _maxReviewResults) {
+      return;
+    }
+
+    final naverStart = (pageStart ~/ _reviewBatchSize) * _reviewBatchSize + 1;
+
+    setState(() => _isLoadingReviewBatch = true);
+    try {
+      final mode = ref.read(analysisModeProvider);
+      final fresh = await _fetchFreshReviews(
+        _r.name,
+        _r.address,
+        mode,
+        naverStart: naverStart,
+      );
+      final merged = _mergeReviews(_reviews, fresh.reviews);
+      _applyReviews(
+        _ReviewFetchResult(reviews: merged, hasMore: fresh.hasMore),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _hasMoreReviewBatches = false;
+        _isLoadingReviewBatch = false;
+      });
+      _showError('추가 리뷰를 불러오지 못했습니다: $e');
+    }
+  }
+
+  List<BlogReview> _mergeReviews(
+    List<BlogReview> current,
+    List<BlogReview> incoming,
+  ) {
+    final byKey = <String, BlogReview>{};
+    for (final review in current) {
+      byKey[review.url.isNotEmpty ? review.url : 'id:${review.id}'] = review;
+    }
+    for (final review in incoming) {
+      byKey[review.url.isNotEmpty ? review.url : 'id:${review.id}'] = review;
+    }
+    return byKey.values.toList();
+  }
+
+  void _applyReviews(_ReviewFetchResult result) {
+    final reviews = result.reviews;
+
     if (reviews.isEmpty) {
       setState(() {
         _reviews = const [];
         _shopInfo = null;
         _wordFreqs = const [];
+        _hasMoreReviewBatches = false;
+        _isLoadingReviewBatch = false;
         _state = _ScreenState.noData;
       });
       return;
@@ -167,6 +260,9 @@ class _RestaurantDetailScreenState
       _reviews = reviews;
       _shopInfo = shopInfo;
       _wordFreqs = wordFreqs;
+      _hasMoreReviewBatches =
+          result.hasMore && reviews.length < _maxReviewResults;
+      _isLoadingReviewBatch = false;
       _state = _ScreenState.loaded;
     });
   }
@@ -349,6 +445,9 @@ class _RestaurantDetailScreenState
                 child: ReviewListSection(
                   shopInfo: _shopInfo!,
                   blogs: _reviews,
+                  hasMoreReviews: _hasMoreReviewBatches,
+                  isLoadingReviewBatch: _isLoadingReviewBatch,
+                  onRequestReviewBatch: _loadReviewBatchForPage,
                 ),
               ),
             ),
