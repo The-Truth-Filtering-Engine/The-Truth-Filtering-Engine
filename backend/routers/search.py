@@ -169,7 +169,7 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
         ):
             continue
 
-        print(f"[DEBUG] ELECTRA 판별 중 | id: {review_id}")
+        print(f"[DEBUG] BERT 판별 중 | id: {review_id}")
         is_ad_electra = predict_is_ad(description)
         score = score_is_ad(description)
         if review_id is not None:
@@ -178,7 +178,7 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
         review["is_ad_electra_pred"] = is_ad_electra
         review["is_ad_finetuned_pred"] = score
         print(
-            f"[DEBUG] ELECTRA 판별 완료 | id: {review_id} | "
+            f"[DEBUG] BERT 판별 완료 | id: {review_id} | "
             f"is_ad_electra_pred: {is_ad_electra} | is_ad_finetuned_pred: {score}"
         )
 
