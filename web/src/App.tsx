@@ -1748,6 +1748,7 @@ function App() {
             restaurant,
           }),
           controller.signal,
+          accessToken,
         )
         if (requestId !== detailRequestIdRef.current) return
 

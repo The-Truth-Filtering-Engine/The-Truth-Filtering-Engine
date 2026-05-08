@@ -31,16 +31,26 @@ async def search_cached(
     query: str,
     limit: int = Query(MAX_REVIEW_RESULTS, ge=1, le=MAX_REVIEW_RESULTS),
     store_id: str | None = Query(None, alias="storeId"),
+    authorization: str | None = Header(default=None),
 ):
     review_limit = clamp_max_results(limit)
     cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id)
-    return {
+    usage = None
+    auth_email = await _get_optional_auth_email(authorization)
+
+    if cached and auth_email and store_id:
+        usage = await _consume_analysis_usage(auth_email, store_id)
+
+    response = {
         "source": "cache",
         "reviews": cached or [],
         "reviewBatchSize": REVIEW_BATCH_SIZE,
         "maxReviewResults": MAX_REVIEW_RESULTS,
         "hasMore": bool(cached) and len(cached) >= REVIEW_BATCH_SIZE,
     }
+    if usage is not None:
+        response["usage"] = usage
+    return response
 
 
 @router.get("/search")
@@ -101,7 +111,7 @@ async def search(
 
     if should_fetch:
         if auth_email:
-            await _ensure_analysis_usage_available(auth_email)
+            await _ensure_analysis_usage_available(auth_email, store_id)
 
         print("[DEBUG] → Naver API 호출")
         blogs = await fetch_blog_previews(
@@ -146,19 +156,8 @@ async def search(
         )
     )
 
-    if should_fetch and auth_email:
-        try:
-            usage = await consume_analysis_usage(auth_email)
-        except AnalysisUsageError as error:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=str(error),
-            ) from error
-        except RuntimeError as error:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(error),
-            ) from error
+    if auth_email and (should_fetch or (store_id and saved)):
+        usage = await _consume_analysis_usage(auth_email, store_id if store_id else None)
     elif auth_email:
         usage = {
             "charged": False,
@@ -217,9 +216,12 @@ async def _get_optional_auth_email(authorization: str | None) -> str | None:
     return email
 
 
-async def _ensure_analysis_usage_available(email: str) -> None:
+async def _ensure_analysis_usage_available(
+    email: str,
+    store_id: str | None = None,
+) -> None:
     try:
-        if await has_analysis_usage(email):
+        if await has_analysis_usage(email, store_id=store_id):
             return
     except RuntimeError as error:
         raise HTTPException(
@@ -231,6 +233,24 @@ async def _ensure_analysis_usage_available(email: str) -> None:
         status_code=status.HTTP_402_PAYMENT_REQUIRED,
         detail=ANALYSIS_USAGE_REQUIRED_MESSAGE,
     )
+
+
+async def _consume_analysis_usage(
+    email: str,
+    store_id: str | None = None,
+) -> dict:
+    try:
+        return await consume_analysis_usage(email, store_id=store_id)
+    except AnalysisUsageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=str(error),
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
 
 
 async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
