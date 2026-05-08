@@ -9,7 +9,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 load_dotenv(Path(__file__).resolve().parents[2] / "the_truth_filtering_engine" / ".env")
 
-MODEL_DIR = Path(__file__).resolve().parents[2] / "classifier" / "electra2naver"
+MODEL_DIR = Path(__file__).resolve().parents[2] / "classifier" / "bert2naver"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 _tokenizer = None
@@ -33,7 +33,14 @@ def _load_model() -> None:
     if _tokenizer is None:
         _tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
     if _model is None:
-        _model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
+        _model = AutoModelForSequenceClassification.from_pretrained(
+            MODEL_DIR,
+            ov_config={
+                "PERFORMANCE_HINT": "LATENCY",
+                "NUM_STREAMS": "1",
+                "INFERENCE_NUM_THREADS": "8",
+            }
+        )
         _model.to(DEVICE)
         _model.eval()
 
@@ -49,7 +56,7 @@ def predict_is_ad(review_description: str) -> int:
         text,
         truncation=True,
         padding=True,
-        max_length=512,
+        max_length=300, # description ~ 150, title ~ 80 토큰 수로 인해 500보단 300으로 지정하는 게 최적화된 값임.
         return_tensors="pt",
     )
     encoded = {k: v.to(DEVICE) for k, v in encoded.items()}
