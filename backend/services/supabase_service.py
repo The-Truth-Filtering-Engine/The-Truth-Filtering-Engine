@@ -226,13 +226,20 @@ async def add_user_coins(email: str, amount: int) -> dict:
     return await _patch_user_profile(normalized_email, {"coin": next_coin})
 
 
-async def has_analysis_usage(email: str) -> bool:
+async def has_analysis_usage(email: str, store_id: str | None = None) -> bool:
     profile = await ensure_user_profile(email)
+    normalized_store_id = _text_or_none(store_id)
+    if normalized_store_id and not _should_charge_store_detail(
+        profile.get("store"),
+        normalized_store_id,
+    ):
+        return True
     return _has_analysis_usage(profile)
 
 
-async def consume_analysis_usage(email: str) -> dict:
+async def consume_analysis_usage(email: str, store_id: str | None = None) -> dict:
     normalized_email = _text_or_none(email)
+    normalized_store_id = _text_or_none(store_id)
     if not normalized_email:
         raise RuntimeError("사용자 이메일이 없습니다")
 
@@ -243,11 +250,27 @@ async def consume_analysis_usage(email: str) -> dict:
         freecount = _int_or_zero(profile.get("freecount"))
         premiumcount = _int_or_zero(profile.get("premiumcount"))
         coin = _int_or_zero(profile.get("coin"))
+        store_date_map = _normalize_store_date_map(profile.get("store"))
+
+        if normalized_store_id and not _should_charge_store_detail(
+            store_date_map,
+            normalized_store_id,
+        ):
+            return _build_analysis_usage_not_charged(profile)
+
+        store_update = (
+            _with_today_store_date(store_date_map, normalized_store_id)
+            if normalized_store_id
+            else None
+        )
 
         if freecount > 0:
+            data = {"freecount": freecount - 1}
+            if store_update is not None:
+                data["store"] = store_update
             updated = await _patch_user_profile_if_current(
                 normalized_email,
-                data={"freecount": freecount - 1},
+                data=data,
                 match={"freecount": freecount},
             )
             if updated:
@@ -255,9 +278,12 @@ async def consume_analysis_usage(email: str) -> dict:
             continue
 
         if premiumcount > 0:
+            data = {"premiumcount": premiumcount - 1}
+            if store_update is not None:
+                data["store"] = store_update
             updated = await _patch_user_profile_if_current(
                 normalized_email,
-                data={"premiumcount": premiumcount - 1},
+                data=data,
                 match={"premiumcount": premiumcount},
             )
             if updated:
@@ -265,9 +291,12 @@ async def consume_analysis_usage(email: str) -> dict:
             continue
 
         if coin >= ANALYSIS_COIN_COST:
+            data = {"coin": coin - ANALYSIS_COIN_COST}
+            if store_update is not None:
+                data["store"] = store_update
             updated = await _patch_user_profile_if_current(
                 normalized_email,
-                data={"coin": coin - ANALYSIS_COIN_COST},
+                data=data,
                 match={"coin": coin},
             )
             if updated:
@@ -391,6 +420,50 @@ def _float_or_none(value) -> float | None:
         return None
 
 
+def _normalize_store_date_map(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+
+    date_map = {}
+    for key, item in value.items():
+        store_id = _text_or_none(key)
+        date_text = _text_or_none(item)
+        if not store_id or not date_text:
+            continue
+        date_map[store_id] = date_text
+
+    return date_map
+
+
+def _today_store_date() -> str:
+    return datetime.now(KST).strftime("%Y%m%d")
+
+
+def _with_today_store_date(store_date_map: dict, store_id: str) -> dict:
+    next_store_date_map = dict(store_date_map)
+    next_store_date_map[store_id] = _today_store_date()
+    return next_store_date_map
+
+
+def _should_charge_store_detail(store_value, store_id: str) -> bool:
+    store_date_map = (
+        store_value
+        if isinstance(store_value, dict)
+        else _normalize_store_date_map(store_value)
+    )
+    last_date_text = _text_or_none(store_date_map.get(store_id))
+    if not last_date_text:
+        return True
+
+    try:
+        last_date = datetime.strptime(last_date_text, "%Y%m%d").date()
+    except ValueError:
+        return True
+
+    today = datetime.now(KST).date()
+    return (today - last_date).days >= 2
+
+
 def _has_analysis_usage(profile: dict) -> bool:
     return (
         _int_or_zero(profile.get("freecount")) > 0
@@ -403,6 +476,14 @@ def _build_analysis_usage(charged_by: str, profile: dict) -> dict:
     return {
         "charged": True,
         "chargedBy": charged_by,
+        "profile": profile,
+    }
+
+
+def _build_analysis_usage_not_charged(profile: dict | None = None) -> dict:
+    return {
+        "charged": False,
+        "chargedBy": None,
         "profile": profile,
     }
 
