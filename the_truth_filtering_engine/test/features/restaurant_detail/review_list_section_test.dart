@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:truth_mouth/core/providers/current_user_provider.dart';
 import 'package:truth_mouth/core/theme/app_theme.dart';
 import 'package:truth_mouth/features/1-3_restaurant_detail/providers/blog_review.dart';
 import 'package:truth_mouth/features/1-3_restaurant_detail/widgets/review_list_section.dart';
@@ -15,23 +17,28 @@ void main() {
     ValueChanged<int>? onRequestReviewBatch,
   }) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: ReviewListSection(
-              shopInfo: ShopInfo(
-                name: '테스트 가게',
-                category: '테스트 카테고리',
-                trustScore: 80,
-                adRatio: 20,
-                realRatio: 80,
-                totalReviews: blogs.length,
+      ProviderScope(
+        overrides: [
+          currentUserEmailProvider.overrideWith((ref) => null),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ReviewListSection(
+                shopInfo: ShopInfo(
+                  name: '테스트 가게',
+                  category: '테스트 카테고리',
+                  trustScore: 80,
+                  adRatio: 20,
+                  realRatio: 80,
+                  totalReviews: blogs.length,
+                ),
+                blogs: blogs,
+                hasMoreReviews: hasMoreReviews,
+                isLoadingReviewBatch: isLoadingReviewBatch,
+                onRequestReviewBatch: onRequestReviewBatch,
               ),
-              blogs: blogs,
-              hasMoreReviews: hasMoreReviews,
-              isLoadingReviewBatch: isLoadingReviewBatch,
-              onRequestReviewBatch: onRequestReviewBatch,
             ),
           ),
         ),
