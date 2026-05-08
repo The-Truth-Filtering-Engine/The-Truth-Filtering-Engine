@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -8,8 +10,10 @@ from services.supabase_service import (
     get_auth_email,
     get_user_recent_analyses,
     get_user_bookmarks,
+    get_user_review_reactions,
     remove_user_bookmark,
     set_user_premium,
+    update_user_review_reaction,
 )
 
 router = APIRouter()
@@ -28,6 +32,11 @@ class CoinChargeRequest(BaseModel):
 class BookmarkUpdateRequest(BaseModel):
     storeId: str
     store: dict = Field(default_factory=dict)
+
+
+class ReviewReactionUpdateRequest(BaseModel):
+    reviewId: str
+    reaction: Literal["like", "dislike"] | None = None
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
@@ -178,6 +187,39 @@ async def delete_my_bookmark(
     email = await _require_email(authorization)
     try:
         return await remove_user_bookmark(email, normalized_store_id)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/user/me/review-reactions")
+async def get_my_review_reactions(
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await get_user_review_reactions(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.put("/user/me/review-reactions")
+async def update_my_review_reaction(
+    payload: ReviewReactionUpdateRequest,
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await update_user_review_reaction(
+            email,
+            payload.reviewId,
+            payload.reaction,
+        )
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

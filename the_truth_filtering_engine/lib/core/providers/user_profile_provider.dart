@@ -6,11 +6,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
 import '../config/supabase_config.dart';
+import 'current_user_provider.dart';
 
 final userProfileProvider =
     StateNotifierProvider<UserProfileNotifier, AsyncValue<UserProfile?>>(
   (ref) => UserProfileNotifier(),
 );
+
+final currentUserIdProvider = Provider<int?>((ref) {
+  final email = ref.watch(currentUserEmailProvider);
+  if (email == null || email.isEmpty) return null;
+  if (email == 'admin') return 1;
+
+  final id = ref.watch(userProfileProvider).asData?.value?.id;
+  if (id == null || id <= 0) return null;
+  return id;
+});
 
 class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   UserProfileNotifier() : super(const AsyncValue.data(null));
@@ -126,6 +137,7 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
 class UserProfile {
   const UserProfile({
+    required this.id,
     required this.email,
     required this.premium,
     required this.coin,
@@ -137,6 +149,7 @@ class UserProfile {
 
   static const int analysisCoinCost = 100;
 
+  final int id;
   final String email;
   final int premium;
   final int coin;
@@ -173,6 +186,7 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
+      id: _intFromJson(json['id']),
       email: json['email']?.toString() ?? '',
       premium: _intFromJson(json['premium']),
       coin: _intFromJson(json['coin']),
