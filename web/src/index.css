@@ -446,6 +446,18 @@ body {
   font-size: 12px;
 }
 
+.bookmark-copy em {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #0f766e;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bookmark-remove-button {
   display: grid;
   width: 38px;
@@ -453,6 +465,56 @@ body {
   place-items: center;
   border-radius: 13px;
   color: #2b54e8;
+}
+
+.recent-panel-header > svg {
+  background: #0f766e;
+}
+
+.recent-analysis-groups {
+  display: grid;
+  gap: 20px;
+}
+
+.recent-analysis-section {
+  display: grid;
+  gap: 10px;
+}
+
+.recent-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #111827;
+}
+
+.recent-section-heading strong {
+  font-size: 14px;
+}
+
+.recent-section-heading span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recent-section-empty {
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.recent-analysis-list li {
+  grid-template-columns: 1fr;
+}
+
+.recent-analysis-item {
+  width: 100%;
 }
 
 .search-panel {

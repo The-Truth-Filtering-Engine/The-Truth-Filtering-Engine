@@ -8,6 +8,7 @@ import 'features/1-1_map/models/restaurant_model.dart';
 import 'features/1-1_map/providers/map_provider.dart';
 import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
+import 'features/2_recent_analysis/screens/recent_analysis_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
 import 'features/0-1_auth/screens/login_screen.dart'; // ← 추가
@@ -104,10 +105,11 @@ class _MainShellState extends ConsumerState<MainShell> {
         children: [
           MapScreen(
             onOpenSettings: () {
-              ref.read(mainTabIndexProvider.notifier).state = 3;
+              ref.read(mainTabIndexProvider.notifier).state = 4;
             },
           ),
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
+          RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
           const SettingsScreen(),
         ],
@@ -119,6 +121,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
         ),
         child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
           currentIndex: ref.watch(mainTabIndexProvider),
           onTap: (index) =>
               ref.read(mainTabIndexProvider.notifier).state = index,
@@ -135,6 +138,11 @@ class _MainShellState extends ConsumerState<MainShell> {
               icon: Icon(Icons.bookmark_border_rounded),
               activeIcon: Icon(Icons.bookmark_rounded),
               label: '북마크',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              activeIcon: Icon(Icons.history_toggle_off_rounded),
+              label: '최근분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),

@@ -6,6 +6,7 @@ from services.supabase_service import (
     add_user_bookmark,
     ensure_user_profile,
     get_auth_email,
+    get_user_recent_analyses,
     get_user_bookmarks,
     remove_user_bookmark,
     set_user_premium,
@@ -119,6 +120,20 @@ async def get_my_bookmarks(authorization: str | None = Header(default=None)):
     email = await _require_email(authorization)
     try:
         return await get_user_bookmarks(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/user/me/recent-analyses")
+async def get_my_recent_analyses(
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await get_user_recent_analyses(email)
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
