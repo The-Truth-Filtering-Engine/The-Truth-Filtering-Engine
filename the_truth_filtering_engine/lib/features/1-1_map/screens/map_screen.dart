@@ -99,7 +99,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       level: _latestMapLevel,
     );
     final isSelectedBookmarked = selectedRestaurant != null &&
-        bookmarkedRestaurants.any((item) => item.id == selectedRestaurant.id);
+        bookmarkedRestaurants.any(
+          (item) =>
+              item.effectiveStoreId == selectedRestaurant.effectiveStoreId,
+        );
 
     return Scaffold(
       backgroundColor: AppColors.mapTeal,
@@ -215,8 +218,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   },
                   onBookmarkTap: () {
                     final previous = ref.read(bookmarkRestaurantsProvider);
-                    final alreadyBookmarked = previous
-                        .any((item) => item.id == selectedRestaurant.id);
+                    final alreadyBookmarked = previous.any(
+                      (item) =>
+                          item.effectiveStoreId ==
+                          selectedRestaurant.effectiveStoreId,
+                    );
                     ref
                         .read(bookmarkRestaurantsProvider.notifier)
                         .toggle(selectedRestaurant);
@@ -442,7 +448,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           restaurants;
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
       if (selectedRestaurant != null &&
-          mergedRestaurants.every((r) => r.id != selectedRestaurant.id)) {
+          mergedRestaurants.every(
+            (r) => r.effectiveStoreId != selectedRestaurant.effectiveStoreId,
+          )) {
         ref.read(selectedRestaurantProvider.notifier).state = null;
       }
 
@@ -539,7 +547,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (restaurant == null) return restaurants;
 
     final source = restaurants ?? const <RestaurantModel>[];
-    if (source.any((item) => item.id == restaurant.id)) return restaurants;
+    if (source.any(
+      (item) => item.effectiveStoreId == restaurant.effectiveStoreId,
+    )) {
+      return restaurants;
+    }
 
     return [restaurant, ...source];
   }

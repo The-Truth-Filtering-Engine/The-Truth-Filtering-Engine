@@ -5,6 +5,7 @@ supabase_service.py
 - 캐시 조회, AI 추천 조회 등 모든 DB 접근 통합
 """
 import os
+import json
 import httpx
 from typing import Optional
 from services.review_limits import MAX_REVIEW_RESULTS, clamp_max_results
@@ -218,6 +219,136 @@ async def add_user_coins(email: str, amount: int) -> dict:
     return await _patch_user_profile(normalized_email, {"coin": next_coin})
 
 
+async def get_user_bookmarks(email: str) -> dict:
+    profile = await ensure_user_profile(email)
+    return _normalize_user_bookmarks(profile)
+
+
+async def add_user_bookmark(email: str, store_id: str, store: dict | None) -> dict:
+    normalized_email = _text_or_none(email)
+    normalized_store_id = _text_or_none(store_id)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+    if not normalized_store_id:
+        raise RuntimeError("storeId가 없습니다")
+
+    profile = await ensure_user_profile(normalized_email)
+    bookmark_ids = _parse_bookmark_ids(profile.get("bookmark"))
+    store_map = _normalize_store_map(profile.get("store"))
+
+    if normalized_store_id not in bookmark_ids:
+        bookmark_ids.append(normalized_store_id)
+
+    store_map[normalized_store_id] = _normalize_bookmark_store(
+        normalized_store_id,
+        store,
+    )
+
+    updated = await _patch_user_profile(
+        normalized_email,
+        {
+            "bookmark": _serialize_bookmark_ids(bookmark_ids),
+            "store": store_map,
+        },
+    )
+    return _normalize_user_bookmarks(updated)
+
+
+async def remove_user_bookmark(email: str, store_id: str) -> dict:
+    normalized_email = _text_or_none(email)
+    normalized_store_id = _text_or_none(store_id)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+    if not normalized_store_id:
+        raise RuntimeError("storeId가 없습니다")
+
+    profile = await ensure_user_profile(normalized_email)
+    bookmark_ids = [
+        item
+        for item in _parse_bookmark_ids(profile.get("bookmark"))
+        if item != normalized_store_id
+    ]
+    store_map = _normalize_store_map(profile.get("store"))
+    store_map.pop(normalized_store_id, None)
+
+    updated = await _patch_user_profile(
+        normalized_email,
+        {
+            "bookmark": _serialize_bookmark_ids(bookmark_ids),
+            "store": store_map,
+        },
+    )
+    return _normalize_user_bookmarks(updated)
+
+
+def _normalize_user_bookmarks(profile: dict) -> dict:
+    bookmark_ids = _parse_bookmark_ids(profile.get("bookmark"))
+    store_map = _normalize_store_map(profile.get("store"))
+    return {
+        "bookmark": bookmark_ids,
+        "store": store_map,
+    }
+
+
+def _parse_bookmark_ids(value) -> list[str]:
+    text = _text_or_none(value)
+    if not text:
+        return []
+
+    try:
+        decoded = json.loads(text)
+    except (TypeError, ValueError):
+        return []
+
+    if not isinstance(decoded, list):
+        return []
+
+    bookmark_ids: list[str] = []
+    seen = set()
+    for item in decoded:
+        bookmark_id = _text_or_none(item)
+        if not bookmark_id or bookmark_id in seen:
+            continue
+        seen.add(bookmark_id)
+        bookmark_ids.append(bookmark_id)
+
+    return bookmark_ids
+
+
+def _serialize_bookmark_ids(bookmark_ids: list[str]) -> str:
+    normalized_ids: list[str] = []
+    seen = set()
+    for item in bookmark_ids:
+        bookmark_id = _text_or_none(item)
+        if not bookmark_id or bookmark_id in seen:
+            continue
+        seen.add(bookmark_id)
+        normalized_ids.append(bookmark_id)
+
+    return json.dumps(normalized_ids, ensure_ascii=False)
+
+
+def _normalize_store_map(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+
+    store_map = {}
+    for key, item in value.items():
+        store_id = _text_or_none(key)
+        if not store_id or not isinstance(item, dict):
+            continue
+        store_map[store_id] = dict(item)
+
+    return store_map
+
+
+def _normalize_bookmark_store(store_id: str, store: dict | None) -> dict:
+    normalized = dict(store) if isinstance(store, dict) else {}
+    normalized["id"] = _text_or_none(normalized.get("id")) or store_id
+    normalized["storeId"] = store_id
+    return normalized
+
+
 async def _fetch_user_profile_by_email(
     client: httpx.AsyncClient,
     email: str,
@@ -239,7 +370,7 @@ async def _fetch_user_profile_by_email(
             f"{resp.status_code} {resp.text[:240]}"
         )
 
-    rows = resp.json() or []
+    rows = resp.json() if resp.text else []
     return _normalize_user_profile(rows[0]) if rows else None
 
 
@@ -263,7 +394,7 @@ async def _patch_user_profile(email: str, data: dict) -> dict:
             f"{resp.status_code} {resp.text[:240]}"
         )
 
-    rows = resp.json() or []
+    rows = resp.json() if resp.text else []
     if not rows:
         return await ensure_user_profile(email)
     return _normalize_user_profile(rows[0])

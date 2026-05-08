@@ -130,6 +130,11 @@ type UserProfile = {
   bookmark: string | null
 }
 
+type UserBookmarks = {
+  storeIds: string[]
+  restaurants: Restaurant[]
+}
+
 type UserProfileState = {
   profile: UserProfile | null
   isLoading: boolean
@@ -827,6 +832,38 @@ async function chargeUserCoins(accessToken: string, amount: number) {
   return parseUserProfile((await response.json()) as Record<string, unknown>)
 }
 
+function getRestaurantStoreId(restaurant: Pick<Restaurant, 'id' | 'storeId'>) {
+  return restaurant.storeId?.trim() || restaurant.id.trim()
+}
+
+function getBookmarkStoreIds(restaurants: Restaurant[]) {
+  const storeIds: string[] = []
+  const seen = new Set<string>()
+
+  for (const restaurant of restaurants) {
+    const storeId = getRestaurantStoreId(restaurant)
+    if (!storeId || seen.has(storeId)) continue
+    seen.add(storeId)
+    storeIds.push(storeId)
+  }
+
+  return storeIds
+}
+
+function dedupeBookmarkRestaurants(restaurants: Restaurant[]) {
+  const seen = new Set<string>()
+  const deduped: Restaurant[] = []
+
+  for (const restaurant of restaurants) {
+    const storeId = getRestaurantStoreId(restaurant)
+    if (!storeId || seen.has(storeId)) continue
+    seen.add(storeId)
+    deduped.push(restaurant)
+  }
+
+  return deduped
+}
+
 function normalizeRestaurant(value: unknown): Restaurant | null {
   if (!value || typeof value !== 'object') return null
 
@@ -868,9 +905,11 @@ function loadBookmarkedRestaurants() {
     const decoded = JSON.parse(raw) as unknown
     if (!Array.isArray(decoded)) return []
 
-    return decoded
-      .map((item) => normalizeRestaurant(item))
-      .filter((restaurant): restaurant is Restaurant => Boolean(restaurant))
+    return dedupeBookmarkRestaurants(
+      decoded
+        .map((item) => normalizeRestaurant(item))
+        .filter((restaurant): restaurant is Restaurant => Boolean(restaurant)),
+    )
   } catch {
     return []
   }
@@ -881,6 +920,145 @@ function saveBookmarkedRestaurants(bookmarkedRestaurants: Restaurant[]) {
     BOOKMARK_STORAGE_KEY,
     JSON.stringify(bookmarkedRestaurants),
   )
+}
+
+function parseBookmarkIds(value: unknown) {
+  let decoded = value
+
+  if (typeof value === 'string') {
+    try {
+      decoded = JSON.parse(value) as unknown
+    } catch {
+      return []
+    }
+  }
+
+  if (!Array.isArray(decoded)) return []
+
+  const storeIds: string[] = []
+  const seen = new Set<string>()
+
+  for (const item of decoded) {
+    const storeId = String(item ?? '').trim()
+    if (!storeId || seen.has(storeId)) continue
+    seen.add(storeId)
+    storeIds.push(storeId)
+  }
+
+  return storeIds
+}
+
+function parseBookmarkStoreMap(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {} as Record<string, Record<string, unknown>>
+  }
+
+  const storeMap: Record<string, Record<string, unknown>> = {}
+  for (const [key, item] of Object.entries(value)) {
+    const storeId = key.trim()
+    if (!storeId || !item || typeof item !== 'object' || Array.isArray(item)) {
+      continue
+    }
+    storeMap[storeId] = item as Record<string, unknown>
+  }
+
+  return storeMap
+}
+
+function parseUserBookmarks(item: Record<string, unknown>): UserBookmarks {
+  const storeIds = parseBookmarkIds(item.bookmark)
+  const storeMap = parseBookmarkStoreMap(item.store)
+  const restaurants = storeIds
+    .map((storeId) =>
+      normalizeRestaurant({
+        ...(storeMap[storeId] ?? {}),
+        id: storeId,
+        storeId,
+      }),
+    )
+    .filter((restaurant): restaurant is Restaurant => Boolean(restaurant))
+
+  return {
+    storeIds,
+    restaurants,
+  }
+}
+
+function restaurantToBookmarkStore(restaurant: Restaurant) {
+  const storeId = getRestaurantStoreId(restaurant)
+
+  return {
+    id: storeId,
+    storeId,
+    name: restaurant.name,
+    address: restaurant.address,
+    category: restaurant.category,
+    categoryName: restaurant.categoryName,
+    categoryGroupCode: restaurant.categoryGroupCode,
+    categoryGroupName: restaurant.categoryGroupName,
+    distance: restaurant.distance,
+    phone: restaurant.phone,
+    link: restaurant.link || restaurant.placeUrl,
+    placeUrl: restaurant.placeUrl || restaurant.link,
+    addressName: restaurant.addressName,
+    roadAddressName: restaurant.roadAddressName,
+    latitude: restaurant.latitude,
+    longitude: restaurant.longitude,
+    lat: restaurant.latitude,
+    lng: restaurant.longitude,
+  }
+}
+
+async function fetchUserBookmarks(accessToken: string) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/bookmarks`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseUserBookmarks((await response.json()) as Record<string, unknown>)
+}
+
+async function addUserBookmark(accessToken: string, restaurant: Restaurant) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/bookmarks`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      storeId: getRestaurantStoreId(restaurant),
+      store: restaurantToBookmarkStore(restaurant),
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseUserBookmarks((await response.json()) as Record<string, unknown>)
+}
+
+async function deleteUserBookmark(accessToken: string, storeId: string) {
+  const response = await fetch(
+    `${BACKEND_BASE_URL}/api/user/me/bookmarks/${encodeURIComponent(storeId)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseUserBookmarks((await response.json()) as Record<string, unknown>)
 }
 
 function App() {
@@ -902,6 +1080,9 @@ function App() {
     Restaurant[]
   >(() =>
     loadBookmarkedRestaurants(),
+  )
+  const [bookmarkedStoreIds, setBookmarkedStoreIds] = useState<string[]>(() =>
+    getBookmarkStoreIds(loadBookmarkedRestaurants()),
   )
   const [activeSidePanel, setActiveSidePanel] = useState<ActiveSidePanel>(
     'search',
@@ -951,9 +1132,10 @@ function App() {
   })
   const [toastMessage, setToastMessage] = useState('')
   const isLoggedIn = authSession !== null || isTemporaryAdmin
-  const bookmarkedIds = bookmarkedRestaurants.map((restaurant) => restaurant.id)
+  const bookmarkedIds = bookmarkedStoreIds
   const detailRequestIdRef = useRef(0)
   const reviewBatchRequestIdRef = useRef(0)
+  const bookmarkSyncSessionRef = useRef<string | null>(null)
 
   function showToast(message: string) {
     setToastMessage(message)
@@ -968,6 +1150,20 @@ function App() {
       errorMessage: '',
       hasLoaded: false,
     })
+  }
+
+  function applyRemoteBookmarkState(bookmarks: UserBookmarks) {
+    setBookmarkedStoreIds(bookmarks.storeIds)
+    setBookmarkedRestaurants(bookmarks.restaurants)
+  }
+
+  function applyLocalBookmarkState(restaurants: Restaurant[], shouldSave = false) {
+    const nextRestaurants = dedupeBookmarkRestaurants(restaurants)
+    setBookmarkedRestaurants(nextRestaurants)
+    setBookmarkedStoreIds(getBookmarkStoreIds(nextRestaurants))
+    if (shouldSave) {
+      saveBookmarkedRestaurants(nextRestaurants)
+    }
   }
 
   useEffect(() => {
@@ -1015,6 +1211,67 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const token = authSession?.access_token
+
+    if (!token) {
+      if (isTemporaryAdmin) {
+        applyLocalBookmarkState(loadBookmarkedRestaurants())
+      }
+      return
+    }
+
+    let canceled = false
+    const accessToken = token
+    const sessionKey = authSession.user?.id || token
+
+    async function syncBookmarks() {
+      try {
+        let bookmarks = await fetchUserBookmarks(accessToken)
+        const localBookmarks = loadBookmarkedRestaurants()
+
+        if (
+          localBookmarks.length > 0 &&
+          bookmarkSyncSessionRef.current !== sessionKey
+        ) {
+          for (const restaurant of localBookmarks) {
+            const storeId = getRestaurantStoreId(restaurant)
+            const hasRemoteStore = bookmarks.restaurants.some(
+              (item) => getRestaurantStoreId(item) === storeId,
+            )
+            if (
+              !storeId ||
+              (bookmarks.storeIds.includes(storeId) && hasRemoteStore)
+            ) {
+              continue
+            }
+            bookmarks = await addUserBookmark(accessToken, restaurant)
+          }
+          window.localStorage.removeItem(BOOKMARK_STORAGE_KEY)
+        }
+
+        bookmarkSyncSessionRef.current = sessionKey
+        if (!canceled) {
+          applyRemoteBookmarkState(bookmarks)
+        }
+      } catch (error) {
+        if (canceled) return
+        applyLocalBookmarkState(loadBookmarkedRestaurants())
+        showToast(
+          error instanceof Error
+            ? `북마크 동기화 실패: ${error.message}`
+            : '북마크 동기화에 실패했습니다',
+        )
+      }
+    }
+
+    void syncBookmarks()
+
+    return () => {
+      canceled = true
+    }
+  }, [authSession?.access_token, authSession?.user?.id, isTemporaryAdmin])
+
   async function signInWithGoogle() {
     if (!supabase) {
       setAuthErrorMessage(
@@ -1043,6 +1300,7 @@ function App() {
     setAuthErrorMessage('')
     setAuthStatus('signedIn')
     resetUserProfileState()
+    applyLocalBookmarkState(loadBookmarkedRestaurants())
     showToast('관리자 임시 로그인 상태입니다')
   }
 
@@ -1174,17 +1432,55 @@ function App() {
     }
   }
 
-  function toggleBookmark(restaurant: Restaurant) {
-    setBookmarkedRestaurants((previous) => {
-      const bookmarked = previous.some((item) => item.id === restaurant.id)
-      const next = bookmarked
-        ? previous.filter((item) => item.id !== restaurant.id)
-        : [restaurant, ...previous]
+  async function toggleBookmark(restaurant: Restaurant) {
+    const storeId = getRestaurantStoreId(restaurant)
+    if (!storeId) {
+      showToast('북마크할 가게 ID가 없습니다')
+      return
+    }
 
-      saveBookmarkedRestaurants(next)
+    const bookmarked = bookmarkedStoreIds.includes(storeId)
+    const previousRestaurants = bookmarkedRestaurants
+    const previousStoreIds = bookmarkedStoreIds
+    const nextRestaurants = bookmarked
+      ? previousRestaurants.filter(
+          (item) => getRestaurantStoreId(item) !== storeId,
+        )
+      : dedupeBookmarkRestaurants([
+          restaurant,
+          ...previousRestaurants.filter(
+            (item) => getRestaurantStoreId(item) !== storeId,
+          ),
+        ])
+    const nextStoreIds = bookmarked
+      ? previousStoreIds.filter((item) => item !== storeId)
+      : [storeId, ...previousStoreIds.filter((item) => item !== storeId)]
+
+    setBookmarkedRestaurants(nextRestaurants)
+    setBookmarkedStoreIds(nextStoreIds)
+
+    const token = authSession?.access_token
+    if (!token) {
+      saveBookmarkedRestaurants(nextRestaurants)
       showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
-      return next
-    })
+      return
+    }
+
+    try {
+      const bookmarks = bookmarked
+        ? await deleteUserBookmark(token, storeId)
+        : await addUserBookmark(token, restaurant)
+      applyRemoteBookmarkState(bookmarks)
+      showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
+    } catch (error) {
+      setBookmarkedRestaurants(previousRestaurants)
+      setBookmarkedStoreIds(previousStoreIds)
+      showToast(
+        error instanceof Error
+          ? `북마크 저장 실패: ${error.message}`
+          : '북마크 저장에 실패했습니다',
+      )
+    }
   }
 
   function clearRestaurantOverlays() {
@@ -2032,7 +2328,7 @@ function App() {
                 type="button"
                 onClick={() => toggleBookmark(selectedRestaurant)}
               >
-                {bookmarkedIds.includes(selectedRestaurant.id) ? (
+                {bookmarkedIds.includes(getRestaurantStoreId(selectedRestaurant)) ? (
                   <BookmarkCheck aria-hidden="true" size={20} strokeWidth={2.1} />
                 ) : (
                   <Bookmark aria-hidden="true" size={20} strokeWidth={2.1} />
@@ -2109,7 +2405,7 @@ function App() {
                 type="button"
                 onClick={() => toggleBookmark(selectedRestaurant)}
               >
-                {bookmarkedIds.includes(selectedRestaurant.id) ? (
+                {bookmarkedIds.includes(getRestaurantStoreId(selectedRestaurant)) ? (
                   <BookmarkCheck aria-hidden="true" size={20} strokeWidth={2.1} />
                 ) : (
                   <Bookmark aria-hidden="true" size={20} strokeWidth={2.1} />
@@ -2326,7 +2622,7 @@ function App() {
             ) : (
               <ul className="bookmark-list">
                 {bookmarkedRestaurants.map((restaurant) => (
-                  <li key={restaurant.id}>
+                  <li key={getRestaurantStoreId(restaurant)}>
                     <button
                       type="button"
                       className="bookmark-list-item"

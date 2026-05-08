@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Header, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from services.supabase_service import (
     add_user_coins,
+    add_user_bookmark,
     ensure_user_profile,
     get_auth_email,
+    get_user_bookmarks,
+    remove_user_bookmark,
     set_user_premium,
 )
 
@@ -19,6 +22,11 @@ class PremiumUpdateRequest(BaseModel):
 
 class CoinChargeRequest(BaseModel):
     amount: int
+
+
+class BookmarkUpdateRequest(BaseModel):
+    storeId: str
+    store: dict = Field(default_factory=dict)
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
@@ -99,6 +107,62 @@ async def charge_my_coins(
     email = await _require_email(authorization)
     try:
         return await add_user_coins(email, payload.amount)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/user/me/bookmarks")
+async def get_my_bookmarks(authorization: str | None = Header(default=None)):
+    email = await _require_email(authorization)
+    try:
+        return await get_user_bookmarks(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/user/me/bookmarks")
+async def add_my_bookmark(
+    payload: BookmarkUpdateRequest,
+    authorization: str | None = Header(default=None),
+):
+    store_id = payload.storeId.strip()
+    if not store_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="storeId가 필요합니다",
+        )
+
+    email = await _require_email(authorization)
+    try:
+        return await add_user_bookmark(email, store_id, payload.store)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/user/me/bookmarks/{store_id}")
+async def delete_my_bookmark(
+    store_id: str,
+    authorization: str | None = Header(default=None),
+):
+    normalized_store_id = store_id.strip()
+    if not normalized_store_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="storeId가 필요합니다",
+        )
+
+    email = await _require_email(authorization)
+    try:
+        return await remove_user_bookmark(email, normalized_store_id)
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
