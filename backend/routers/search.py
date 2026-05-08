@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from services.electra_service import predict_is_ad, score_is_ad
 from services.llm_service import classify_ad, summarize_reviews
@@ -11,7 +11,12 @@ from services.review_limits import (
     normalize_naver_start,
 )
 from services.supabase_service import (
+    ANALYSIS_USAGE_REQUIRED_MESSAGE,
+    AnalysisUsageError,
+    consume_analysis_usage,
+    get_auth_email,
     get_cached_reviews,
+    has_analysis_usage,
     save_reviews,
     update_electra_pred,
     update_finetuned_pred,
@@ -59,6 +64,7 @@ async def search(
     address_name: str | None = Query(None, alias="addressName"),
     road_address_name: str | None = Query(None, alias="roadAddressName"),
     place_url: str | None = Query(None, alias="placeUrl"),
+    authorization: str | None = Header(default=None),
 ):
     review_limit = clamp_review_limit(limit)
     max_review_results = clamp_max_results(max_results)
@@ -90,8 +96,13 @@ async def search(
     requested_batch_end = normalized_start + review_limit - 1
     should_fetch = refresh or cached_count < requested_batch_end
     fetched_count = 0
+    usage = None
+    auth_email = await _get_optional_auth_email(authorization)
 
     if should_fetch:
+        if auth_email:
+            await _ensure_analysis_usage_available(auth_email)
+
         print("[DEBUG] → Naver API 호출")
         blogs = await fetch_blog_previews(
             query,
@@ -135,7 +146,27 @@ async def search(
         )
     )
 
-    return {
+    if should_fetch and auth_email:
+        try:
+            usage = await consume_analysis_usage(auth_email)
+        except AnalysisUsageError as error:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=str(error),
+            ) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(error),
+            ) from error
+    elif auth_email:
+        usage = {
+            "charged": False,
+            "chargedBy": None,
+            "profile": None,
+        }
+
+    response = {
         "source": "fresh" if should_fetch else "cache",
         "reviews": saved,
         "summary": summary,
@@ -145,6 +176,61 @@ async def search(
         "fetchedCount": fetched_count,
         "hasMore": has_more,
     }
+    if usage is not None:
+        response["usage"] = usage
+    return response
+
+
+def _extract_optional_bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Bearer 인증 토큰이 필요합니다",
+        )
+
+    return token.strip()
+
+
+async def _get_optional_auth_email(authorization: str | None) -> str | None:
+    token = _extract_optional_bearer_token(authorization)
+    if not token:
+        return None
+
+    try:
+        email = await get_auth_email(token)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 인증 토큰입니다",
+        )
+
+    return email
+
+
+async def _ensure_analysis_usage_available(email: str) -> None:
+    try:
+        if await has_analysis_usage(email):
+            return
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+    raise HTTPException(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        detail=ANALYSIS_USAGE_REQUIRED_MESSAGE,
+    )
 
 
 async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
