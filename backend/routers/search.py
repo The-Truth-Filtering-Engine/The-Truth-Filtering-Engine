@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Header, HTTPException, Query, status
 
-from services.electra_service import predict_is_ad, score_is_ad
+from services.preprocess import preprocess
+from services.electra_service import predict_is_ad, score_is_ad, predict_and_score_batch
 from services.llm_service import classify_ad, summarize_reviews
 from services.naver_service import fetch_blog_previews
 from services.review_limits import (
@@ -233,12 +234,46 @@ async def _ensure_analysis_usage_available(email: str) -> None:
     )
 
 
-async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
-    for review in reviews:
-        review_id = review.get("id")
-        description = review.get("review_description") or ""
+# async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
+#     for review in reviews:
+#         review_id = review.get("id")
+#         description = review.get("review_description") or ""
 
-        if mode == "llm":
+#         if mode == "llm":
+#             if review.get("is_ad_llm_pred") is not None:
+#                 continue
+#             print(f"[DEBUG] LLM 판별 중 | id: {review_id}")
+#             is_ad_llm = await classify_ad(review)
+#             if review_id is not None:
+#                 await update_llm_pred(review_id, is_ad_llm)
+#             review["is_ad_llm_pred"] = is_ad_llm
+#             print(f"[DEBUG] LLM 판별 완료 | id: {review_id} | is_ad_llm_pred: {is_ad_llm}")
+#             continue
+
+#         if (
+#             review.get("is_ad_electra_pred") is not None
+#             and review.get("is_ad_finetuned_pred") is not None
+#         ):
+#             continue
+
+#         print(f"[DEBUG] BERT 판별 중 | id: {review_id}")
+#         is_ad_electra = predict_is_ad(description)
+#         score = score_is_ad(description)
+#         if review_id is not None:
+#             await update_electra_pred(review_id, is_ad_electra)
+#             await update_finetuned_pred(review_id, score)
+#         review["is_ad_electra_pred"] = is_ad_electra
+#         review["is_ad_finetuned_pred"] = score
+#         print(
+#             f"[DEBUG] BERT 판별 완료 | id: {review_id} | "
+#             f"is_ad_electra_pred: {is_ad_electra} | is_ad_finetuned_pred: {score}"
+#         )
+
+# 수정 후
+async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
+    if mode == "llm":
+        for review in reviews:
+            review_id = review.get("id")
             if review.get("is_ad_llm_pred") is not None:
                 continue
             print(f"[DEBUG] LLM 판별 중 | id: {review_id}")
@@ -247,26 +282,37 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
                 await update_llm_pred(review_id, is_ad_llm)
             review["is_ad_llm_pred"] = is_ad_llm
             print(f"[DEBUG] LLM 판별 완료 | id: {review_id} | is_ad_llm_pred: {is_ad_llm}")
-            continue
+        return
 
-        if (
-            review.get("is_ad_electra_pred") is not None
-            and review.get("is_ad_finetuned_pred") is not None
-        ):
-            continue
+    # 분석이 필요한 리뷰만 필터링
+    targets = [
+        r for r in reviews
+        if r.get("is_ad_electra_pred") is None or r.get("is_ad_finetuned_pred") is None
+    ]
+    if not targets:
+        return
 
-        print(f"[DEBUG] BERT 판별 중 | id: {review_id}")
-        is_ad_electra = predict_is_ad(description)
-        score = score_is_ad(description)
+    descriptions = [
+      preprocess(
+          title=r.get("review_title") or "",
+          description=r.get("review_description") or "",
+          store_name=r.get("name") or "",
+      )
+      for r in targets
+    ]
+
+    print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
+    preds, scores = predict_and_score_batch(descriptions)
+    print(f"[DEBUG] BERT 배치 판별 완료")
+
+    for review, pred, score in zip(targets, preds, scores):
+        review_id = review.get("id")
         if review_id is not None:
-            await update_electra_pred(review_id, is_ad_electra)
+            await update_electra_pred(review_id, pred)
             await update_finetuned_pred(review_id, score)
-        review["is_ad_electra_pred"] = is_ad_electra
+        review["is_ad_electra_pred"] = pred
         review["is_ad_finetuned_pred"] = score
-        print(
-            f"[DEBUG] BERT 판별 완료 | id: {review_id} | "
-            f"is_ad_electra_pred: {is_ad_electra} | is_ad_finetuned_pred: {score}"
-        )
+        print(f"[DEBUG] 저장 완료 | id: {review_id} | pred: {pred} | score: {score:.3f}")
 
 
 def _build_place_metadata(
