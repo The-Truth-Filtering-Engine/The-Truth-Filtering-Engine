@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 // reviews 테이블 컬럼 구조
-//   likes    : jsonb  → [{"user_email": "a@gmail.com"}, ...]
-//   dislikes : jsonb  → [{"user_email": "b@gmail.com"}, ...]
+//   likes    : jsonb  → [{"user_id": 1}, ...]
+//   dislikes : jsonb  → [{"user_id": 2}, ...]
 // ─────────────────────────────────────────────
 
 enum LikeType { like, dislike }
@@ -9,8 +9,8 @@ enum LikeType { like, dislike }
 class ReviewLikeState {
   final int likeCount;
   final int dislikeCount;
-  final bool isLiked;      // 내가 좋아요 눌렀는지
-  final bool isDisliked;   // 내가 싫어요 눌렀는지
+  final bool isLiked; // 내가 좋아요 눌렀는지
+  final bool isDisliked; // 내가 싫어요 눌렀는지
 
   const ReviewLikeState({
     this.likeCount = 0,
@@ -20,23 +20,23 @@ class ReviewLikeState {
   });
 
   /// Supabase row 에서 파싱
-  factory ReviewLikeState.fromRow(Map<String, dynamic> row, String userEmail) {
-    final likes = _parseEmails(row['likes']);
-    final dislikes = _parseEmails(row['dislikes']);
+  factory ReviewLikeState.fromRow(Map<String, dynamic> row, int userId) {
+    final likes = _parseUserIds(row['likes']);
+    final dislikes = _parseUserIds(row['dislikes']);
 
     return ReviewLikeState(
       likeCount: likes.length,
       dislikeCount: dislikes.length,
-      isLiked: likes.contains(userEmail),
-      isDisliked: dislikes.contains(userEmail),
+      isLiked: likes.contains(userId),
+      isDisliked: dislikes.contains(userId),
     );
   }
 
-  static Set<String> _parseEmails(dynamic json) {
+  static Set<int> _parseUserIds(dynamic json) {
     if (json == null) return {};
     return (json as List)
-        .map((e) => (e as Map)['user_email']?.toString() ?? '')
-        .where((e) => e.isNotEmpty)
+        .map((e) => int.tryParse((e as Map)['user_id']?.toString() ?? ''))
+        .whereType<int>()
         .toSet();
   }
 

@@ -1,19 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/providers/current_user_provider.dart';
 import '../../../data/models/review_like_model.dart';
 import '../../../data/repositories/review_like_repository.dart';
 import '../../../data/sources/review_like_remote_source.dart';
 
-// ── 의존성 ────────────────────────────────────
 final reviewLikeRepositoryProvider = Provider<ReviewLikeRepository>(
   (ref) => ReviewLikeRepository(
     ReviewLikeRemoteSource(Supabase.instance.client),
   ),
 );
 
-// ── 상태 ──────────────────────────────────────
 class ReviewLikeNotifierState {
   final bool isLoading;
   final ReviewLikeState likeState;
@@ -33,19 +30,39 @@ class ReviewLikeNotifierState {
       );
 }
 
-// ── Notifier ──────────────────────────────────
+class ReviewLikeProviderKey {
+  final String reviewId;
+  final int userId;
+
+  const ReviewLikeProviderKey({
+    required this.reviewId,
+    required this.userId,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReviewLikeProviderKey &&
+          runtimeType == other.runtimeType &&
+          reviewId == other.reviewId &&
+          userId == other.userId;
+
+  @override
+  int get hashCode => Object.hash(reviewId, userId);
+}
+
 class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
   final ReviewLikeRepository _repo;
   final String _reviewId;
-  final String _userEmail;
+  final int _userId;
 
   ReviewLikeNotifier({
     required ReviewLikeRepository repo,
     required String reviewId,
-    required String userEmail,
+    required int userId,
   })  : _repo = repo,
         _reviewId = reviewId,
-        _userEmail = userEmail,
+        _userId = userId,
         super(ReviewLikeNotifierState(likeState: const ReviewLikeState())) {
     _load();
   }
@@ -54,7 +71,7 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
     state = state.copyWith(isLoading: true);
     final likeState = await _repo.fetchState(
       reviewId: _reviewId,
-      userEmail: _userEmail,
+      userId: _userId,
     );
     state = state.copyWith(isLoading: false, likeState: likeState);
   }
@@ -65,7 +82,7 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
 
     final likeState = await _repo.toggle(
       reviewId: _reviewId,
-      userEmail: _userEmail,
+      userId: _userId,
       type: type,
     );
 
@@ -73,15 +90,11 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
   }
 }
 
-// reviewId 별로 provider 생성
-final reviewLikeProvider = StateNotifierProviderFamily<
-    ReviewLikeNotifier, ReviewLikeNotifierState, String>(
-  (ref, reviewId) {
-    final email = ref.watch(currentUserEmailProvider) ?? '';
-    return ReviewLikeNotifier(
-      repo: ref.read(reviewLikeRepositoryProvider),
-      reviewId: reviewId,
-      userEmail: email,
-    );
-  },
+final reviewLikeProvider = StateNotifierProviderFamily<ReviewLikeNotifier,
+    ReviewLikeNotifierState, ReviewLikeProviderKey>(
+  (ref, key) => ReviewLikeNotifier(
+    repo: ref.read(reviewLikeRepositoryProvider),
+    reviewId: key.reviewId,
+    userId: key.userId,
+  ),
 );

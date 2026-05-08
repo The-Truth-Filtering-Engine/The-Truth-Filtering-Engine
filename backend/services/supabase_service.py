@@ -15,7 +15,7 @@ SUPABASE_KEY = (
     os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     or os.getenv("SUPABASE_KEY", "")
 )
-USER_PROFILE_SELECT = "email,premium,coin,freecount,premiumcount,store,bookmark"
+USER_PROFILE_SELECT = "id,email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
 KST = timezone(timedelta(hours=9))
@@ -126,6 +126,7 @@ def _require_supabase_config() -> None:
 
 def _normalize_user_profile(row: dict) -> dict:
     return {
+        "id": _int_or_zero(row.get("id")),
         "email": _text_or_none(row.get("email")) or "",
         "premium": _int_or_zero(row.get("premium")),
         "coin": _int_or_zero(row.get("coin")),

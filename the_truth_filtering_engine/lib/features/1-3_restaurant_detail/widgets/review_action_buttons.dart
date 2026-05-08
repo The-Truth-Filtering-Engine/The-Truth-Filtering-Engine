@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/current_user_provider.dart';
+import '../../../core/providers/user_profile_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/review_like_model.dart';
 import '../providers/review_like_provider.dart';
@@ -26,8 +27,13 @@ class ReviewActionButtons extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final email = ref.watch(currentUserEmailProvider);
+    final userId = ref.watch(currentUserIdProvider);
     final isLoggedIn = email != null && email.isNotEmpty;
-    final state = isLoggedIn ? ref.watch(reviewLikeProvider(reviewId)) : null;
+    final likeKey = userId == null
+        ? null
+        : ReviewLikeProviderKey(reviewId: reviewId, userId: userId);
+    final state =
+        likeKey == null ? null : ref.watch(reviewLikeProvider(likeKey));
     final ls = state?.likeState ?? const ReviewLikeState();
 
     void onTap(LikeType type) {
@@ -47,7 +53,26 @@ class ReviewActionButtons extends ConsumerWidget {
         );
         return;
       }
-      ref.read(reviewLikeProvider(reviewId).notifier).toggle(type);
+
+      if (likeKey == null) {
+        ref.read(userProfileProvider.notifier).loadIfPossible(force: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '사용자 정보를 불러오는 중입니다.',
+              style: AppText.body().copyWith(color: Colors.white),
+            ),
+            backgroundColor: AppColors.warning400,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      ref.read(reviewLikeProvider(likeKey).notifier).toggle(type);
     }
 
     return Column(
