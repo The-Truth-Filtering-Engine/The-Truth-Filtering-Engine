@@ -66,8 +66,24 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
       limit: '$_maxReviewResults',
     ),
   );
+  final accessToken = _currentAccessToken();
 
-  final res = await http.get(uri).timeout(const Duration(seconds: 15));
+  final res = await http
+      .get(
+        uri,
+        headers: accessToken == null
+            ? null
+            : {
+                'Authorization': 'Bearer $accessToken',
+              },
+      )
+      .timeout(const Duration(seconds: 15));
+  if (res.statusCode == 402) {
+    throw _AnalysisRequestException(
+      _readApiError(res) ?? '추가분석을 위해 코인을 충전해 주세요',
+      res.statusCode,
+    );
+  }
   if (res.statusCode != 200) {
     return const _ReviewFetchResult(reviews: [], hasMore: false);
   }

@@ -102,7 +102,11 @@ class _MainShellState extends ConsumerState<MainShell> {
       body: IndexedStack(
         index: ref.watch(mainTabIndexProvider),
         children: [
-          const MapScreen(),
+          MapScreen(
+            onOpenSettings: () {
+              ref.read(mainTabIndexProvider.notifier).state = 3;
+            },
+          ),
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
           const SettingsScreen(),
