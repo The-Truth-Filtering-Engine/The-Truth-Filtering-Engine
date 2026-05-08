@@ -240,18 +240,20 @@ class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
     final decoded = jsonDecode(body);
     if (decoded is! Map) return const [];
 
-    final bookmarkIds = _parseBookmarkIds(decoded['bookmark']);
-    final storeMap = decoded['store'];
-    if (storeMap is! Map) return const [];
+    final bookmarkMap = decoded['bookmark'];
+    if (bookmarkMap is! Map) return const [];
 
     final restaurants = <RestaurantModel>[];
-    for (final storeId in bookmarkIds) {
-      final rawStore = storeMap[storeId];
-      if (rawStore is! Map) continue;
+    for (final entry in bookmarkMap.entries) {
+      final storeId = entry.key?.toString().trim() ?? '';
+      final rawStore = entry.value;
+      if (storeId.isEmpty || rawStore is! Map) continue;
 
-      final storeJson = rawStore.cast<String, dynamic>();
+      final storeJson = _stringKeyedMap(rawStore);
       storeJson['id'] = storeId;
       storeJson['storeId'] = storeId;
+      storeJson['latitude'] = storeJson['latitude'] ?? storeJson['lat'];
+      storeJson['longitude'] = storeJson['longitude'] ?? storeJson['lng'];
 
       final restaurant = RestaurantModel.fromJson(storeJson);
       if (restaurant.effectiveStoreId.isEmpty || restaurant.name.isEmpty) {
@@ -263,28 +265,10 @@ class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
     return _dedupeRestaurants(restaurants);
   }
 
-  List<String> _parseBookmarkIds(Object? value) {
-    Object? decoded = value;
-    if (value is String) {
-      try {
-        decoded = jsonDecode(value);
-      } catch (_) {
-        return const [];
-      }
-    }
-
-    if (decoded is! List) return const [];
-
-    final seen = <String>{};
-    final ids = <String>[];
-    for (final item in decoded) {
-      final storeId = item?.toString().trim() ?? '';
-      if (storeId.isEmpty || seen.contains(storeId)) continue;
-      seen.add(storeId);
-      ids.add(storeId);
-    }
-
-    return ids;
+  Map<String, dynamic> _stringKeyedMap(Map value) {
+    return value.map(
+      (key, dynamic item) => MapEntry(key.toString(), item),
+    );
   }
 
   Map<String, dynamic> _bookmarkStoreJson(RestaurantModel restaurant) {

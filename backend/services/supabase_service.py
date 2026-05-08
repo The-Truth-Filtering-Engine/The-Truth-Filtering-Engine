@@ -5,8 +5,8 @@ supabase_service.py
 - 캐시 조회, AI 추천 조회 등 모든 DB 접근 통합
 """
 import os
-import json
 import httpx
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from services.review_limits import MAX_REVIEW_RESULTS, clamp_max_results
 
@@ -18,6 +18,7 @@ SUPABASE_KEY = (
 USER_PROFILE_SELECT = "email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
+KST = timezone(timedelta(hours=9))
 
 
 class AnalysisUsageError(RuntimeError):
@@ -131,7 +132,7 @@ def _normalize_user_profile(row: dict) -> dict:
         "freecount": _int_or_zero(row.get("freecount")),
         "premiumcount": _int_or_zero(row.get("premiumcount")),
         "store": row.get("store"),
-        "bookmark": _text_or_none(row.get("bookmark")),
+        "bookmark": row.get("bookmark"),
     }
 
 
@@ -296,23 +297,16 @@ async def add_user_bookmark(email: str, store_id: str, store: dict | None) -> di
         raise RuntimeError("storeId가 없습니다")
 
     profile = await ensure_user_profile(normalized_email)
-    bookmark_ids = _parse_bookmark_ids(profile.get("bookmark"))
-    store_map = _normalize_store_map(profile.get("store"))
-
-    if normalized_store_id not in bookmark_ids:
-        bookmark_ids.append(normalized_store_id)
-
-    store_map[normalized_store_id] = _normalize_bookmark_store(
+    bookmark_map = _normalize_bookmark_map(profile.get("bookmark"))
+    bookmark_map[normalized_store_id] = _normalize_bookmark_store(
         normalized_store_id,
         store,
+        touch=True,
     )
 
     updated = await _patch_user_profile(
         normalized_email,
-        {
-            "bookmark": _serialize_bookmark_ids(bookmark_ids),
-            "store": store_map,
-        },
+        {"bookmark": bookmark_map},
     )
     return _normalize_user_bookmarks(updated)
 
@@ -326,90 +320,75 @@ async def remove_user_bookmark(email: str, store_id: str) -> dict:
         raise RuntimeError("storeId가 없습니다")
 
     profile = await ensure_user_profile(normalized_email)
-    bookmark_ids = [
-        item
-        for item in _parse_bookmark_ids(profile.get("bookmark"))
-        if item != normalized_store_id
-    ]
-    store_map = _normalize_store_map(profile.get("store"))
-    store_map.pop(normalized_store_id, None)
+    bookmark_map = _normalize_bookmark_map(profile.get("bookmark"))
+    bookmark_map.pop(normalized_store_id, None)
 
     updated = await _patch_user_profile(
         normalized_email,
-        {
-            "bookmark": _serialize_bookmark_ids(bookmark_ids),
-            "store": store_map,
-        },
+        {"bookmark": bookmark_map},
     )
     return _normalize_user_bookmarks(updated)
 
 
 def _normalize_user_bookmarks(profile: dict) -> dict:
-    bookmark_ids = _parse_bookmark_ids(profile.get("bookmark"))
-    store_map = _normalize_store_map(profile.get("store"))
+    bookmark_map = _normalize_bookmark_map(profile.get("bookmark"))
     return {
-        "bookmark": bookmark_ids,
-        "store": store_map,
+        "bookmark": bookmark_map,
+        "store": profile.get("store") if isinstance(profile.get("store"), dict) else {},
     }
 
 
-def _parse_bookmark_ids(value) -> list[str]:
-    text = _text_or_none(value)
-    if not text:
-        return []
-
-    try:
-        decoded = json.loads(text)
-    except (TypeError, ValueError):
-        return []
-
-    if not isinstance(decoded, list):
-        return []
-
-    bookmark_ids: list[str] = []
-    seen = set()
-    for item in decoded:
-        bookmark_id = _text_or_none(item)
-        if not bookmark_id or bookmark_id in seen:
-            continue
-        seen.add(bookmark_id)
-        bookmark_ids.append(bookmark_id)
-
-    return bookmark_ids
-
-
-def _serialize_bookmark_ids(bookmark_ids: list[str]) -> str:
-    normalized_ids: list[str] = []
-    seen = set()
-    for item in bookmark_ids:
-        bookmark_id = _text_or_none(item)
-        if not bookmark_id or bookmark_id in seen:
-            continue
-        seen.add(bookmark_id)
-        normalized_ids.append(bookmark_id)
-
-    return json.dumps(normalized_ids, ensure_ascii=False)
-
-
-def _normalize_store_map(value) -> dict:
+def _normalize_bookmark_map(value) -> dict:
     if not isinstance(value, dict):
         return {}
 
-    store_map = {}
+    bookmark_map = {}
     for key, item in value.items():
         store_id = _text_or_none(key)
         if not store_id or not isinstance(item, dict):
             continue
-        store_map[store_id] = dict(item)
+        bookmark_map[store_id] = _normalize_bookmark_store(store_id, item)
 
-    return store_map
+    return bookmark_map
 
 
-def _normalize_bookmark_store(store_id: str, store: dict | None) -> dict:
+def _normalize_bookmark_store(
+    store_id: str,
+    store: dict | None,
+    *,
+    touch: bool = False,
+) -> dict:
     normalized = dict(store) if isinstance(store, dict) else {}
     normalized["id"] = _text_or_none(normalized.get("id")) or store_id
     normalized["storeId"] = store_id
+
+    latitude = _float_or_none(normalized.get("latitude"))
+    if latitude is None:
+        latitude = _float_or_none(normalized.get("lat"))
+    longitude = _float_or_none(normalized.get("longitude"))
+    if longitude is None:
+        longitude = _float_or_none(normalized.get("lng"))
+
+    if latitude is not None:
+        normalized["latitude"] = latitude
+        normalized["lat"] = latitude
+    if longitude is not None:
+        normalized["longitude"] = longitude
+        normalized["lng"] = longitude
+
+    if touch or not _text_or_none(normalized.get("updatedAt")):
+        normalized["updatedAt"] = datetime.now(KST).isoformat()
+
     return normalized
+
+
+def _float_or_none(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _has_analysis_usage(profile: dict) -> bool:

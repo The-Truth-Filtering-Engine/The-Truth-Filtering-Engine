@@ -139,7 +139,7 @@ type UserProfile = {
   freecount: number
   premiumcount: number
   store: unknown
-  bookmark: string | null
+  bookmark: unknown
 }
 
 type UserBookmarks = {
@@ -806,7 +806,7 @@ function parseUserProfile(item: Record<string, unknown>): UserProfile {
     freecount: parseProfileNumber(item.freecount),
     premiumcount: parseProfileNumber(item.premiumcount),
     store: item.store ?? null,
-    bookmark: item.bookmark === null ? null : cleanText(item.bookmark),
+    bookmark: item.bookmark ?? null,
   }
 }
 
@@ -957,32 +957,6 @@ function saveBookmarkedRestaurants(bookmarkedRestaurants: Restaurant[]) {
   )
 }
 
-function parseBookmarkIds(value: unknown) {
-  let decoded = value
-
-  if (typeof value === 'string') {
-    try {
-      decoded = JSON.parse(value) as unknown
-    } catch {
-      return []
-    }
-  }
-
-  if (!Array.isArray(decoded)) return []
-
-  const storeIds: string[] = []
-  const seen = new Set<string>()
-
-  for (const item of decoded) {
-    const storeId = String(item ?? '').trim()
-    if (!storeId || seen.has(storeId)) continue
-    seen.add(storeId)
-    storeIds.push(storeId)
-  }
-
-  return storeIds
-}
-
 function parseBookmarkStoreMap(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {} as Record<string, Record<string, unknown>>
@@ -1001,12 +975,12 @@ function parseBookmarkStoreMap(value: unknown) {
 }
 
 function parseUserBookmarks(item: Record<string, unknown>): UserBookmarks {
-  const storeIds = parseBookmarkIds(item.bookmark)
-  const storeMap = parseBookmarkStoreMap(item.store)
+  const bookmarkMap = parseBookmarkStoreMap(item.bookmark)
+  const storeIds = Object.keys(bookmarkMap)
   const restaurants = storeIds
     .map((storeId) =>
       normalizeRestaurant({
-        ...(storeMap[storeId] ?? {}),
+        ...(bookmarkMap[storeId] ?? {}),
         id: storeId,
         storeId,
       }),
@@ -1104,6 +1078,7 @@ function App() {
   const restaurantOverlaysRef = useRef<KakaoCustomOverlay[]>([])
   const viewportRestaurantsRef = useRef<Restaurant[]>([])
   const searchModeRef = useRef(false)
+  const bookmarkFocusModeRef = useRef(false)
   const searchRequestIdRef = useRef(0)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState('')
@@ -1539,9 +1514,14 @@ function App() {
     restaurantOverlaysRef.current = []
   }
 
-  function displayRestaurantsOnMap(restaurants: Restaurant[]) {
-    viewportRestaurantsRef.current =
-      searchModeRef.current ? viewportRestaurantsRef.current : restaurants
+  function displayRestaurantsOnMap(
+    restaurants: Restaurant[],
+    options: { preserveViewport?: boolean } = {},
+  ) {
+    if (!options.preserveViewport) {
+      viewportRestaurantsRef.current =
+        searchModeRef.current ? viewportRestaurantsRef.current : restaurants
+    }
 
     const kakaoMaps = kakaoMapsRef.current
     const map = kakaoMapRef.current
@@ -1600,6 +1580,7 @@ function App() {
   function clearRestaurantSearch() {
     searchRequestIdRef.current += 1
     searchModeRef.current = false
+    bookmarkFocusModeRef.current = false
     setSearchInput('')
     setSearchQuery('')
     setSearchResults([])
@@ -1621,6 +1602,7 @@ function App() {
     const requestId = ++searchRequestIdRef.current
     const center = getSearchCenter()
     searchModeRef.current = true
+    bookmarkFocusModeRef.current = false
     setSelectedRestaurant(null)
     setActiveSidePanel('search')
     setSearchQuery(query)
@@ -1649,6 +1631,12 @@ function App() {
   }
 
   function selectSearchResult(restaurant: Restaurant) {
+    focusRestaurantOnMap(restaurant)
+  }
+
+  function selectBookmarkedRestaurant(restaurant: Restaurant) {
+    bookmarkFocusModeRef.current = true
+    displayRestaurantsOnMap([restaurant], { preserveViewport: true })
     focusRestaurantOnMap(restaurant)
   }
 
@@ -2033,7 +2021,7 @@ function App() {
       }
 
       function scheduleViewportSearch(map: KakaoMap) {
-        if (searchModeRef.current) return
+        if (searchModeRef.current || bookmarkFocusModeRef.current) return
 
         const center = pointFromLatLng(map.getCenter())
         const level = map.getLevel()
@@ -2089,8 +2077,14 @@ function App() {
         setLoadState('ready')
         kakaoMaps.event.addListener(map, 'idle', () => scheduleViewportSearch(map))
         kakaoMaps.event.addListener(map, 'click', () => {
+          const wasBookmarkFocusMode = bookmarkFocusModeRef.current
+          bookmarkFocusModeRef.current = false
           setSelectedRestaurant(null)
           setActiveSidePanel('search')
+          if (wasBookmarkFocusMode) {
+            displayRestaurantsOnMap(viewportRestaurantsRef.current)
+            scheduleViewportSearch(map)
+          }
         })
 
         for (const delay of [100, 300, 700]) {
@@ -2691,7 +2685,7 @@ function App() {
                     <button
                       type="button"
                       className="bookmark-list-item"
-                      onClick={() => focusRestaurantOnMap(restaurant)}
+                      onClick={() => selectBookmarkedRestaurant(restaurant)}
                     >
                       <span className="bookmark-thumb" aria-hidden="true">
                         {isCafe(restaurant) ? '☕' : '🍽'}
@@ -2708,7 +2702,10 @@ function App() {
                       type="button"
                       className="bookmark-remove-button"
                       aria-label={`${restaurant.name} 북마크 해제`}
-                      onClick={() => toggleBookmark(restaurant)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleBookmark(restaurant)
+                      }}
                     >
                       <BookmarkCheck
                         aria-hidden="true"
