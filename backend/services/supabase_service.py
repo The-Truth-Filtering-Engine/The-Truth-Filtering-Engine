@@ -16,6 +16,12 @@ SUPABASE_KEY = (
     or os.getenv("SUPABASE_KEY", "")
 )
 USER_PROFILE_SELECT = "email,premium,coin,freecount,premiumcount,store,bookmark"
+ANALYSIS_COIN_COST = 100
+ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
+
+
+class AnalysisUsageError(RuntimeError):
+    pass
 
 # ── 공통 헤더 ────────────────────────────────────────────────────────────────
 
@@ -219,6 +225,63 @@ async def add_user_coins(email: str, amount: int) -> dict:
     return await _patch_user_profile(normalized_email, {"coin": next_coin})
 
 
+async def has_analysis_usage(email: str) -> bool:
+    profile = await ensure_user_profile(email)
+    return _has_analysis_usage(profile)
+
+
+async def consume_analysis_usage(email: str) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+
+    await ensure_user_profile(normalized_email)
+
+    for _ in range(3):
+        profile = await ensure_user_profile(normalized_email)
+        freecount = _int_or_zero(profile.get("freecount"))
+        premiumcount = _int_or_zero(profile.get("premiumcount"))
+        coin = _int_or_zero(profile.get("coin"))
+
+        if freecount > 0:
+            updated = await _patch_user_profile_if_current(
+                normalized_email,
+                data={"freecount": freecount - 1},
+                match={"freecount": freecount},
+            )
+            if updated:
+                return _build_analysis_usage("freecount", updated)
+            continue
+
+        if premiumcount > 0:
+            updated = await _patch_user_profile_if_current(
+                normalized_email,
+                data={"premiumcount": premiumcount - 1},
+                match={"premiumcount": premiumcount},
+            )
+            if updated:
+                return _build_analysis_usage("premiumcount", updated)
+            continue
+
+        if coin >= ANALYSIS_COIN_COST:
+            updated = await _patch_user_profile_if_current(
+                normalized_email,
+                data={"coin": coin - ANALYSIS_COIN_COST},
+                match={"coin": coin},
+            )
+            if updated:
+                return _build_analysis_usage("coin", updated)
+            continue
+
+        raise AnalysisUsageError(ANALYSIS_USAGE_REQUIRED_MESSAGE)
+
+    profile = await ensure_user_profile(normalized_email)
+    if not _has_analysis_usage(profile):
+        raise AnalysisUsageError(ANALYSIS_USAGE_REQUIRED_MESSAGE)
+
+    raise RuntimeError("분석 사용량을 차감하지 못했습니다")
+
+
 async def get_user_bookmarks(email: str) -> dict:
     profile = await ensure_user_profile(email)
     return _normalize_user_bookmarks(profile)
@@ -349,6 +412,22 @@ def _normalize_bookmark_store(store_id: str, store: dict | None) -> dict:
     return normalized
 
 
+def _has_analysis_usage(profile: dict) -> bool:
+    return (
+        _int_or_zero(profile.get("freecount")) > 0
+        or _int_or_zero(profile.get("premiumcount")) > 0
+        or _int_or_zero(profile.get("coin")) >= ANALYSIS_COIN_COST
+    )
+
+
+def _build_analysis_usage(charged_by: str, profile: dict) -> dict:
+    return {
+        "charged": True,
+        "chargedBy": charged_by,
+        "profile": profile,
+    }
+
+
 async def _fetch_user_profile_by_email(
     client: httpx.AsyncClient,
     email: str,
@@ -397,6 +476,40 @@ async def _patch_user_profile(email: str, data: dict) -> dict:
     rows = resp.json() if resp.text else []
     if not rows:
         return await ensure_user_profile(email)
+    return _normalize_user_profile(rows[0])
+
+
+async def _patch_user_profile_if_current(
+    email: str,
+    data: dict,
+    match: dict,
+) -> dict | None:
+    _require_supabase_config()
+    params = {
+        "email": f"eq.{email}",
+        "select": USER_PROFILE_SELECT,
+    }
+    for key, value in match.items():
+        params[key] = f"eq.{value}"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.patch(
+            f"{SUPABASE_URL}/rest/v1/users",
+            headers=_h("return=representation"),
+            params=params,
+            json=data,
+            timeout=10,
+        )
+
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(
+            f"사용자 프로필을 업데이트하지 못했습니다: "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() if resp.text else []
+    if not rows:
+        return None
     return _normalize_user_profile(rows[0])
 
 

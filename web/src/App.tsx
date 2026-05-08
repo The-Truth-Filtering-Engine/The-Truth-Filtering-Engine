@@ -72,6 +72,18 @@ type DetailData = {
   keywords: Array<{ word: string; count: number }>
 }
 
+type AnalysisUsage = {
+  charged?: boolean
+  chargedBy?: 'freecount' | 'premiumcount' | 'coin' | null
+  profile?: Record<string, unknown> | null
+}
+
+type DetailJson = {
+  reviews?: Record<string, unknown>[]
+  hasMore?: boolean
+  usage?: AnalysisUsage
+}
+
 type AiRecommendItem = {
   id: number
   name: string
@@ -221,6 +233,7 @@ const SEARCH_PLACE_DISPLAY_COUNT = 30
 const REVIEW_BATCH_SIZE = 100
 const REVIEW_PAGE_SIZE = 10
 const MAX_REVIEW_RESULTS = 300
+const ANALYSIS_USAGE_REQUIRED_MESSAGE = '추가분석을 위해 코인을 충전해 주세요'
 const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
 const TEMP_ADMIN_AUTH_STORAGE_KEY = 'truth_filtering_temp_admin_auth'
 const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
@@ -231,6 +244,20 @@ const AI_REGION_SCOPE_LABELS: Record<AiRegionScope, string> = {
 const AI_REGION_SCOPE_OPTIONS: AiRegionScope[] = ['si', 'gu', 'dong']
 
 let kakaoMapsLoader: Promise<KakaoMaps> | null = null
+
+class ApiRequestError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+  }
+}
+
+function isAnalysisUsageRequiredError(error: unknown) {
+  return error instanceof ApiRequestError && error.status === 402
+}
 
 async function fetchKakaoJsKey() {
   const response = await fetch(`${BACKEND_BASE_URL}/config`)
@@ -631,15 +658,23 @@ function buildKeywords(reviews: BlogReview[]) {
     .map(([word, count]) => ({ word, count }))
 }
 
-async function fetchDetailJson(path: string, signal: AbortSignal) {
-  const response = await fetch(`${BACKEND_BASE_URL}${path}`, { signal })
+async function fetchDetailJson(
+  path: string,
+  signal: AbortSignal,
+  accessToken?: string,
+): Promise<DetailJson> {
+  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+    signal,
+    headers: accessToken
+      ? {
+          Authorization: `Bearer ${accessToken}`,
+        }
+      : undefined,
+  })
   if (!response.ok) {
-    throw new Error(`상세 데이터 요청 실패: ${response.status}`)
+    throw new ApiRequestError(await readErrorMessage(response), response.status)
   }
-  return (await response.json()) as {
-    reviews?: Record<string, unknown>[]
-    hasMore?: boolean
-  }
+  return (await response.json()) as DetailJson
 }
 
 function buildReviewSearchPath(
@@ -1164,6 +1199,20 @@ function App() {
     if (shouldSave) {
       saveBookmarkedRestaurants(nextRestaurants)
     }
+  }
+
+  function applyUsageProfile(usage?: AnalysisUsage) {
+    const profile = usage?.profile
+    if (!profile) return
+
+    setUserProfileState((previous) => ({
+      ...previous,
+      profile: parseUserProfile(profile),
+      isLoading: false,
+      isSaving: false,
+      errorMessage: '',
+      hasLoaded: true,
+    }))
   }
 
   useEffect(() => {
@@ -1692,6 +1741,7 @@ function App() {
     const requestId = ++detailRequestIdRef.current
     const controller = new AbortController()
     const query = restaurant.name
+    const accessToken = authSession?.access_token
 
     setDetailErrorMessage('')
     setDetailData(null)
@@ -1724,8 +1774,10 @@ function App() {
                 restaurant,
               }),
               controller.signal,
+              accessToken,
             )
           } catch (error) {
+            if (isAnalysisUsageRequiredError(error)) throw error
             if ((cached.reviews ?? []).length === 0) throw error
             detailJson = cached
             showToast('추가 리뷰를 불러오지 못해 저장된 리뷰만 표시합니다')
@@ -1739,10 +1791,13 @@ function App() {
             restaurant,
           }),
           controller.signal,
+          accessToken,
         )
       }
 
       if (requestId !== detailRequestIdRef.current) return
+
+      applyUsageProfile(detailJson.usage)
 
       const reviews = (detailJson.reviews ?? []).map(parseBlogReview)
       if (reviews.length === 0) {
@@ -1760,11 +1815,14 @@ function App() {
       setDetailState('loaded')
     } catch (error) {
       if (requestId !== detailRequestIdRef.current) return
-      setDetailErrorMessage(
+      const message =
         error instanceof Error
           ? error.message
-          : '상세 데이터를 불러오지 못했습니다',
-      )
+          : '상세 데이터를 불러오지 못했습니다'
+      setDetailErrorMessage(message)
+      if (isAnalysisUsageRequiredError(error)) {
+        showToast(message || ANALYSIS_USAGE_REQUIRED_MESSAGE)
+      }
       setDetailState('error')
     }
   }
@@ -1807,8 +1865,11 @@ function App() {
           restaurant: selectedRestaurant,
         }),
         controller.signal,
+        authSession?.access_token,
       )
       if (requestId !== reviewBatchRequestIdRef.current) return
+
+      applyUsageProfile(detailJson.usage)
 
       const nextReviews = (detailJson.reviews ?? []).map(parseBlogReview)
       const reviews = mergeReviews(detailData.reviews, nextReviews)
@@ -1820,7 +1881,7 @@ function App() {
       setDetailHasMoreReviews(
         Boolean(detailJson.hasMore) && reviews.length < MAX_REVIEW_RESULTS,
       )
-    } catch {
+    } catch (error) {
       if (requestId !== reviewBatchRequestIdRef.current) return
       const lastLoadedPage = Math.max(
         0,
@@ -1828,7 +1889,11 @@ function App() {
       )
       setReviewPage((current) => Math.min(current, lastLoadedPage))
       setDetailHasMoreReviews(false)
-      showToast('추가 리뷰를 불러오지 못했습니다')
+      showToast(
+        isAnalysisUsageRequiredError(error) && error instanceof Error
+          ? error.message
+          : '추가 리뷰를 불러오지 못했습니다',
+      )
     } finally {
       if (requestId === reviewBatchRequestIdRef.current) {
         setIsReviewBatchLoading(false)

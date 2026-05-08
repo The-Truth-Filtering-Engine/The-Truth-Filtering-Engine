@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/backend_config.dart';
+import '../../../core/config/supabase_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -39,6 +41,16 @@ class _ReviewFetchResult {
     required this.reviews,
     required this.hasMore,
   });
+}
+
+class _AnalysisRequestException implements Exception {
+  final String message;
+  final int statusCode;
+
+  const _AnalysisRequestException(this.message, this.statusCode);
+
+  @override
+  String toString() => message;
 }
 
 // ── API: Supabase 캐시 조회 ───────────────────────────────────────────────────
@@ -94,9 +106,24 @@ Future<_ReviewFetchResult> _fetchFreshReviews(
   if (refresh) queryParameters['refresh'] = 'true';
 
   final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
+  final accessToken = _currentAccessToken();
 
-  final res = await http.get(uri).timeout(const Duration(seconds: 90));
-  if (res.statusCode != 200) throw Exception('서버 오류 (${res.statusCode})');
+  final res = await http
+      .get(
+        uri,
+        headers: accessToken == null
+            ? null
+            : {
+                'Authorization': 'Bearer $accessToken',
+              },
+      )
+      .timeout(const Duration(seconds: 90));
+  if (res.statusCode != 200) {
+    throw _AnalysisRequestException(
+      _readApiError(res) ?? '서버 오류 (${res.statusCode})',
+      res.statusCode,
+    );
+  }
 
   final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   final list = body['reviews'] as List<dynamic>? ?? [];
@@ -107,6 +134,31 @@ Future<_ReviewFetchResult> _fetchFreshReviews(
         .toList(),
     hasMore: body['hasMore'] as bool? ?? false,
   );
+}
+
+String? _currentAccessToken() {
+  if (!SupabaseConfig.isConfigured) return null;
+
+  try {
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (token == null || token.isEmpty) return null;
+    return token;
+  } catch (_) {
+    return null;
+  }
+}
+
+String? _readApiError(http.Response response) {
+  try {
+    final text = utf8.decode(response.bodyBytes);
+    if (text.isEmpty) return null;
+    final decoded = jsonDecode(text);
+    if (decoded is Map) {
+      final detail = decoded['detail']?.toString().trim();
+      if (detail != null && detail.isNotEmpty) return detail;
+    }
+  } catch (_) {}
+  return null;
 }
 
 Map<String, String> _reviewQueryParameters(
@@ -186,6 +238,12 @@ class _RestaurantDetailScreenState
           );
           _applyReviews(fresh);
         } catch (e) {
+          if (_isUsageRequiredError(e)) {
+            setState(() => _state = _ScreenState.noData);
+            _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
+            return;
+          }
+
           if (cached.reviews.isNotEmpty) {
             _applyReviews(cached);
             _showError('추가 리뷰를 불러오지 못해 저장된 리뷰만 표시합니다: $e');
@@ -217,7 +275,7 @@ class _RestaurantDetailScreenState
       _applyReviews(fresh);
     } catch (e) {
       setState(() => _state = _ScreenState.noData);
-      _showError('분석 중 오류가 발생했어요: $e');
+      _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
     }
   }
 
@@ -249,7 +307,7 @@ class _RestaurantDetailScreenState
         _hasMoreReviewBatches = false;
         _isLoadingReviewBatch = false;
       });
-      _showError('추가 리뷰를 불러오지 못했습니다: $e');
+      _showError(_errorMessage(e, '추가 리뷰를 불러오지 못했습니다'));
     }
   }
 
@@ -310,6 +368,17 @@ class _RestaurantDetailScreenState
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  bool _isUsageRequiredError(Object error) {
+    return error is _AnalysisRequestException && error.statusCode == 402;
+  }
+
+  String _errorMessage(Object error, String fallbackPrefix) {
+    if (error is _AnalysisRequestException) {
+      return error.message;
+    }
+    return '$fallbackPrefix: $error';
   }
 
   // ── 빌드 ──────────────────────────────────────────────────────────────────
