@@ -307,19 +307,29 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
     # 분석이 필요한 리뷰만 필터링
     targets = [
         r for r in reviews
-        if r.get("is_ad_electra_pred") is None or r.get("is_ad_finetuned_pred") is None
+        if r.get("is_ad_finetuned_pred") is None
     ]
     if not targets:
         return
+    
+    INFER_BATCH = 32
+    all_preds, all_scores = [], []
 
-    descriptions = [
-      preprocess(
-          title=r.get("review_title") or "",
-          description=r.get("review_description") or "",
-          store_name=r.get("name") or "",
-      )
-      for r in targets
-    ]
+    print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
+    for i in range(0, len(targets), INFER_BATCH):
+        chunk = targets[i:i + INFER_BATCH]
+        descriptions = [
+            preprocess(
+                title=r.get("review_title") or "",
+                description=r.get("review_description") or "",
+                store_name=r.get("name") or "",
+            )
+            for r in chunk
+        ]
+        preds, scores = predict_and_score_batch(descriptions)
+        all_preds.extend(preds)
+        all_scores.extend(scores)
+    print(f"[DEBUG] BERT 배치 판별 완료")
 
     print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
     preds, scores = predict_and_score_batch(descriptions)
@@ -330,7 +340,7 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
         if review_id is not None:
             await update_electra_pred(review_id, pred)
             await update_finetuned_pred(review_id, score)
-        review["is_ad_electra_pred"] = pred
+        # review["is_ad_electra_pred"] = pred
         review["is_ad_finetuned_pred"] = score
         print(f"[DEBUG] 저장 완료 | id: {review_id} | pred: {pred} | score: {score:.3f}")
 
@@ -383,7 +393,7 @@ def _blogs_to_reviews(
             "address_name": metadata.get("address_name"),
             "road_address_name": metadata.get("road_address_name"),
             "place_url": metadata.get("place_url"),
-            "is_ad_electra_pred": None,
+            # "is_ad_electra_pred": None,
             "is_ad_finetuned_pred": None,
             "is_ad_llm_pred": None,
         }
