@@ -18,6 +18,7 @@ class ReviewLikeRepository {
     required String reviewId,
     required int userId,
     required LikeType type,
+    String? accessToken,
   }) async {
     final row = await _source.fetchLikes(reviewId);
     var likes = _parseList(row['likes']);
@@ -45,12 +46,31 @@ class ReviewLikeRepository {
       dislikes: dislikes,
     );
 
-    return ReviewLikeState(
+    final nextState = ReviewLikeState(
       likeCount: likes.length,
       dislikeCount: dislikes.length,
       isLiked: likes.any((e) => e['user_id'] == userId),
       isDisliked: dislikes.any((e) => e['user_id'] == userId),
     );
+
+    final token = accessToken?.trim() ?? '';
+    if (token.isNotEmpty) {
+      try {
+        await _source.syncUserReaction(
+          accessToken: token,
+          reviewId: reviewId,
+          reaction: nextState.isLiked
+              ? LikeType.like
+              : nextState.isDisliked
+                  ? LikeType.dislike
+                  : null,
+        );
+      } catch (_) {
+        // 리뷰 카운트 반영은 유지하고, 계정 동기화 실패만 삼킨다.
+      }
+    }
+
+    return nextState;
   }
 
   List<Map<String, dynamic>> _parseList(dynamic json) {

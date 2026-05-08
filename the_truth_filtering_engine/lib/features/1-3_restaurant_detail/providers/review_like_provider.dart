@@ -55,14 +55,17 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
   final ReviewLikeRepository _repo;
   final String _reviewId;
   final int _userId;
+  final String? _accessToken;
 
   ReviewLikeNotifier({
     required ReviewLikeRepository repo,
     required String reviewId,
     required int userId,
+    String? accessToken,
   })  : _repo = repo,
         _reviewId = reviewId,
         _userId = userId,
+        _accessToken = accessToken,
         super(ReviewLikeNotifierState(likeState: const ReviewLikeState())) {
     _load();
   }
@@ -84,6 +87,7 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
       reviewId: _reviewId,
       userId: _userId,
       type: type,
+      accessToken: _accessToken,
     );
 
     state = state.copyWith(isLoading: false, likeState: likeState);
@@ -96,5 +100,6 @@ final reviewLikeProvider = StateNotifierProviderFamily<ReviewLikeNotifier,
     repo: ref.read(reviewLikeRepositoryProvider),
     reviewId: key.reviewId,
     userId: key.userId,
+    accessToken: Supabase.instance.client.auth.currentSession?.accessToken,
   ),
 );

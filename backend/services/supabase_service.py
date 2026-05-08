@@ -360,12 +360,121 @@ async def remove_user_bookmark(email: str, store_id: str) -> dict:
     return _normalize_user_bookmarks(updated)
 
 
+async def get_user_review_reactions(email: str) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("?ъ슜???대찓?쇱씠 ?놁뒿?덈떎")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        reactions = await _fetch_user_review_reactions_by_email(
+            client,
+            normalized_email,
+        )
+    return _normalize_user_review_reactions(reactions)
+
+
+async def update_user_review_reaction(
+    email: str,
+    review_id: str,
+    reaction: str | None,
+) -> dict:
+    normalized_email = _text_or_none(email)
+    normalized_review_id = _text_or_none(review_id)
+    if not normalized_email:
+        raise RuntimeError("?ъ슜???대찓?쇱씠 ?놁뒿?덈떎")
+    if not normalized_review_id:
+        raise RuntimeError("reviewId媛 ?놁뒿?덈떎")
+    if reaction not in ("like", "dislike", None):
+        raise RuntimeError("reaction??like, dislike, null留?媛?ν빀?덈떎")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        current = await _fetch_user_review_reactions_by_email(
+            client,
+            normalized_email,
+        ) or {}
+
+        review_likes = _normalize_review_reaction_map(
+            current.get("review_likes")
+        )
+        review_dislikes = _normalize_review_reaction_map(
+            current.get("review_dislikes")
+        )
+
+        if reaction == "like":
+            review_likes[normalized_review_id] = _normalize_review_reaction(
+                normalized_review_id,
+                touch=True,
+            )
+            review_dislikes.pop(normalized_review_id, None)
+        elif reaction == "dislike":
+            review_dislikes[normalized_review_id] = _normalize_review_reaction(
+                normalized_review_id,
+                touch=True,
+            )
+            review_likes.pop(normalized_review_id, None)
+        else:
+            review_likes.pop(normalized_review_id, None)
+            review_dislikes.pop(normalized_review_id, None)
+
+        updated = await _patch_user_review_reactions(
+            client,
+            normalized_email,
+            review_likes,
+            review_dislikes,
+        )
+
+    return _normalize_user_review_reactions(updated)
+
+
 def _normalize_user_bookmarks(profile: dict) -> dict:
     bookmark_map = _normalize_bookmark_map(profile.get("bookmark"))
     return {
         "bookmark": bookmark_map,
         "store": profile.get("store") if isinstance(profile.get("store"), dict) else {},
     }
+
+
+def _normalize_user_review_reactions(profile: dict | None) -> dict:
+    profile = profile or {}
+    return {
+        "review_likes": _normalize_review_reaction_map(
+            profile.get("review_likes")
+        ),
+        "review_dislikes": _normalize_review_reaction_map(
+            profile.get("review_dislikes")
+        ),
+    }
+
+
+def _normalize_review_reaction_map(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+
+    reaction_map = {}
+    for key, item in value.items():
+        review_id = _text_or_none(key)
+        if not review_id:
+            continue
+        reaction_map[review_id] = _normalize_review_reaction(review_id, item)
+
+    return reaction_map
+
+
+def _normalize_review_reaction(
+    review_id: str,
+    reaction: dict | None = None,
+    *,
+    touch: bool = False,
+) -> dict:
+    normalized = dict(reaction) if isinstance(reaction, dict) else {}
+    normalized["reviewId"] = review_id
+
+    if touch or not _text_or_none(normalized.get("updatedAt")):
+        normalized["updatedAt"] = datetime.now(KST).isoformat()
+
+    return normalized
 
 
 def _normalize_bookmark_map(value) -> dict:
@@ -512,6 +621,65 @@ async def _fetch_user_profile_by_email(
 
     rows = resp.json() if resp.text else []
     return _normalize_user_profile(rows[0]) if rows else None
+
+
+async def _fetch_user_review_reactions_by_email(
+    client: httpx.AsyncClient,
+    email: str,
+) -> dict | None:
+    resp = await client.get(
+        f"{SUPABASE_URL}/rest/v1/users",
+        headers=_h(),
+        params={
+            "email": f"eq.{email}",
+            "select": "review_likes,review_dislikes",
+            "limit": "1",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code != 200:
+        raise RuntimeError(
+            "review_likes/review_dislikes 而щ읆???꾩슂?⑸땲?? "
+            "supabase/migrations/20260508_add_user_review_reactions.sql瑜? "
+            f"?ㅽ뻾??二쇱꽭?? {resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() if resp.text else []
+    return rows[0] if rows else None
+
+
+async def _patch_user_review_reactions(
+    client: httpx.AsyncClient,
+    email: str,
+    review_likes: dict,
+    review_dislikes: dict,
+) -> dict:
+    resp = await client.patch(
+        f"{SUPABASE_URL}/rest/v1/users",
+        headers=_h("return=representation"),
+        params={
+            "email": f"eq.{email}",
+            "select": "review_likes,review_dislikes",
+        },
+        json={
+            "review_likes": review_likes,
+            "review_dislikes": review_dislikes,
+        },
+        timeout=10,
+    )
+
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(
+            f"由щ럭 諛섏쓳???ъ슜???꾨줈?꾩뿉 ??ν븯吏 紐삵뻽?듬땲?? "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() if resp.text else []
+    return rows[0] if rows else {
+        "review_likes": review_likes,
+        "review_dislikes": review_dislikes,
+    }
 
 
 async def _patch_user_profile(email: str, data: dict) -> dict:
