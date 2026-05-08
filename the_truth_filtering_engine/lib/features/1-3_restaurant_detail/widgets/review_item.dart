@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../providers/blog_review.dart';
-import 'report_button.dart';
+import 'review_action_buttons.dart';
 
 class ReviewItem extends StatelessWidget {
   final BlogReview blog;
@@ -26,86 +26,88 @@ class ReviewItem extends StatelessWidget {
       bgColor: bgColor,
       borderColor: borderColor,
       onTap: onTap,
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 36),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── 뱃지 + 제목 ──
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (grade != null) ...[
-                      _AdGradeBadge(grade: grade),
-                      const SizedBox(width: 7),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 108),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 44),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── 뱃지 + 제목 ──
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (grade != null) ...[
+                        _AdGradeBadge(grade: grade),
+                        const SizedBox(width: 7),
+                      ],
+                      Expanded(
+                        child: Text(
+                          blog.title,
+                          style: AppText.title(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
-                    Expanded(
-                      child: Text(
-                        blog.title,
-                        style: AppText.title(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
+                  ),
+                  const SizedBox(height: 6),
 
-                // ── 미리보기 ──
-                Text(
-                  blog.preview.isNotEmpty ? blog.preview : '요약 없음',
-                  style: AppText.caption(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
+                  // ── 미리보기 ──
+                  Text(
+                    blog.preview.isNotEmpty ? blog.preview : '요약 없음',
+                    style: AppText.caption(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
 
-                // ── 작성자 · 날짜 ──
-                Row(
-                  children: [
-                    Text(
-                      blog.author,
-                      style: AppText.caption().copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
+                  // ── 작성자 · 날짜 ──
+                  Row(
+                    children: [
+                      Text(
+                        blog.author,
+                        style: AppText.caption().copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '·',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
+                      const SizedBox(width: 6),
+                      Text(
+                        '·',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      blog.date,
-                      style: AppText.caption().copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
+                      const SizedBox(width: 6),
+                      Text(
+                        blog.date,
+                        style: AppText.caption().copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            bottom: 0,
-            child: Center(
-              child: ReportButton(
-                reviewId: blog.id.toString(),
-                iconOnly: true,
-                onReportSubmitted: onReportSubmitted,
+                    ],
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Positioned(
+              top: 0,
+              right: 0,
+              bottom: 0,
+              child: Center(
+                child: ReviewActionButtons(
+                  reviewId: blog.id.toString(),
+                  onReportSubmitted: onReportSubmitted,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
