@@ -18,14 +18,6 @@ class ReviewReportRemoteSource {
     }).eq('id', reviewId);
   }
 
-  // ── 신고 취소 (report, confirm → NULL) ────
-  Future<void> cancelReport(String reviewId) async {
-    await _client.from(_table).update({
-      'report': null,
-      'confirm': null,
-    }).eq('id', reviewId);
-  }
-
   // ── 내가 신고한 리뷰인지 확인 ─────────────
   Future<bool> hasReportedByUser({
     required String reviewId,
@@ -34,7 +26,7 @@ class ReviewReportRemoteSource {
     final res =
         await _client.from(_table).select('report').eq('id', reviewId).single();
 
-    final report = (res as Map<String, dynamic>)['report'];
+    final report = res['report'];
     if (report == null) return false;
     return (report as Map)['user_email'] == userEmail;
   }
@@ -44,6 +36,6 @@ class ReviewReportRemoteSource {
     final res =
         await _client.from(_table).select('report').eq('id', reviewId).single();
 
-    return (res as Map<String, dynamic>)['report'] == null;
+    return res['report'] == null;
   }
 }

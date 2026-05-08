@@ -69,8 +69,6 @@ class ReportButton extends ConsumerWidget {
         '신고가 접수되어 리뷰를 숨겼습니다.',
         isError: false,
       );
-    } else if (result == ReportSubmitResult.cancelled) {
-      _showSnack(messenger, '신고가 취소되었습니다.', isError: false);
     }
   }
 

@@ -3,7 +3,6 @@ import '../sources/review_report_remote_source.dart';
 
 enum ReportSubmitResult {
   submitted, // 신고 완료
-  cancelled, // 신고 취소
   duplicate, // 다른 유저가 이미 신고한 리뷰
   error,
 }
@@ -28,8 +27,7 @@ class ReviewReportRepository {
         userEmail: report.userEmail,
       );
       if (alreadyMine) {
-        await _source.cancelReport(reviewId);
-        return ReportSubmitResult.cancelled;
+        return ReportSubmitResult.submitted;
       }
 
       // ② 다른 사람이 이미 신고했는지 확인

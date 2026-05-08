@@ -57,8 +57,6 @@ class _ReviewReportSheetState extends ConsumerState<_ReviewReportSheet> {
     switch (result) {
       case ReportSubmitResult.submitted:
         Navigator.pop(context, result);
-      case ReportSubmitResult.cancelled:
-        Navigator.pop(context, result);
       case ReportSubmitResult.duplicate:
         _showSnack(context, '이미 다른 사용자가 신고한 리뷰입니다.', isError: true);
       case ReportSubmitResult.error:
