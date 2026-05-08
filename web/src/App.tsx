@@ -128,6 +128,7 @@ type ActiveSidePanel =
   | 'search'
   | 'restaurant'
   | 'bookmarks'
+  | 'recent'
   | 'detail'
   | 'ai'
   | 'settings'
@@ -145,6 +146,32 @@ type UserProfile = {
 type UserBookmarks = {
   storeIds: string[]
   restaurants: Restaurant[]
+}
+
+type RecentAnalysisRestaurant = Omit<Restaurant, 'latitude' | 'longitude'> & {
+  latitude: number | null
+  longitude: number | null
+}
+
+type RecentAnalysisItem = {
+  storeId: string
+  analyzedDate: string
+  daysElapsed: number | null
+  remainingFreeDays: number
+  restaurant: RecentAnalysisRestaurant
+}
+
+type RecentAnalyses = {
+  today: string
+  freeItems: RecentAnalysisItem[]
+  expiredItems: RecentAnalysisItem[]
+}
+
+type RecentAnalysesState = {
+  data: RecentAnalyses | null
+  isLoading: boolean
+  errorMessage: string
+  hasLoaded: boolean
 }
 
 type UserProfileState = {
@@ -355,7 +382,7 @@ function createRestaurantMarker(
   return marker
 }
 
-function isCafe(restaurant: Restaurant) {
+function isCafe(restaurant: Pick<Restaurant, 'category'>) {
   const normalizedCategory = restaurant.category.toLowerCase()
   return restaurant.category.includes('카페') || normalizedCategory.includes('cafe')
 }
@@ -1169,6 +1196,103 @@ async function deleteUserBookmark(accessToken: string, storeId: string) {
   return parseUserBookmarks((await response.json()) as Record<string, unknown>)
 }
 
+function parseRecentAnalysisRestaurant(
+  item: unknown,
+  storeId: string,
+): RecentAnalysisRestaurant {
+  const source =
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? (item as Record<string, unknown>)
+      : {}
+  const latitude = Number(source.latitude ?? source.lat)
+  const longitude = Number(source.longitude ?? source.lng)
+  const placeUrl = cleanText(source.placeUrl ?? source.link)
+
+  return {
+    id: cleanText(source.id) || storeId,
+    storeId: cleanText(source.storeId) || storeId,
+    name: cleanText(source.name) || storeId,
+    address: cleanText(source.address),
+    category: cleanText(source.category) || '음식점',
+    categoryName: cleanText(source.categoryName),
+    categoryGroupCode: cleanText(source.categoryGroupCode),
+    categoryGroupName: cleanText(source.categoryGroupName),
+    distance: Number(source.distance) || 0,
+    phone: cleanText(source.phone),
+    link: placeUrl,
+    addressName: cleanText(source.addressName),
+    roadAddressName: cleanText(source.roadAddressName),
+    placeUrl,
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
+  }
+}
+
+function parseRecentAnalysisItem(item: Record<string, unknown>) {
+  const storeId = cleanText(item.storeId)
+  if (!storeId) return null
+
+  const daysElapsed = Number(item.daysElapsed)
+  return {
+    storeId,
+    analyzedDate: cleanText(item.analyzedDate),
+    daysElapsed: Number.isFinite(daysElapsed) ? daysElapsed : null,
+    remainingFreeDays: Number(item.remainingFreeDays) || 0,
+    restaurant: parseRecentAnalysisRestaurant(item.restaurant, storeId),
+  } satisfies RecentAnalysisItem
+}
+
+function parseRecentAnalyses(item: Record<string, unknown>): RecentAnalyses {
+  const parseItems = (value: unknown) =>
+    Array.isArray(value)
+      ? value
+          .map((entry) =>
+            entry && typeof entry === 'object' && !Array.isArray(entry)
+              ? parseRecentAnalysisItem(entry as Record<string, unknown>)
+              : null,
+          )
+          .filter((entry): entry is RecentAnalysisItem => Boolean(entry))
+      : []
+
+  return {
+    today: cleanText(item.today),
+    freeItems: parseItems(item.freeItems),
+    expiredItems: parseItems(item.expiredItems),
+  }
+}
+
+function recentAnalysisToRestaurant(item: RecentAnalysisItem): Restaurant | null {
+  const restaurant = item.restaurant
+  if (
+    typeof restaurant.latitude !== 'number' ||
+    typeof restaurant.longitude !== 'number' ||
+    !Number.isFinite(restaurant.latitude) ||
+    !Number.isFinite(restaurant.longitude)
+  ) {
+    return null
+  }
+
+  return {
+    ...restaurant,
+    latitude: restaurant.latitude as number,
+    longitude: restaurant.longitude as number,
+  }
+}
+
+async function fetchRecentAnalyses(accessToken: string) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/recent-analyses`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return parseRecentAnalyses((await response.json()) as Record<string, unknown>)
+}
+
 function App() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const kakaoMapsRef = useRef<KakaoMaps | null>(null)
@@ -1239,6 +1363,13 @@ function App() {
     currentRegionDong: '',
     isRegionFiltered: false,
   })
+  const [recentAnalysesState, setRecentAnalysesState] =
+    useState<RecentAnalysesState>({
+      data: null,
+      isLoading: false,
+      errorMessage: '',
+      hasLoaded: false,
+    })
   const [toastMessage, setToastMessage] = useState('')
   const isLoggedIn = authSession !== null || isTemporaryAdmin
   const bookmarkedIds = bookmarkedStoreIds
@@ -1256,6 +1387,15 @@ function App() {
       profile: null,
       isLoading: false,
       isSaving: false,
+      errorMessage: '',
+      hasLoaded: false,
+    })
+  }
+
+  function resetRecentAnalysesState() {
+    setRecentAnalysesState({
+      data: null,
+      isLoading: false,
       errorMessage: '',
       hasLoaded: false,
     })
@@ -1287,6 +1427,10 @@ function App() {
       errorMessage: '',
       hasLoaded: true,
     }))
+    setRecentAnalysesState((previous) => ({
+      ...previous,
+      hasLoaded: false,
+    }))
   }
 
   useEffect(() => {
@@ -1297,6 +1441,7 @@ function App() {
     if (!supabase) {
       setAuthStatus('signedOut')
       resetUserProfileState()
+      resetRecentAnalysesState()
       return
     }
 
@@ -1312,6 +1457,7 @@ function App() {
       setAuthStatus(data.session ? 'signedIn' : 'signedOut')
       if (!data.session) {
         resetUserProfileState()
+        resetRecentAnalysesState()
       }
     })
 
@@ -1325,6 +1471,7 @@ function App() {
         window.localStorage.removeItem(TEMP_ADMIN_AUTH_STORAGE_KEY)
       } else {
         resetUserProfileState()
+        resetRecentAnalysesState()
       }
     })
 
@@ -1423,6 +1570,7 @@ function App() {
     setAuthErrorMessage('')
     setAuthStatus('signedIn')
     resetUserProfileState()
+    resetRecentAnalysesState()
     applyLocalBookmarkState(loadBookmarkedRestaurants())
     showToast('관리자 임시 로그인 상태입니다')
   }
@@ -1556,6 +1704,7 @@ function App() {
       setAuthSession(null)
       setAuthStatus('signedOut')
       resetUserProfileState()
+      resetRecentAnalysesState()
       setSelectedRestaurant(null)
       setActiveSidePanel('search')
       showToast('로그아웃되었습니다')
@@ -2103,6 +2252,69 @@ function App() {
     })
   }
 
+  async function loadRecentAnalyses() {
+    const token = authSession?.access_token
+    if (!token || isTemporaryAdmin) {
+      setRecentAnalysesState({
+        data: { today: '', freeItems: [], expiredItems: [] },
+        isLoading: false,
+        errorMessage: '',
+        hasLoaded: true,
+      })
+      return
+    }
+
+    setRecentAnalysesState((previous) => ({
+      ...previous,
+      isLoading: true,
+      errorMessage: '',
+    }))
+
+    try {
+      const data = await fetchRecentAnalyses(token)
+      setRecentAnalysesState({
+        data,
+        isLoading: false,
+        errorMessage: '',
+        hasLoaded: true,
+      })
+    } catch (error) {
+      setRecentAnalysesState((previous) => ({
+        ...previous,
+        isLoading: false,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : '최근분석 목록을 불러오지 못했습니다',
+        hasLoaded: true,
+      }))
+    }
+  }
+
+  function openRecentPanel() {
+    const shouldOpen = activeSidePanel !== 'recent'
+    setSelectedRestaurant(null)
+    setActiveSidePanel(shouldOpen ? 'recent' : 'search')
+
+    if (
+      shouldOpen &&
+      !recentAnalysesState.hasLoaded &&
+      !recentAnalysesState.isLoading
+    ) {
+      void loadRecentAnalyses()
+    }
+  }
+
+  function focusRecentAnalysis(item: RecentAnalysisItem) {
+    const restaurant = recentAnalysisToRestaurant(item)
+    if (!restaurant) {
+      showToast('최근분석 위치 정보를 찾지 못했습니다')
+      return
+    }
+
+    focusRestaurantOnMap(restaurant)
+  }
+
   function openSettingsPanel() {
     const shouldOpen = activeSidePanel !== 'settings'
     setSelectedRestaurant(null)
@@ -2315,6 +2527,11 @@ function App() {
     setReviewSort(nextSort)
     setReviewPage(0)
   }
+
+  const recentFreeItems = recentAnalysesState.data?.freeItems ?? []
+  const recentExpiredItems = recentAnalysesState.data?.expiredItems ?? []
+  const hasRecentAnalysisItems =
+    recentFreeItems.length > 0 || recentExpiredItems.length > 0
 
   return (
     <main className="map-page">
@@ -2853,6 +3070,158 @@ function App() {
           </section>
         </aside>
       )}
+      {activeSidePanel === 'recent' && (
+        <aside className="restaurant-panel bookmark-panel recent-panel" aria-label="최근분석">
+          <button
+            type="button"
+            className="panel-close-button"
+            aria-label="최근분석 닫기"
+            onClick={() => setActiveSidePanel('search')}
+          >
+            <X aria-hidden="true" size={19} strokeWidth={2.2} />
+          </button>
+
+          <section className="bookmark-panel-body">
+            <div className="bookmark-panel-header recent-panel-header">
+              <Clock aria-hidden="true" size={22} strokeWidth={2.2} />
+              <div>
+                <p>Recent Analysis</p>
+                <h2>최근분석</h2>
+              </div>
+            </div>
+
+            {isTemporaryAdmin || !authSession ? (
+              <div className="bookmark-empty">
+                Google 로그인 후 최근분석을 확인할 수 있습니다
+              </div>
+            ) : (
+              <>
+                {recentAnalysesState.isLoading && !recentAnalysesState.data && (
+                  <div className="detail-state-card">
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="spinning-icon"
+                      size={24}
+                      strokeWidth={2.2}
+                    />
+                    <strong>최근분석을 불러오는 중입니다</strong>
+                    <p>무료 분석 기간인 가게를 확인하고 있어요.</p>
+                  </div>
+                )}
+
+                {recentAnalysesState.errorMessage && (
+                  <div className="detail-state-card detail-state-error">
+                    <AlertCircle aria-hidden="true" size={24} strokeWidth={2.2} />
+                    <strong>최근분석을 불러오지 못했어요</strong>
+                    <p>{recentAnalysesState.errorMessage}</p>
+                    <button
+                      type="button"
+                      className="detail-secondary-button"
+                      onClick={loadRecentAnalyses}
+                    >
+                      <RefreshCw aria-hidden="true" size={16} strokeWidth={2.2} />
+                      다시 시도
+                    </button>
+                  </div>
+                )}
+
+                {!recentAnalysesState.isLoading &&
+                  !recentAnalysesState.errorMessage &&
+                  recentAnalysesState.hasLoaded &&
+                  !hasRecentAnalysisItems && (
+                    <div className="bookmark-empty">
+                      아직 분석한 가게가 없습니다
+                    </div>
+                  )}
+
+                {hasRecentAnalysisItems && (
+                  <div className="recent-analysis-groups">
+                    <section className="recent-analysis-section">
+                      <div className="recent-section-heading">
+                        <strong>무료 분석 가능</strong>
+                        <span>{recentFreeItems.length}개</span>
+                      </div>
+                      {recentFreeItems.length === 0 ? (
+                        <div className="recent-section-empty">
+                          무료 기간인 가게가 없습니다
+                        </div>
+                      ) : (
+                        <ul className="bookmark-list recent-analysis-list">
+                          {recentFreeItems.map((item) => (
+                            <li key={`free-${item.storeId}`}>
+                              <button
+                                type="button"
+                                className="bookmark-list-item recent-analysis-item"
+                                onClick={() => focusRecentAnalysis(item)}
+                              >
+                                <span className="bookmark-thumb" aria-hidden="true">
+                                  {isCafe(item.restaurant) ? '☕' : '🍽'}
+                                </span>
+                                <span className="bookmark-copy">
+                                  <strong>{item.restaurant.name}</strong>
+                                  <small>
+                                    {item.restaurant.category} ·{' '}
+                                    {item.restaurant.address || '주소 정보 없음'}
+                                  </small>
+                                  <em>
+                                    {item.analyzedDate} · 무료-
+                                    {item.remainingFreeDays}일 남음
+                                  </em>
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+
+                    <section className="recent-analysis-section">
+                      <div className="recent-section-heading">
+                        <strong>지난 검색</strong>
+                        <span>{recentExpiredItems.length}개</span>
+                      </div>
+                      {recentExpiredItems.length === 0 ? (
+                        <div className="recent-section-empty">
+                          지난 검색 가게가 없습니다
+                        </div>
+                      ) : (
+                        <ul className="bookmark-list recent-analysis-list">
+                          {recentExpiredItems.map((item) => (
+                            <li key={`expired-${item.storeId}`}>
+                              <button
+                                type="button"
+                                className="bookmark-list-item recent-analysis-item"
+                                onClick={() => focusRecentAnalysis(item)}
+                              >
+                                <span className="bookmark-thumb" aria-hidden="true">
+                                  {isCafe(item.restaurant) ? '☕' : '🍽'}
+                                </span>
+                                <span className="bookmark-copy">
+                                  <strong>{item.restaurant.name}</strong>
+                                  <small>
+                                    {item.restaurant.category} ·{' '}
+                                    {item.restaurant.address || '주소 정보 없음'}
+                                  </small>
+                                  <em>
+                                    {item.analyzedDate}
+                                    {item.daysElapsed !== null
+                                      ? ` · ${item.daysElapsed}일 전`
+                                      : ''}
+                                  </em>
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </aside>
+      )}
       {activeSidePanel === 'ai' && (
         <aside className="restaurant-panel ai-panel" aria-label="AI 추천">
           <button
@@ -3255,6 +3624,14 @@ function App() {
           }}
         >
           <Bookmark aria-hidden="true" size={20} strokeWidth={2.2} />
+        </button>
+        <button
+          type="button"
+          className="map-tool-button"
+          aria-label="최근분석"
+          onClick={openRecentPanel}
+        >
+          <Clock aria-hidden="true" size={20} strokeWidth={2.2} />
         </button>
         <button
           type="button"

@@ -19,6 +19,9 @@ USER_PROFILE_SELECT = "email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
 KST = timezone(timedelta(hours=9))
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
+KAKAO_LOCAL_KEYWORD_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
+KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
 
 
 class AnalysisUsageError(RuntimeError):
@@ -315,6 +318,217 @@ async def consume_analysis_usage(email: str, store_id: str | None = None) -> dic
 async def get_user_bookmarks(email: str) -> dict:
     profile = await ensure_user_profile(email)
     return _normalize_user_bookmarks(profile)
+
+
+async def get_user_recent_analyses(email: str) -> dict:
+    profile = await ensure_user_profile(email)
+    store_date_map = _normalize_store_date_map(profile.get("store"))
+    today = datetime.now(KST).date()
+    today_text = today.strftime("%Y%m%d")
+
+    if not store_date_map:
+        return {"today": today_text, "freeItems": [], "expiredItems": []}
+
+    recent_entries = []
+    for store_id, date_text in store_date_map.items():
+        try:
+            analyzed_date = datetime.strptime(date_text, "%Y%m%d").date()
+        except ValueError:
+            analyzed_date = None
+
+        days_elapsed = (
+            max(0, (today - analyzed_date).days) if analyzed_date else None
+        )
+        recent_entries.append(
+            {
+                "storeId": store_id,
+                "analyzedDate": date_text,
+                "daysElapsed": days_elapsed,
+                "remainingFreeDays": 1
+                if days_elapsed is not None and days_elapsed < 2
+                else 0,
+                "restaurant": None,
+            }
+        )
+
+    async with httpx.AsyncClient(timeout=6.0) as client:
+        for item in recent_entries:
+            store_id = item["storeId"]
+            review = await _fetch_latest_review_for_store(client, store_id)
+            place = await _find_kakao_place_for_recent_analysis(
+                client,
+                store_id=store_id,
+                review=review,
+            )
+            item["restaurant"] = _recent_analysis_restaurant(
+                store_id=store_id,
+                review=review,
+                place=place,
+            )
+
+    recent_entries.sort(
+        key=lambda item: (
+            item.get("analyzedDate") or "",
+            item.get("restaurant", {}).get("name") or "",
+        ),
+        reverse=True,
+    )
+
+    free_items = [
+        item
+        for item in recent_entries
+        if isinstance(item.get("daysElapsed"), int) and item["daysElapsed"] < 2
+    ]
+    expired_items = [
+        item
+        for item in recent_entries
+        if not isinstance(item.get("daysElapsed"), int)
+        or item.get("daysElapsed", 0) >= 2
+    ]
+
+    return {
+        "today": today_text,
+        "freeItems": free_items,
+        "expiredItems": expired_items,
+    }
+
+
+async def _fetch_latest_review_for_store(
+    client: httpx.AsyncClient,
+    store_id: str,
+) -> dict | None:
+    resp = await client.get(
+        f"{SUPABASE_URL}/rest/v1/reviews",
+        headers=_h(),
+        params={
+            "store_id": f"eq.{store_id}",
+            "select": (
+                "name,store_id,category_name,category_group_code,"
+                "category_group_name,phone,address_name,road_address_name,"
+                "place_url,created_at"
+            ),
+            "order": "created_at.desc",
+            "limit": "1",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code != 200:
+        return None
+
+    rows = resp.json() if resp.text else []
+    return rows[0] if rows else None
+
+
+async def _find_kakao_place_for_recent_analysis(
+    client: httpx.AsyncClient,
+    *,
+    store_id: str,
+    review: dict | None,
+) -> dict | None:
+    if not KAKAO_REST_API_KEY:
+        return None
+
+    name = _text_or_none(review.get("name")) if review else None
+    address = _text_or_none(
+        (review or {}).get("road_address_name") or (review or {}).get("address_name")
+    )
+    queries = [name, f"{name} {address}" if name and address else None, store_id]
+    headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
+    fallback = None
+
+    for query in [item for item in queries if item]:
+        for category_code in KAKAO_PLACE_CATEGORY_CODES:
+            response = await client.get(
+                KAKAO_LOCAL_KEYWORD_URL,
+                headers=headers,
+                params={
+                    "query": query,
+                    "category_group_code": category_code,
+                    "size": 5,
+                },
+                timeout=5,
+            )
+            if response.status_code != 200:
+                continue
+
+            documents = response.json().get("documents", [])
+            if not documents:
+                continue
+
+            exact = next(
+                (
+                    document
+                    for document in documents
+                    if _text_or_none(document.get("id")) == store_id
+                ),
+                None,
+            )
+            if exact:
+                return exact
+            fallback = fallback or documents[0]
+
+    return fallback
+
+
+def _recent_analysis_restaurant(
+    *,
+    store_id: str,
+    review: dict | None,
+    place: dict | None,
+) -> dict:
+    review = review or {}
+    place = place or {}
+    place_url = (
+        _text_or_none(review.get("place_url"))
+        or _text_or_none(place.get("place_url"))
+        or ""
+    )
+    address_name = (
+        _text_or_none(review.get("address_name"))
+        or _text_or_none(place.get("address_name"))
+        or ""
+    )
+    road_address_name = (
+        _text_or_none(review.get("road_address_name"))
+        or _text_or_none(place.get("road_address_name"))
+        or ""
+    )
+    lat = _float_or_none(place.get("y"))
+    lng = _float_or_none(place.get("x"))
+
+    return {
+        "id": store_id,
+        "storeId": store_id,
+        "name": _text_or_none(review.get("name"))
+        or _text_or_none(place.get("place_name"))
+        or store_id,
+        "address": road_address_name or address_name,
+        "category": _text_or_none(review.get("category_name"))
+        or _text_or_none(place.get("category_name"))
+        or "음식점",
+        "categoryName": _text_or_none(review.get("category_name"))
+        or _text_or_none(place.get("category_name"))
+        or "",
+        "categoryGroupCode": _text_or_none(review.get("category_group_code"))
+        or _text_or_none(place.get("category_group_code"))
+        or "",
+        "categoryGroupName": _text_or_none(review.get("category_group_name"))
+        or _text_or_none(place.get("category_group_name"))
+        or "",
+        "distance": 0,
+        "phone": _text_or_none(review.get("phone"))
+        or _text_or_none(place.get("phone"))
+        or "",
+        "link": place_url,
+        "placeUrl": place_url,
+        "addressName": address_name,
+        "roadAddressName": road_address_name,
+        "lat": lat,
+        "lng": lng,
+        "latitude": lat,
+        "longitude": lng,
+    }
 
 
 async def add_user_bookmark(email: str, store_id: str, store: dict | None) -> dict:
