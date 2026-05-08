@@ -52,4 +52,22 @@ def score_is_ad(review_description: str) -> float:
     logits = _model(**encoded).logits
     probs = logits.softmax(dim=-1)
     ad_score = probs[0, 1].item()
-    return float(ad_score)
+    return float(ad_score)
+
+def predict_and_score_batch(texts: list[str]) -> tuple[list[int], list[float]]:
+    if not _model_available or _model is None or _tokenizer is None:
+        return [0] * len(texts), [0.0] * len(texts)
+
+    cleaned = [(t or "").strip() for t in texts]
+    encoded = _tokenizer(
+        cleaned,
+        truncation=True,
+        padding=True,
+        max_length=256,
+        return_tensors="pt",
+    )
+    logits = _model(**encoded).logits
+    preds = logits.argmax(dim=-1).tolist()
+    probs = logits.softmax(dim=-1)
+    scores = [float(probs[i, 1].item()) for i in range(len(cleaned))]
+    return [int(p) for p in preds], scores
