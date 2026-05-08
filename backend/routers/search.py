@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Header, HTTPException, Query, status
 
+import time
 from services.preprocess import preprocess
 from services.electra_service import predict_is_ad, score_is_ad, predict_and_score_batch
 from services.llm_service import classify_ad, summarize_reviews
@@ -19,7 +20,7 @@ from services.supabase_service import (
     get_cached_reviews,
     has_analysis_usage,
     save_reviews,
-    update_electra_pred,
+    # update_electra_pred,
     update_finetuned_pred,
     update_llm_pred,
 )
@@ -316,6 +317,7 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
     all_preds, all_scores = [], []
 
     print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
+    batch_start = time.time()
     for i in range(0, len(targets), INFER_BATCH):
         chunk = targets[i:i + INFER_BATCH]
         descriptions = [
@@ -329,20 +331,20 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
         preds, scores = predict_and_score_batch(descriptions)
         all_preds.extend(preds)
         all_scores.extend(scores)
-    print(f"[DEBUG] BERT 배치 판별 완료")
+        print(f"[DEBUG] BERT 판별 진행 | {len(all_preds)}/{len(targets)}")
+    batch_elapsed = time.time() - batch_start
+    print(f"[DEBUG] BERT 배치 판별 완료 | 소요 시간: {batch_elapsed:.2f}s")
 
     print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
     preds, scores = predict_and_score_batch(descriptions)
     print(f"[DEBUG] BERT 배치 판별 완료")
 
-    for review, pred, score in zip(targets, preds, scores):
-        review_id = review.get("id")
-        if review_id is not None:
-            await update_electra_pred(review_id, pred)
-            await update_finetuned_pred(review_id, score)
-        # review["is_ad_electra_pred"] = pred
-        review["is_ad_finetuned_pred"] = score
-        print(f"[DEBUG] 저장 완료 | id: {review_id} | pred: {pred} | score: {score:.3f}")
+    for idx, (review, pred, score) in enumerate(zip(targets, all_preds, all_scores), 1):
+      review_id = review.get("id")
+      if review_id is not None:
+          await update_finetuned_pred(review_id, score)
+      review["is_ad_finetuned_pred"] = score
+      print(f"[DEBUG] 저장 완료 | {idx}/{len(targets)} | id: {review_id} | score: {score:.3f}")
 
 
 def _build_place_metadata(

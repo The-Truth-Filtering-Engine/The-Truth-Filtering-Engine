@@ -616,9 +616,9 @@ async def get_cached_reviews(
 # 판별 결과 업데이트 (search.py 에서 호출)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def update_electra_pred(review_id: str, is_ad: int) -> None:
-    """Electra 이진 판별 결과 저장."""
-    await _patch_review(review_id, {"is_ad_electra_pred": int(is_ad)})
+# async def update_electra_pred(review_id: str, is_ad: int) -> None:
+#     """Electra 이진 판별 결과 저장."""
+#     await _patch_review(review_id, {"is_ad_electra_pred": int(is_ad)})
 
 
 async def update_finetuned_pred(review_id: str, score: float) -> None:

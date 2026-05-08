@@ -89,7 +89,7 @@ async def get_nearby_restaurants(
             )
         return response.json().get("documents", [])
 
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         documents = []
         for category_code in KAKAO_PLACE_CATEGORY_CODES:
             documents.extend(await fetch_category(client, category_code))

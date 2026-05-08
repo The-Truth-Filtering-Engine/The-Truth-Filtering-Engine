@@ -191,7 +191,7 @@ async def _find_places_by_names(names: list) -> dict[str, dict]:
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
     places: dict[str, dict] = {}
 
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         for name in cleaned_names:
             place = await _find_place_by_name(client, headers, name)
             if place:
