@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/blog_review.dart';
+import '../utils/blog_review_url.dart';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/review_item.dart';
 
@@ -142,6 +143,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
   late TabController _tabController;
   int _currentTabIndex = 0;
   int _currentPage = 0;
+  final Set<int> _hiddenReviewIds = <int>{};
 
   @override
   void initState() {
@@ -159,6 +161,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
         oldWidget.blogs.length != widget.blogs.length;
 
     if (shopChanged) {
+      _hiddenReviewIds.clear();
       _currentPage = 0;
     } else if (blogsChanged ||
         oldWidget.hasMoreReviews != widget.hasMoreReviews) {
@@ -173,14 +176,22 @@ class _ReviewListSectionState extends State<ReviewListSection>
     super.dispose();
   }
 
-  List<BlogReview> get _sortedByReal => [...widget.blogs]
+  List<BlogReview> get _displayBlogs => _hiddenReviewIds.isEmpty
+      ? widget.blogs
+      : widget.blogs
+          .where((blog) => !_hiddenReviewIds.contains(blog.id))
+          .toList();
+
+  List<BlogReview> get _sortedByReal => [..._displayBlogs]
     ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
   List<BlogReview> get _sortedByDate =>
-      [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
+      [..._displayBlogs]..sort((a, b) => b.date.compareTo(a.date));
 
   Future<void> _openUrl(BlogReview blog) async {
-    final uri = Uri.parse(blog.url);
+    final uri = mobileBlogReviewUri(blog.url);
+    if (uri == null) return;
+
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
@@ -262,6 +273,15 @@ class _ReviewListSectionState extends State<ReviewListSection>
     if (!widget.hasMoreReviews || widget.isLoadingReviewBatch) return;
 
     widget.onRequestReviewBatch?.call(page);
+  }
+
+  void _hideReportedReview(BlogReview blog) {
+    if (_hiddenReviewIds.contains(blog.id)) return;
+
+    setState(() {
+      _hiddenReviewIds.add(blog.id);
+      _clampCurrentPage();
+    });
   }
 
   @override
@@ -350,6 +370,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
                     ReviewItem(
                       blog: blog,
                       onTap: () => _openUrl(blog),
+                      onReportSubmitted: () => _hideReportedReview(blog),
                     ),
                 _PaginationControls(
                   currentPage: _currentPage,

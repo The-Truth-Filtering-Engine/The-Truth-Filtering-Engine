@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/blog_review.dart';
+import '../utils/blog_review_url.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../common/app_bar_logo.dart';
 import '../../../common/stat_progress_bar.dart';
@@ -174,7 +175,9 @@ class _BlogListScreenState extends State<BlogListScreen>
       [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
 
   Future<void> _openWebview(BlogReview blog) async {
-    final uri = Uri.parse(blog.url);
+    final uri = mobileBlogReviewUri(blog.url);
+    if (uri == null) return;
+
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

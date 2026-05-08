@@ -2,19 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/config/supabase_config.dart';
+import '../../../core/providers/current_user_provider.dart'; // ← 추가
 import '../../../main.dart';
 
-class LoginSignupScreen extends StatefulWidget {
+// StatefulWidget → ConsumerStatefulWidget 으로 변경
+class LoginSignupScreen extends ConsumerStatefulWidget {
   const LoginSignupScreen({super.key});
 
   @override
-  State<LoginSignupScreen> createState() => _LoginSignupScreenState();
+  ConsumerState<LoginSignupScreen> createState() => _LoginSignupScreenState();
 }
 
-class _LoginSignupScreenState extends State<LoginSignupScreen> {
+class _LoginSignupScreenState extends ConsumerState<LoginSignupScreen> {
   static const _mainColor = Color(0xFF1D9E75);
   static const _textColor = Color(0xFF1E2A24);
   static const _mutedColor = Color(0xFF6B7A72);
@@ -41,6 +44,11 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
 
     _authSubscription = auth.onAuthStateChange.listen((data) {
       if (data.session != null) {
+        // ▼ Google 로그인 완료 → appAuthProvider 에 이메일 저장
+        final email = data.session!.user.email ?? '';
+        if (email.isNotEmpty) {
+          ref.read(appAuthProvider.notifier).setGoogleUser(email);
+        }
         _goToMainShell();
       }
     });
@@ -82,6 +90,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
   }
 
   void _signInAsTemporaryAdmin() {
+    // ▼ 임시 로그인 → appAuthProvider 에 'admin' 저장
+    ref.read(appAuthProvider.notifier).setTempAdmin();
     _showSnackBar('관리자 임시 로그인 상태입니다.');
     _goToMainShell();
   }
