@@ -11,6 +11,7 @@ class RestaurantBottomSheet extends StatelessWidget {
   final VoidCallback? onCallTap;
   final VoidCallback? onRouteTap;
   final bool isBookmarked;
+  final String detailButtonLabel;
 
   const RestaurantBottomSheet({
     super.key,
@@ -21,6 +22,7 @@ class RestaurantBottomSheet extends StatelessWidget {
     this.onCallTap,
     this.onRouteTap,
     this.isBookmarked = false,
+    this.detailButtonLabel = '상세 보기',
   });
 
   @override
@@ -177,9 +179,13 @@ class RestaurantBottomSheet extends StatelessWidget {
                                 size: 18,
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                '상세 보기',
-                                style: AppTextStyles.primaryButton,
+                              Flexible(
+                                child: Text(
+                                  detailButtonLabel,
+                                  style: AppTextStyles.primaryButton,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),

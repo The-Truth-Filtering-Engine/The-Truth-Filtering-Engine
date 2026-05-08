@@ -1,13 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/config/backend_config.dart';
 import '../../../core/config/supabase_config.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
+import '../../../core/providers/user_profile_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -17,9 +14,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  UserProfile? _profile;
   String? _errorMessage;
-  bool _isLoading = false;
   bool _isSaving = false;
 
   String? get _accessToken {
@@ -34,7 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_hasGoogleSession) {
-        _loadProfile();
+        ref.read(userProfileProvider.notifier).loadIfPossible(force: true);
       }
     });
   }
@@ -109,6 +104,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _accountSection() {
+    final profileState = ref.watch(userProfileProvider);
+    final profile = profileState.asData?.value;
+    final profileError =
+        profileState.hasError ? profileState.error.toString() : null;
+
     if (!_hasGoogleSession) {
       return Card(
         child: Padding(
@@ -143,7 +143,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
-    if (_isLoading && _profile == null) {
+    if (profileState.isLoading && profile == null) {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -152,7 +152,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
-    if (_errorMessage != null && _profile == null) {
+    if (profileError != null && profile == null) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -160,12 +160,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                _errorMessage!,
+                profileError,
                 style: const TextStyle(color: Colors.red),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: _isLoading ? null : _loadProfile,
+                onPressed: profileState.isLoading ? null : _loadProfile,
                 icon: const Icon(Icons.refresh),
                 label: const Text('다시 시도'),
               ),
@@ -175,7 +175,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
-    final profile = _profile;
     if (profile == null) {
       return const Card(
         child: ListTile(
@@ -316,57 +315,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final token = _accessToken;
-    if (token == null) return;
-
     setState(() {
-      _isLoading = true;
       _errorMessage = null;
     });
-
-    try {
-      final profile = await _requestProfile(token);
-      if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _isLoading = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = error.toString();
-      });
-    }
+    await ref.read(userProfileProvider.notifier).loadIfPossible(force: true);
   }
 
   Future<void> _togglePremium() async {
-    final token = _accessToken;
-    final profile = _profile;
-    if (token == null || profile == null) return;
+    final profile = ref.read(userProfileProvider).asData?.value;
+    if (!_hasGoogleSession || profile == null) return;
 
     await _mutateProfile(
-      () => _requestProfile(
-        token,
-        method: 'PATCH',
-        path: '/user/me/premium',
-        body: {'premium': !profile.isPremium},
-      ),
+      () =>
+          ref.read(userProfileProvider.notifier).setPremium(!profile.isPremium),
       profile.isPremium ? '프리미엄이 해제되었습니다' : '프리미엄이 설정되었습니다',
     );
   }
 
   Future<void> _chargeCoins(int amount) async {
-    final token = _accessToken;
-    if (token == null) return;
+    if (!_hasGoogleSession) return;
 
     await _mutateProfile(
-      () => _requestProfile(
-        token,
-        method: 'POST',
-        path: '/user/me/coins',
-        body: {'amount': amount},
-      ),
+      () => ref.read(userProfileProvider.notifier).chargeCoins(amount),
       '$amount 코인이 충전되었습니다',
     );
   }
@@ -381,10 +351,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     try {
-      final profile = await request();
+      await request();
       if (!mounted) return;
       setState(() {
-        _profile = profile;
         _isSaving = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -397,49 +366,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _errorMessage = error.toString();
       });
     }
-  }
-
-  Future<UserProfile> _requestProfile(
-    String token, {
-    String method = 'GET',
-    String path = '/user/me',
-    Map<String, Object?>? body,
-  }) async {
-    final uri = BackendConfig.apiUri(path);
-    final headers = {
-      'Authorization': 'Bearer $token',
-      'Content-Type': 'application/json',
-    };
-
-    final response = switch (method) {
-      'PATCH' => await http.patch(
-          uri,
-          headers: headers,
-          body: jsonEncode(body),
-        ),
-      'POST' => await http.post(
-          uri,
-          headers: headers,
-          body: jsonEncode(body),
-        ),
-      _ => await http.get(uri, headers: headers),
-    };
-
-    final text = utf8.decode(response.bodyBytes);
-    final decoded = text.isEmpty ? null : jsonDecode(text);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = decoded is Map
-          ? decoded['detail']?.toString() ?? '요청 실패: ${response.statusCode}'
-          : '요청 실패: ${response.statusCode}';
-      throw Exception(message);
-    }
-
-    if (decoded is! Map<String, dynamic>) {
-      throw Exception('사용자 응답 형식이 올바르지 않습니다');
-    }
-
-    return UserProfile.fromJson(decoded);
   }
 
   Future<void> _logout() async {
@@ -458,44 +384,5 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
-  }
-}
-
-class UserProfile {
-  const UserProfile({
-    required this.email,
-    required this.premium,
-    required this.coin,
-    required this.freecount,
-    required this.premiumcount,
-    this.store,
-    this.bookmark,
-  });
-
-  final String email;
-  final int premium;
-  final int coin;
-  final int freecount;
-  final int premiumcount;
-  final Object? store;
-  final String? bookmark;
-
-  bool get isPremium => premium == 1;
-
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
-    return UserProfile(
-      email: json['email']?.toString() ?? '',
-      premium: _intFromJson(json['premium']),
-      coin: _intFromJson(json['coin']),
-      freecount: _intFromJson(json['freecount']),
-      premiumcount: _intFromJson(json['premiumcount']),
-      store: json['store'],
-      bookmark: json['bookmark']?.toString(),
-    );
-  }
-
-  static int _intFromJson(Object? value) {
-    if (value == null) return 0;
-    return int.tryParse(value.toString()) ?? 0;
   }
 }
