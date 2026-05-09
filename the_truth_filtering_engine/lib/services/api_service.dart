@@ -1,0 +1,16 @@
+import 'package:dio/dio.dart';
+import '../core/config/backend_config.dart';
+import '../models/search_result.dart';
+
+class ApiService {
+  final _dio = Dio(BaseOptions(
+    baseUrl: BackendConfig.apiBaseUrl,
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 60), // LLM 응답 오래 걸릴 수 있음
+  ));
+
+  Future<SearchResult> search(String query) async {
+    final res = await _dio.get('/search', queryParameters: {'query': query});
+    return SearchResult.fromJson(res.data);
+  }
+}
