@@ -61,7 +61,7 @@ class NaverServiceStoreNameFilterTest(unittest.TestCase):
     def test_filters_out_results_without_exact_store_name(self):
         blogs = [
             _blog("스타벅스 강남역점 라떼 후기"),
-            _blog("강남역 카페", "다녀온 곳은 스타벅스 강남역점입니다"),
+            _blog("강남역 카페", "다녀온 곳은 스타벅스 강남역점 입니다"),
             _blog("스타벅스 강남역", "좋았던 역점 근처 카페"),
             _blog("스타벅스", "강남역점"),
         ]
@@ -73,11 +73,27 @@ class NaverServiceStoreNameFilterTest(unittest.TestCase):
             "강남역 카페",
         ])
 
+    def test_rejects_store_name_when_letters_are_attached(self):
+        blogs = [
+            _blog("슈슈커리 신상 메뉴"),
+            _blog("맛슈슈 방문기"),
+            _blog("슈슈123 후기"),
+            _blog("슈슈 커리"),
+            _blog("[슈슈] 주말 후기"),
+        ]
+
+        filtered = filter_blogs_by_store_name(blogs, "슈슈")
+
+        self.assertEqual([item["title"] for item in filtered], [
+            "슈슈 커리",
+            "[슈슈] 주말 후기",
+        ])
+
     def test_filters_cached_review_fields(self):
         reviews = [
             {
                 "review_title": "브런치 기록",
-                "review_description": "스타벅스 강남역점에서 커피",
+                "review_description": "스타벅스 강남역점 에서 커피",
             },
             {
                 "review_title": "강남역 카페",

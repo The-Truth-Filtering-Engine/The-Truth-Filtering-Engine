@@ -11,6 +11,8 @@ NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 NAVER_BLOG_API_URL = "https://openapi.naver.com/v1/search/blog.json"
 NAVER_BLOG_MAX_DISPLAY = 100
+_MATCH_WORD_CHAR_PATTERN = r"0-9a-z가-힣"
+_MATCH_SEPARATOR_PATTERN = rf"[^{_MATCH_WORD_CHAR_PATTERN}]*"
 
 _PROVINCE_ALIASES = {
     "경기",
@@ -109,9 +111,29 @@ def normalize_store_name_for_match(value: object) -> str:
     return re.sub(r"[^0-9a-z가-힣]", "", text)
 
 
-def blog_mentions_store_name(blog: dict, store_name: object) -> bool:
+def _normalize_text_for_match(value: object) -> str:
+    return unicodedata.normalize("NFKC", _clean(str(value or ""))).casefold()
+
+
+def _store_name_match_pattern(store_name: object) -> re.Pattern | None:
     required = normalize_store_name_for_match(store_name)
     if not required:
+        return None
+
+    required_chars = _MATCH_SEPARATOR_PATTERN.join(
+        re.escape(char)
+        for char in required
+    )
+    return re.compile(
+        rf"(?<![{_MATCH_WORD_CHAR_PATTERN}])"
+        rf"{required_chars}"
+        rf"(?![{_MATCH_WORD_CHAR_PATTERN}])"
+    )
+
+
+def blog_mentions_store_name(blog: dict, store_name: object) -> bool:
+    pattern = _store_name_match_pattern(store_name)
+    if pattern is None:
         return True
 
     candidates = (
@@ -121,7 +143,7 @@ def blog_mentions_store_name(blog: dict, store_name: object) -> bool:
         blog.get("review_description"),
     )
     return any(
-        required in normalize_store_name_for_match(candidate)
+        pattern.search(_normalize_text_for_match(candidate))
         for candidate in candidates
     )
 
