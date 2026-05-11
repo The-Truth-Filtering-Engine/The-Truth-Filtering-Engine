@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
+import 'core/design_system/widgets/widgets.dart';
 import 'core/theme/app_theme.dart';
 import 'features/1-1_map/models/restaurant_model.dart';
 import 'features/1-1_map/providers/map_provider.dart';
@@ -75,25 +76,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             // 탭 0번(탐색/홈)으로 이동
             ref.read(mainTabIndexProvider.notifier).state = 0;
           },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/logo.png',
-                width: 32,
-                height: 32,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                '진실의 입',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary900,
-                ),
-              ),
-            ],
-          ),
+          child: const DsAppLogo(),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),

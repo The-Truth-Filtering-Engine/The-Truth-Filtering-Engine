@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
-import '../../1-1_map/widgets/truth_score_badge.dart';
 
 class RestaurantHeaderWidget extends StatelessWidget {
   final RestaurantModel restaurant;

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/config/supabase_config.dart';
+import '../../../core/design_system/app_tokens.dart';
+import '../../../core/design_system/widgets/widgets.dart';
 import '../../../core/providers/current_user_provider.dart'; // ← 추가
 import '../../../main.dart';
 
@@ -18,11 +20,6 @@ class LoginSignupScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginSignupScreenState extends ConsumerState<LoginSignupScreen> {
-  static const _mainColor = Color(0xFF1D9E75);
-  static const _textColor = Color(0xFF1E2A24);
-  static const _mutedColor = Color(0xFF6B7A72);
-  static const _borderColor = Color(0xFFDDE7E1);
-
   StreamSubscription<AuthState>? _authSubscription;
   bool _isGoogleLoading = false;
   bool _hasNavigated = false;
@@ -108,37 +105,34 @@ class _LoginSignupScreenState extends ConsumerState<LoginSignupScreen> {
   void _showSnackBar(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    DsToast.show(context, message);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F8F6),
+      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.x6),
+            child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: _borderColor),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _header(),
-                  const SizedBox(height: 28),
-                  _googleButton(),
-                  const SizedBox(height: 12),
-                  _temporaryAdminButton(),
-                ],
+              child: SizedBox(
+                width: double.infinity,
+                child: DsCard(
+                  padding: const EdgeInsets.all(AppSpacing.x7),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _header(),
+                      const SizedBox(height: AppSpacing.x7),
+                      _googleButton(),
+                      const SizedBox(height: AppSpacing.x3),
+                      _temporaryAdminButton(),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -150,40 +144,20 @@ class _LoginSignupScreenState extends ConsumerState<LoginSignupScreen> {
   Widget _header() {
     return Row(
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: _mainColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.layers_outlined,
-            color: Colors.white,
-            size: 28,
-          ),
-        ),
-        const SizedBox(width: 14),
-        const Expanded(
+        const DsAppLogo(showTitle: false, size: 48),
+        const SizedBox(width: AppSpacing.x4),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Sign in',
-                style: TextStyle(
-                  color: _mutedColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppText.label(),
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 3),
               Text(
                 '로그인이 필요합니다',
-                style: TextStyle(
-                  color: _textColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: AppText.display().copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -193,54 +167,23 @@ class _LoginSignupScreenState extends ConsumerState<LoginSignupScreen> {
   }
 
   Widget _googleButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: _isGoogleLoading ? null : _signInWithGoogle,
-        icon: _isGoogleLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.g_mobiledata, size: 28),
-        label: Text(_isGoogleLoading ? 'Google 로그인 중' : 'Google로 계속하기'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _textColor,
-          disabledForegroundColor: _mutedColor,
-          side: const BorderSide(color: _borderColor),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+    return DsButton(
+      label: _isGoogleLoading ? 'Google 로그인 중' : 'Google로 계속하기',
+      variant: DsButtonVariant.secondary,
+      size: DsButtonSize.lg,
+      loading: _isGoogleLoading,
+      onPressed: _isGoogleLoading ? null : _signInWithGoogle,
+      leftIcon: const Icon(Icons.g_mobiledata, size: 28),
     );
   }
 
   Widget _temporaryAdminButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 46,
-      child: TextButton.icon(
-        onPressed: _signInAsTemporaryAdmin,
-        icon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
-        label: const Text('관리자용 임시 로그인'),
-        style: TextButton.styleFrom(
-          foregroundColor: _mutedColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+    return DsButton(
+      label: '관리자용 임시 로그인',
+      variant: DsButtonVariant.ghost,
+      size: DsButtonSize.md,
+      onPressed: _signInAsTemporaryAdmin,
+      leftIcon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/design_system/widgets/widgets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/blog_review.dart';
 import 'review_action_buttons.dart';
@@ -189,21 +190,11 @@ class _AdGradeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: grade.color,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        grade.label,
-        style: const TextStyle(
-          fontSize: 11,
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          height: 1.2,
-        ),
-      ),
-    );
+    final tone = switch (grade) {
+      AdGrade.low => DsTone.real,
+      AdGrade.mid => DsTone.suspicious,
+      AdGrade.high => DsTone.ad,
+    };
+    return DsBadge(label: grade.label, tone: tone);
   }
 }

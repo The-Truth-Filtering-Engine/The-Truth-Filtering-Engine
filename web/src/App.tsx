@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { createClient, type Session } from '@supabase/supabase-js'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
+import appLogoUrl from '../logo.png'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -2541,7 +2542,7 @@ function App() {
           <section className="login-panel-body">
             <div className="login-panel-header">
               <div className="login-mark" aria-hidden="true">
-                T
+                <img src={appLogoUrl} alt="" />
               </div>
               <div>
                 <p>Sign in</p>
@@ -3593,6 +3594,9 @@ function App() {
         <div className="map-status map-status-error">{placesErrorMessage}</div>
       )}
       <nav className="map-tool-rail" aria-label="지도 메뉴">
+        <div className="map-tool-brand" aria-hidden="true">
+          <img src={appLogoUrl} alt="" />
+        </div>
         <button
           type="button"
           className="map-tool-button"
