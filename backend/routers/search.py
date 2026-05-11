@@ -120,7 +120,13 @@ async def search(
         cached = _filter_reviews_for_place(cached, place_metadata)
     cached_count = len(cached)
     requested_batch_end = normalized_start + review_limit - 1
-    should_fetch = refresh or cached_count < requested_batch_end
+    
+    should_fetch = refresh or (
+        not place_detail_request and cached_count < requested_batch_end
+    ) or (
+        place_detail_request and cached_count == 0
+    )
+    
     fetched_count = 0
     raw_fetched_count = 0
     naver_query = build_naver_blog_query(query, place_metadata)
