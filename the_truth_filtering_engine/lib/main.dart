@@ -8,7 +8,6 @@ import 'features/1-1_map/models/restaurant_model.dart';
 import 'features/1-1_map/providers/map_provider.dart';
 import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
-import 'features/2_recent_analysis/screens/recent_analysis_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
 import 'features/0-1_auth/screens/login_screen.dart'; // ← 추가
@@ -25,11 +24,7 @@ Future<void> main() async {
     );
   }
 
-  runApp(
-    const ProviderScope(
-      child: TruthMouthApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: TruthMouthApp()));
 }
 
 class TruthMouthApp extends StatelessWidget {
@@ -78,11 +73,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset(
-                'assets/logo.png',
-                width: 32,
-                height: 32,
-              ),
+              Image.asset('assets/logo.png', width: 32, height: 32),
               const SizedBox(width: 8),
               const Text(
                 '진실의 입',
@@ -103,30 +94,25 @@ class _MainShellState extends ConsumerState<MainShell> {
       body: IndexedStack(
         index: ref.watch(mainTabIndexProvider),
         children: [
-          MapScreen(
-            onOpenSettings: () {
-              ref.read(mainTabIndexProvider.notifier).state = 4;
-            },
-          ),
+          const MapScreen(),
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
-          RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
           const SettingsScreen(),
         ],
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 0.5),
-          ),
+          border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
         ),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
           currentIndex: ref.watch(mainTabIndexProvider),
           onTap: (index) =>
               ref.read(mainTabIndexProvider.notifier).state = index,
-          selectedLabelStyle:
-              const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
           items: const [
             BottomNavigationBarItem(
@@ -138,11 +124,6 @@ class _MainShellState extends ConsumerState<MainShell> {
               icon: Icon(Icons.bookmark_border_rounded),
               activeIcon: Icon(Icons.bookmark_rounded),
               label: '북마크',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              activeIcon: Icon(Icons.history_toggle_off_rounded),
-              label: '최근분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),

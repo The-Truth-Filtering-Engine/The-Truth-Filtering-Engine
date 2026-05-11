@@ -71,16 +71,16 @@ class KakaoMapViewState extends State<KakaoMapView> {
             widget.onMarkerTap(restaurant);
           } else if (type == 'cameraIdle') {
             final center = MapPoint(
-              (data['lat'] as num).toDouble(),
-              (data['lng'] as num).toDouble(),
+              latitude: (data['lat'] as num).toDouble(),
+              longitude: (data['lng'] as num).toDouble(),
             );
             final sw = MapPoint(
-              (data['swLat'] as num).toDouble(),
-              (data['swLng'] as num).toDouble(),
+              latitude: (data['swLat'] as num).toDouble(),
+              longitude: (data['swLng'] as num).toDouble(),
             );
             final ne = MapPoint(
-              (data['neLat'] as num).toDouble(),
-              (data['neLng'] as num).toDouble(),
+              latitude: (data['neLat'] as num).toDouble(),
+              longitude: (data['neLng'] as num).toDouble(),
             );
             final level = (data['level'] as num).toInt();
 

@@ -4,7 +4,10 @@ class MapPoint {
   final double latitude;
   final double longitude;
 
-  const MapPoint(this.latitude, this.longitude);
+  const MapPoint({
+    required this.latitude,
+    required this.longitude,
+  });
 }
 
 class MapBounds {

@@ -1,36 +1,55 @@
 import 'package:flutter/material.dart';
-// import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../1-3_restaurant_detail/providers/blog_review.dart';
+import '../../../core/providers/search_history_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../1-1_map/widgets/common_widgets.dart';
 import 'blog_list_screen.dart';
 import '../../../services/api_service.dart';
-// import '../../../models/review_item.dart';
 
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
+
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   final _apiService = ApiService();
   bool _isLoading = false;
+  bool _showHistory = false; // 포커스 시 기록 드롭다운 표시
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() => _showHistory = _focusNode.hasFocus);
+    });
+  }
 
   Future<void> _goToList(String query) async {
-    if (query.trim().isEmpty) {
+    final q = query.trim();
+    if (q.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('가게명 또는 링크를 입력해 주세요.')));
       return;
     }
 
-    setState(() => _isLoading = true);
+    // 검색어 저장
+    await ref.read(searchHistoryProvider.notifier).add(q);
+
+    _focusNode.unfocus();
+    setState(() {
+      _isLoading = true;
+      _showHistory = false;
+    });
 
     try {
-      final result = await _apiService.search(query.trim());
+      final result = await _apiService.search(q);
 
-      // ReviewItem → BlogReview 변환
       final blogs = result.reviews.map((r) {
         final adProb = (r.isAdLlmPred == 1) ? 90 : 10;
         final status =
@@ -50,9 +69,8 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }).toList();
 
-      // ShopInfo 생성
       final shopInfo = ShopInfo(
-        name: query.trim(),
+        name: q,
         category: '블로그 리뷰 분석',
         trustScore: result.total > 0
             ? ((result.realCount / result.total) * 100).round()
@@ -76,14 +94,21 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
+          .showSnackBar(SnackBar(content: Text('오류가 발생했습니다: \$e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  void _fillAndSearch(String query) {
+    _controller.text = query;
+    _goToList(query);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final history = ref.watch(searchHistoryProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: AppBarLogo(),
@@ -131,55 +156,90 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                TextField(
+
+                // ── 검색창 + 드롭다운 ───────────────────────
+                _SearchFieldWithHistory(
                   controller: _controller,
-                  style: AppText.body(),
+                  focusNode: _focusNode,
+                  history: history,
+                  showHistory: _showHistory && history.isNotEmpty,
                   onSubmitted: _goToList,
-                  decoration: const InputDecoration(
-                    hintText: '예: 오모테나시 스시 / https://map.naver.com/...',
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: AppColors.textHint, size: 20),
-                  ),
+                  onHistoryTap: _fillAndSearch,
+                  onHistoryRemove: (q) =>
+                      ref.read(searchHistoryProvider.notifier).remove(q),
+                  onHistoryClear: () =>
+                      ref.read(searchHistoryProvider.notifier).clear(),
                 ),
+
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed:
                       _isLoading ? null : () => _goToList(_controller.text),
                   child: const Text('🔍  분석 시작'),
                 ),
-                const SizedBox(height: 28),
-                const SectionTitle('최근 검색'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: recentSearches.asMap().entries.map((e) {
-                    final isFirst = e.key == 0;
-                    return GestureDetector(
-                      onTap: () => _goToList(e.value),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isFirst ? AppColors.primary50 : AppColors.bg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
+
+                // ── 최근 검색 칩 (하단 고정 목록) ────────────
+                if (history.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const SectionTitle('최근 검색'),
+                      TextButton(
+                        onPressed: () =>
+                            ref.read(searchHistoryProvider.notifier).clear(),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          '전체 삭제',
+                          style: AppText.caption()
+                              .copyWith(color: AppColors.textHint),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: history.asMap().entries.map((e) {
+                      final isFirst = e.key == 0;
+                      return GestureDetector(
+                        onTap: () => _fillAndSearch(e.value),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color:
+                                isFirst ? AppColors.primary50 : AppColors.bg,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
                               color: isFirst
                                   ? AppColors.primary200
                                   : AppColors.border,
-                              width: 0.5),
-                        ),
-                        child: Text(e.value,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Text(
+                            e.value,
                             style: AppText.caption().copyWith(
                               color: isFirst
                                   ? AppColors.primary500
                                   : AppColors.textSecondary,
-                              fontWeight:
-                                  isFirst ? FontWeight.w500 : FontWeight.w400,
-                            )),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                              fontWeight: isFirst
+                                  ? FontWeight.w500
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+
                 const SizedBox(height: 32),
               ],
             ),
@@ -209,6 +269,119 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+}
+
+// ── 검색창 + 포커스 시 기록 드롭다운 ──────────────────────────
+class _SearchFieldWithHistory extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final List<String> history;
+  final bool showHistory;
+  final ValueChanged<String> onSubmitted;
+  final ValueChanged<String> onHistoryTap;
+  final ValueChanged<String> onHistoryRemove;
+  final VoidCallback onHistoryClear;
+
+  const _SearchFieldWithHistory({
+    required this.controller,
+    required this.focusNode,
+    required this.history,
+    required this.showHistory,
+    required this.onSubmitted,
+    required this.onHistoryTap,
+    required this.onHistoryRemove,
+    required this.onHistoryClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          style: AppText.body(),
+          onSubmitted: onSubmitted,
+          decoration: const InputDecoration(
+            hintText: '예: 오모테나시 스시 / https://map.naver.com/...',
+            prefixIcon: Icon(Icons.search_rounded,
+                color: AppColors.textHint, size: 20),
+          ),
+        ),
+        if (showHistory)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 헤더
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('최근 검색',
+                          style: AppText.caption()
+                              .copyWith(color: AppColors.textHint)),
+                      GestureDetector(
+                        onTap: onHistoryClear,
+                        child: Text('전체 삭제',
+                            style: AppText.caption()
+                                .copyWith(color: AppColors.textHint)),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFE4E4EC)),
+                // 기록 목록
+                ...history.take(5).map(
+                      (q) => InkWell(
+                        onTap: () => onHistoryTap(q),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 11),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.history,
+                                  size: 15, color: AppColors.textHint),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(q, style: AppText.body()),
+                              ),
+                              GestureDetector(
+                                onTap: () => onHistoryRemove(q),
+                                behavior: HitTestBehavior.opaque,
+                                child: const Padding(
+                                  padding: EdgeInsets.only(left: 8),
+                                  child: Icon(Icons.close,
+                                      size: 14, color: AppColors.textHint),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 }
