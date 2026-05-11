@@ -90,6 +90,36 @@ def build_naver_blog_query(query: str, place_metadata: dict | None = None) -> st
     return " ".join(_dedupe_tokens(parts)) or query.strip()
 
 
+def filter_blog_previews_by_store_name(
+    blogs: list[dict],
+    store_name: str,
+) -> list[dict]:
+    return [
+        blog
+        for blog in blogs
+        if _contains_store_name(
+            store_name,
+            blog.get("title", ""),
+            blog.get("description", ""),
+        )
+    ]
+
+
+def filter_reviews_by_store_name(
+    reviews: list[dict],
+    store_name: str,
+) -> list[dict]:
+    return [
+        review
+        for review in reviews
+        if _contains_store_name(
+            store_name,
+            review.get("review_title", ""),
+            review.get("review_description", ""),
+        )
+    ]
+
+
 def _clean_query_token(value: object) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
@@ -144,11 +174,36 @@ def _category_hint(*categories: object) -> str | None:
             return hint
     return None
 
+
+def _contains_store_name(store_name: str, *texts: object) -> bool:
+    required = _primary_store_name_token(store_name)
+    if not required:
+        return True
+
+    haystack = _normalize_for_match(" ".join(_clean_query_token(text) for text in texts))
+    return required in haystack
+
+
+def _primary_store_name_token(store_name: str) -> str:
+    for raw_token in re.split(r"[\s,/|]+", _clean_query_token(store_name)):
+        token = _normalize_for_match(raw_token)
+        if token.endswith("점") and len(token) > 2:
+            token = token[:-1]
+        if len(token) >= 2:
+            return token
+    return _normalize_for_match(store_name)
+
+
+def _normalize_for_match(value: object) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", str(value or "")).lower()
+
+
 async def fetch_blog_previews(
     query: str,
     *,
     start: int = 1,
     display: int = REVIEW_BATCH_SIZE,
+    required_store_name: str | None = None,
 ) -> list[dict]:
     url = "https://openapi.naver.com/v1/search/blog.json"
     headers = {
@@ -167,7 +222,7 @@ async def fetch_blog_previews(
         res.raise_for_status()
         items = res.json().get("items", [])
 
-    return [
+    blogs = [
         {
             "title":       _clean(item["title"]),
             "description": _clean(item["description"]),
@@ -177,3 +232,7 @@ async def fetch_blog_previews(
         }
         for item in items
     ]
+
+    if required_store_name:
+        return filter_blog_previews_by_store_name(blogs, required_store_name)
+    return blogs

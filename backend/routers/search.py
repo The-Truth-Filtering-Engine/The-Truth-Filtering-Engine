@@ -5,7 +5,11 @@ import time
 from services.preprocess import preprocess
 from services.electra_service import predict_is_ad, score_is_ad, predict_and_score_batch
 from services.llm_service import classify_ad, summarize_reviews
-from services.naver_service import build_naver_blog_query, fetch_blog_previews
+from services.naver_service import (
+    build_naver_blog_query,
+    fetch_blog_previews,
+    filter_reviews_by_store_name,
+)
 from services.review_limits import (
     MAX_REVIEW_RESULTS,
     REVIEW_BATCH_SIZE,
@@ -37,7 +41,10 @@ async def search_cached(
     authorization: str | None = Header(default=None),
 ):
     review_limit = clamp_max_results(limit)
-    cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id)
+    cached = filter_reviews_by_store_name(
+        await get_cached_reviews(query, limit=review_limit, store_id=store_id),
+        query,
+    )
     usage = None
     auth_email = await _get_optional_auth_email(authorization)
 
@@ -100,10 +107,13 @@ async def search(
         f"limit: {review_limit} | refresh: {refresh} | storeId: {store_id or '-'}"
     )
 
-    cached = await get_cached_reviews(
+    cached = filter_reviews_by_store_name(
+        await get_cached_reviews(
+            query,
+            limit=max_review_results,
+            store_id=store_id,
+        ),
         query,
-        limit=max_review_results,
-        store_id=store_id,
     )
     cached_count = len(cached)
     requested_batch_end = normalized_start + review_limit - 1
@@ -122,6 +132,7 @@ async def search(
             naver_query,
             start=normalized_start,
             display=review_limit,
+            required_store_name=query,
         )
         fetched_count = len(blogs)
         print(f"[DEBUG] Naver 블로그 수집 완료 | count: {fetched_count}")
@@ -129,10 +140,13 @@ async def search(
         await save_reviews(query, blogs, place_metadata=place_metadata)
         print("[DEBUG] Supabase 저장 완료")
 
-        saved = await get_cached_reviews(
+        saved = filter_reviews_by_store_name(
+            await get_cached_reviews(
+                query,
+                limit=max_review_results,
+                store_id=store_id,
+            ),
             query,
-            limit=max_review_results,
-            store_id=store_id,
         )
         if not saved and blogs:
             saved = _blogs_to_reviews(
