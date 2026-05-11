@@ -743,6 +743,18 @@ function gradeLabel(grade: ReviewGrade) {
   return '의심'
 }
 
+function aiRegionScopeLabel(
+  regionScope: AiRegionScope,
+  state: Pick<
+    AiRecommendState,
+    'currentRegionSi' | 'currentRegionGu' | 'currentRegionDong'
+  >,
+) {
+  if (regionScope === 'si') return state.currentRegionSi || AI_REGION_SCOPE_LABELS.si
+  if (regionScope === 'gu') return state.currentRegionGu || AI_REGION_SCOPE_LABELS.gu
+  return state.currentRegionDong || AI_REGION_SCOPE_LABELS.dong
+}
+
 function parseBlogReview(item: Record<string, unknown>): BlogReview {
   const electraPred =
     typeof item.is_ad_electra_pred === 'number' ? item.is_ad_electra_pred : null
@@ -3389,20 +3401,21 @@ function App() {
                 <strong>{aiRecommendState.currentRegionLabel}</strong>
               </div>
             )}
-            <div className="ai-region-tabs" role="tablist" aria-label="추천 지역 범위">
-              {AI_REGION_SCOPE_OPTIONS.map((regionScope) => (
-                <button
-                  type="button"
-                  key={regionScope}
-                  className={aiRegionScope === regionScope ? 'active' : ''}
-                  disabled={aiRecommendState.isLoading}
-                  onClick={() => changeAiRegionScope(regionScope)}
-                >
-                  {AI_REGION_SCOPE_LABELS[regionScope]}
-                </button>
-              ))}
-            </div>
-            {!aiRecommendState.currentRegionLabel && (
+            {aiRecommendState.currentRegionLabel ? (
+              <div className="ai-region-tabs" role="tablist" aria-label="추천 지역 범위">
+                {AI_REGION_SCOPE_OPTIONS.map((regionScope) => (
+                  <button
+                    type="button"
+                    key={regionScope}
+                    className={aiRegionScope === regionScope ? 'active' : ''}
+                    disabled={aiRecommendState.isLoading}
+                    onClick={() => changeAiRegionScope(regionScope)}
+                  >
+                    {aiRegionScopeLabel(regionScope, aiRecommendState)}
+                  </button>
+                ))}
+              </div>
+            ) : (
               <p className="ai-region-status">
                 {currentPosition
                   ? '현재 위치를 확인하는 중입니다'
