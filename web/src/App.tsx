@@ -595,6 +595,11 @@ function cleanText(value: unknown) {
     .trim()
 }
 
+function cleanExternalUrl(value: unknown) {
+  const url = cleanText(value)
+  return /^https?:\/\//i.test(url) ? url : ''
+}
+
 function formatReviewDate(value: unknown) {
   const raw = cleanText(value)
   if (/^\d{8}$/.test(raw)) {
@@ -643,7 +648,7 @@ function parseBlogReview(item: Record<string, unknown>): BlogReview {
     author: cleanText(item.review_bloggername) || '알 수 없음',
     date: formatReviewDate(item.review_postdate),
     preview,
-    url: cleanText(item.review_url),
+    url: cleanExternalUrl(item.review_url ?? item.reviewUrl ?? item.link),
     adScore,
     adProbability: adScore === null ? 50 : Math.round(adScore * 100),
     grade: gradeFromScore(adScore),
@@ -2944,37 +2949,39 @@ function App() {
                           </li>
                         ))
                       : visibleDetailReviews.map((review) => (
-                      <li key={`${review.id}-${review.url}`}>
-                        <button
-                          type="button"
-                          className="review-card"
-                          onClick={() => {
-                            if (review.url) {
-                              window.open(review.url, '_blank', 'noopener,noreferrer')
-                            } else {
-                              showToast('열 수 있는 리뷰 링크가 없습니다')
-                            }
-                          }}
-                        >
-                          <span className={`review-grade ${review.grade}`}>
-                            {gradeLabel(review.grade)}
-                          </span>
-                          <strong>{review.title}</strong>
-                          <p>{review.preview}</p>
-                          <small>
-                            {review.author}
-                            {review.date ? ` · ${review.date}` : ''}
-                          </small>
-                          <span className="review-open">
-                            원문 보기
-                            <ExternalLink
-                              aria-hidden="true"
-                              size={13}
-                              strokeWidth={2.2}
-                            />
-                          </span>
-                        </button>
-                      </li>
+                          <li key={`${review.id}-${review.url || review.title}`}>
+                            {review.url ? (
+                              <a
+                                className="review-card"
+                                href={review.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`${review.title} 원문 열기`}
+                              >
+                                <span className={`review-grade ${review.grade}`}>
+                                  {gradeLabel(review.grade)}
+                                </span>
+                                <strong>{review.title}</strong>
+                                <p>{review.preview}</p>
+                                <small>
+                                  {review.author}
+                                  {review.date ? ` · ${review.date}` : ''}
+                                </small>
+                              </a>
+                            ) : (
+                              <article className="review-card">
+                                <span className={`review-grade ${review.grade}`}>
+                                  {gradeLabel(review.grade)}
+                                </span>
+                                <strong>{review.title}</strong>
+                                <p>{review.preview}</p>
+                                <small>
+                                  {review.author}
+                                  {review.date ? ` · ${review.date}` : ''}
+                                </small>
+                              </article>
+                            )}
+                          </li>
                         ))}
                   </ul>
                   {reviewTotalPages > 1 && (

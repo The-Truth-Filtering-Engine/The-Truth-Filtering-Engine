@@ -982,8 +982,21 @@ body {
   border-radius: var(--radius-md);
   background: var(--card-bg);
   color: inherit;
-  cursor: pointer;
+  cursor: default;
   text-align: left;
+  text-decoration: none;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.review-card[href] {
+  cursor: pointer;
+}
+
+.review-card[href]:hover {
+  border-color: color-mix(in srgb, var(--color-text-brand) 34%, var(--card-border));
+  box-shadow: var(--shadow-sm);
 }
 
 .review-card strong,
@@ -1006,8 +1019,7 @@ body {
   line-height: 1.45;
 }
 
-.review-card small,
-.review-open {
+.review-card small {
   color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 700;
@@ -1036,14 +1048,6 @@ body {
 .review-grade.ad {
   background: var(--color-status-ad-bg);
   color: var(--color-status-ad-text);
-}
-
-.review-open {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-  margin-top: 9px;
-  color: var(--color-text-brand);
 }
 
 .review-card-skeleton {
