@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/design_system/widgets/widgets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/ai_recommend_item.dart';
 
@@ -16,13 +17,8 @@ class RecommendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DsCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -36,6 +32,15 @@ class RecommendCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              const SizedBox(width: 8),
+              DsBadge(
+                label: '광고 ${item.adPercent}%',
+                tone: item.adPercent >= 60
+                    ? DsTone.ad
+                    : item.adPercent >= 30
+                        ? DsTone.suspicious
+                        : DsTone.real,
               ),
             ],
           ),
@@ -107,8 +112,6 @@ class RecommendCard extends StatelessWidget {
   }
 
   void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    DsToast.show(context, message, tone: DsTone.error);
   }
 }

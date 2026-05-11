@@ -1,135 +1,34 @@
-# 📘 디자인 시스템 — 진실의 입
-출처: 업로드된 HTML 기반 정리
+# Flutter App Design System
 
----
+The Flutter app follows the shared token model in `../design-tokens/tokens.json` and exposes platform-native Dart APIs.
 
-## 🟦 1. Brand & Colors
+## Files
 
-### 브랜드
-- 서비스명: 진실의 입  
-- 서브 타이틀: The Truth-Filtering Engine  
-- 컨셉 태그: TRUTH GUARD  
+- `lib/core/design_system/app_tokens.dart`: color, type, space, radius, shadow, and compatibility aliases.
+- `lib/core/design_system/app_theme.dart`: Material 3 `ThemeData`.
+- `lib/core/design_system/widgets/`: Flutter design-system widgets.
+- `lib/core/theme/*`: compatibility facades for older imports.
 
----
+## Components
 
-### 🎨 Primary Colors
-- #EEF0FF
-- #C5C7F0
-- #8890E8
-- #2B54E8
-- #1A3AB8
-- #2E2E4E
+- `DsButton`: `variant`, `size`, `loading`, `disabled`, `leftIcon`, `rightIcon`.
+- `DsTextField`: label, error/success/helper text, readonly/disabled states.
+- `DsCard`: repeated content containers.
+- `DsBadge`: `real`, `suspicious`, `ad`, `info`, `success`, `warning`, `error`.
+- `DsToast`: SnackBar-based feedback.
+- `DsDialog`: Material dialog wrapper.
+- `DsBottomSheet`: modal bottom-sheet surface with handle.
+- `DsAppLogo`: logo + service name lockup.
 
----
+## Platform Rules
 
-### ✅ Success (진성 리뷰)
-- #E8F6EE
-- #4CBB87
-- #1A7A4A
+- Keep Material 3 enabled through `AppTheme.light`.
+- iOS and Android should keep platform navigation conventions; only visual tokens are shared.
+- Bottom sheets are preferred for mobile contextual actions, while web can use dialogs or panels.
+- Do not bypass compatibility facades when editing older screens unless the whole file is being migrated.
 
-### ⚠️ Warning (광고 의심)
-- #FEF5E7
-- #F5A623
-- #A05800
+## Accessibility
 
-### ❌ Danger (광고 확정)
-- #FEF0F0
-- #E85C5C
-- #C0392B
-
-### ⚪ Neutral (배경/구분)
-- #F7F7FA
-- #E4E4EC
-- #A0A0C0
-
----
-
-## 🔤 2. Typography
-
-- Display — 22px / 500
-- Title — 17px / 500
-- Body — 13px / 400
-- Caption — 11px / 400
-- Label — 9px / 500
-
----
-
-## 📏 3. Spacing & Radius
-
-### Radius
-- Chip: 4px
-- Input: 8px
-- Card: 12px
-- Sheet: 16px
-- Avatar: 50%
-
-### Spacing
-- 4px — 아이콘 내부
-- 8px — 컴포넌트 내부
-- 12px — 카드 내부
-- 16px — 카드 패딩
-- 24px — 섹션 간격
-
----
-
-## 🔘 4. Buttons
-
-- Primary
-- Secondary
-- Ghost
-- Danger
-
----
-
-## ⌨️ 5. Inputs
-
-- 기본: 회색 배경 + 연한 테두리
-- 포커스: 파란 테두리 + 흰 배경
-
----
-
-## 🏷️ 6. Badges & Status
-
-### 리뷰 신뢰도
-- 진성 리뷰
-- 광고 의심
-- 광고 확정
-
-### 일반 배지
-- AI 검증 완료
-- Deep Filtering
-- 분석 중
-- 광고
-- 카테고리
-- TRUTH 점수
-
----
-
-## 📱 7. App Bar
-
-- 좌측: 로고 + 서비스명
-- 우측: 알림 / 프로필 버튼
-
----
-
-## 📊 8. Bottom Navigation
-
-- 탐색
-- 기록
-- AI 추천
-- 설정
-
----
-
-## 🎯 9. Icons
-
-- 홈 / 검색 / 인사이트 / 프로필 / 위치 / 저장 / 시간 / 인증 / 신뢰 / 경로 / 공유 / 카페
-
----
-
-## 💡 핵심 구조
-
-신뢰 기반 UI 시스템
-→ 색상으로 상태 표현
-→ 최소 텍스트 + 직관적 의미
-→ AI 검증 중심 인터페이스
+- Preserve semantic labels on icon-only buttons.
+- Use text labels alongside color-coded trust states.
+- Keep primary touch targets at 44px or larger where possible.
