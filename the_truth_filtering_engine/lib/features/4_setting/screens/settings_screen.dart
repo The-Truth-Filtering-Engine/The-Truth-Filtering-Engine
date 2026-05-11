@@ -4,10 +4,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/config/supabase_config.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
+import '../../../core/providers/liked_reviews_provider.dart';
+import '../../../core/providers/recent_visit_provider.dart';
 import '../../../core/providers/user_profile_provider.dart';
+import '../../1-1_map/models/restaurant_model.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  final ValueChanged<RestaurantModel>? onViewRestaurant;
+
+  const SettingsScreen({super.key, this.onViewRestaurant});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -98,6 +103,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _accountSection(),
           const SizedBox(height: 12),
           _logoutButton(),
+          const SizedBox(height: 24),
+          const Text(
+            '리뷰',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          _ReviewButtonsSection(
+            onViewRestaurant: widget.onViewRestaurant,
+          ),
         ],
       ),
     );
@@ -384,5 +398,305 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+  }
+}
+
+class _ReviewButtonsSection extends StatelessWidget {
+  final ValueChanged<RestaurantModel>? onViewRestaurant;
+
+  const _ReviewButtonsSection({this.onViewRestaurant});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          _ReviewNavigationButton(
+            icon: Icons.favorite_border,
+            iconColor: Color(0xFFE85C5C),
+            title: '내 하트',
+            subtitle: '하트를 누른 리뷰 목록',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const _LikedReviewsSettingsScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 0),
+          _ReviewNavigationButton(
+            icon: Icons.history,
+            title: '최근 기록',
+            subtitle: '최근 확인한 가게 목록',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => _RecentReviewsSettingsScreen(
+                    onViewRestaurant: onViewRestaurant,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewNavigationButton extends StatelessWidget {
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ReviewNavigationButton({
+    required this.icon,
+    this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    );
+  }
+}
+
+class _LikedReviewsSettingsScreen extends StatelessWidget {
+  const _LikedReviewsSettingsScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('내 하트')),
+      body: const _LikedReviewsSettingsList(),
+    );
+  }
+}
+
+class _RecentReviewsSettingsScreen extends StatelessWidget {
+  final ValueChanged<RestaurantModel>? onViewRestaurant;
+
+  const _RecentReviewsSettingsScreen({this.onViewRestaurant});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('최근 기록')),
+      body: _RecentReviewsSettingsList(
+        onViewRestaurant: onViewRestaurant == null
+            ? null
+            : (restaurant) {
+                Navigator.of(context).pop();
+                onViewRestaurant?.call(restaurant);
+              },
+      ),
+    );
+  }
+}
+
+class _LikedReviewsSettingsList extends ConsumerWidget {
+  const _LikedReviewsSettingsList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final likedReviews = ref.watch(likedReviewsProvider);
+
+    return likedReviews.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _SettingsListMessage(
+        icon: Icons.error_outline,
+        message: '내 하트 목록을 불러오지 못했습니다.',
+        action: TextButton.icon(
+          onPressed: () => ref.read(likedReviewsProvider.notifier).load(),
+          icon: const Icon(Icons.refresh),
+          label: const Text('다시 시도'),
+        ),
+      ),
+      data: (reviews) {
+        if (reviews.isEmpty) {
+          return const _SettingsListMessage(
+            icon: Icons.favorite_border,
+            message: '하트를 누른 리뷰가 없습니다.',
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: reviews.length,
+          separatorBuilder: (_, __) => const Divider(height: 0),
+          itemBuilder: (context, index) {
+            return _LikedReviewSettingsTile(review: reviews[index]);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _LikedReviewSettingsTile extends StatelessWidget {
+  final LikedReview review;
+
+  const _LikedReviewSettingsTile({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return ListTile(
+      leading: const Icon(Icons.favorite, color: Color(0xFFE85C5C)),
+      title: Text(
+        review.title.isEmpty ? '제목 없는 리뷰' : review.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (review.restaurantName.isNotEmpty)
+            Text(
+              review.restaurantName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          if (review.description.isNotEmpty)
+            Text(
+              review.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentReviewsSettingsList extends ConsumerWidget {
+  final ValueChanged<RestaurantModel>? onViewRestaurant;
+
+  const _RecentReviewsSettingsList({this.onViewRestaurant});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recentRestaurants = ref.watch(recentVisitProvider);
+
+    if (recentRestaurants.isEmpty) {
+      return const _SettingsListMessage(
+        icon: Icons.history,
+        message: '최근 기록이 없습니다.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: recentRestaurants.length,
+      separatorBuilder: (_, __) => const Divider(height: 0),
+      itemBuilder: (context, index) {
+        final restaurant = recentRestaurants[index];
+
+        return _RecentReviewSettingsTile(
+          restaurant: restaurant,
+          onTap: onViewRestaurant == null
+              ? null
+              : () => onViewRestaurant?.call(restaurant),
+          onRemove: () => ref
+              .read(recentVisitProvider.notifier)
+              .remove(restaurant.effectiveStoreId),
+        );
+      },
+    );
+  }
+}
+
+class _RecentReviewSettingsTile extends StatelessWidget {
+  final RestaurantModel restaurant;
+  final VoidCallback? onTap;
+  final VoidCallback onRemove;
+
+  const _RecentReviewSettingsTile({
+    required this.restaurant,
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = [
+      restaurant.category,
+      restaurant.address,
+    ].where((value) => value.trim().isNotEmpty).join(' · ');
+
+    return ListTile(
+      leading: const Icon(Icons.store_outlined),
+      title: Text(
+        restaurant.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: subtitle.isEmpty
+          ? null
+          : Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+      trailing: IconButton(
+        tooltip: '최근 기록 삭제',
+        icon: const Icon(Icons.close, size: 18),
+        onPressed: onRemove,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _SettingsListMessage extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final Widget? action;
+
+  const _SettingsListMessage({
+    required this.icon,
+    required this.message,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 40, color: Colors.grey),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 8),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
