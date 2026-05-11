@@ -238,15 +238,14 @@ body {
 }
 
 .restaurant-thumbnail {
-  display: grid;
   width: 88px;
   height: 88px;
-  place-items: center;
+  box-sizing: border-box;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  font-size: 42px;
 }
 
 .restaurant-panel-body {
@@ -422,14 +421,20 @@ body {
   outline-offset: var(--focus-offset);
 }
 
+.restaurant-card-image {
+  display: block;
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
 .bookmark-thumb {
-  display: grid;
   width: 42px;
   height: 42px;
-  place-items: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--card-border) 72%, transparent);
   border-radius: var(--radius-md);
   background: var(--color-bg-brand-subtle);
-  font-size: 20px;
 }
 
 .bookmark-copy {
@@ -800,7 +805,6 @@ body {
 .detail-thumb {
   width: 52px;
   height: 52px;
-  font-size: 24px;
 }
 
 .detail-restaurant-card p,
@@ -968,15 +972,24 @@ body {
 .review-list {
   display: grid;
   gap: 9px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 14px 16px 18px;
   margin: 0;
   list-style: none;
+}
+
+.review-list > li {
+  min-width: 0;
 }
 
 .review-card {
   position: relative;
   display: block;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 13px;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
@@ -1003,6 +1016,7 @@ body {
 .review-card p,
 .review-card small {
   display: block;
+  overflow-wrap: anywhere;
 }
 
 .review-card strong {
