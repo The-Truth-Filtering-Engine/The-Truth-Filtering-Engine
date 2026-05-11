@@ -12,7 +12,6 @@ class ReviewLikeRemoteSource {
 
   ReviewLikeRemoteSource(this._client);
 
-  // ── 현재 likes/dislikes 조회 ───────────────
   Future<Map<String, dynamic>> fetchLikes(String reviewId) async {
     final res = await _client
         .from(_table)
@@ -22,7 +21,6 @@ class ReviewLikeRemoteSource {
     return res;
   }
 
-  // ── likes/dislikes 동시 업데이트 ──────────
   Future<void> updateLikes({
     required String reviewId,
     required List<Map<String, dynamic>> likes,

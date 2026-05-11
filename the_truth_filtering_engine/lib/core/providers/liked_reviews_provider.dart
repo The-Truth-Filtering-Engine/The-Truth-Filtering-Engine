@@ -1,14 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../providers/current_user_provider.dart';
+import 'current_user_provider.dart';
+import 'user_profile_provider.dart';
 
-/// 내가 하트 누른 리뷰 목록
 final likedReviewsProvider =
     StateNotifierProvider<LikedReviewsNotifier, AsyncValue<List<LikedReview>>>(
   (ref) {
-    final email = ref.watch(currentUserEmailProvider);
-    return LikedReviewsNotifier(email: email);
+    final authState = ref.watch(appAuthProvider);
+    final profileState = ref.watch(userProfileProvider);
+    final userId = ref.watch(currentUserIdProvider);
+
+    if (authState.isLoggedIn && userId == null && !profileState.isLoading) {
+      Future.microtask(
+        () => ref.read(userProfileProvider.notifier).loadIfPossible(),
+      );
+    }
+
+    return LikedReviewsNotifier(userId: userId);
   },
 );
 
@@ -35,51 +44,35 @@ class LikedReview {
 
 class LikedReviewsNotifier
     extends StateNotifier<AsyncValue<List<LikedReview>>> {
-  final String? email;
+  final int? userId;
 
-  LikedReviewsNotifier({required this.email})
+  LikedReviewsNotifier({required this.userId})
       : super(const AsyncValue.loading()) {
     load();
   }
 
   Future<void> load() async {
-    if (email == null || email!.isEmpty) {
+    if (userId == null) {
       state = const AsyncValue.data([]);
       return;
     }
 
     state = const AsyncValue.loading();
     try {
-      // reviews 테이블에서 likes 배열에 내 user_id가 포함된 행 조회
-      // (user_id는 백엔드 users.id — Supabase RPC 없이 클라이언트에서 필터)
-      final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id; // uuid
-      if (userId == null) {
-        state = const AsyncValue.data([]);
-        return;
-      }
-
-      // likes 배열에서 user_id 매칭은 contains 필터로
-      final rows = await client
+      final rows = await Supabase.instance.client
           .from('reviews')
           .select('id, title, review_description, restaurant_name, likes')
-          .contains('likes', [{}]) // 전체 조회 후 클라이언트 필터
-          .limit(200);
+          .contains('likes', [
+        {'user_id': userId}
+      ]).limit(200);
 
-      // 내 이메일을 기준으로 클라이언트 사이드 필터
-      // (user_id가 정수형인 경우 별도 처리 필요 — 여기선 이메일 기반)
       final liked = (rows as List<dynamic>)
-          .where((row) {
-            final likes = row['likes'];
-            if (likes is! List) return false;
-            return likes.any((e) => e is Map && e['user_email'] == email);
-          })
-          .map((e) => LikedReview.fromRow(e as Map<String, dynamic>))
+          .map((row) => LikedReview.fromRow(row as Map<String, dynamic>))
           .toList();
 
       state = AsyncValue.data(liked);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
     }
   }
 }

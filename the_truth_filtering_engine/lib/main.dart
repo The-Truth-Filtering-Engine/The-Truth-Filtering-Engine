@@ -121,7 +121,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
               activeIcon: Icon(Icons.history_toggle_off_rounded),
-              label: '최근분석',
+              label: '최근 분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),

@@ -1,55 +1,49 @@
-// ─────────────────────────────────────────────
-// reviews 테이블 컬럼 구조
-//   likes    : jsonb  → [{"user_id": 1}, ...]
-//   dislikes : jsonb  → [{"user_id": 2}, ...]
-// ─────────────────────────────────────────────
-
-enum LikeType { like, dislike }
+enum LikeType { like }
 
 class ReviewLikeState {
   final int likeCount;
-  final int dislikeCount;
-  final bool isLiked; // 내가 좋아요 눌렀는지
-  final bool isDisliked; // 내가 싫어요 눌렀는지
+  final bool isLiked;
 
   const ReviewLikeState({
     this.likeCount = 0,
-    this.dislikeCount = 0,
     this.isLiked = false,
-    this.isDisliked = false,
   });
 
-  /// Supabase row 에서 파싱
   factory ReviewLikeState.fromRow(Map<String, dynamic> row, int userId) {
-    final likes = _parseUserIds(row['likes']);
-    final dislikes = _parseUserIds(row['dislikes']);
+    final likes = parseUserIdEntries(row['likes']);
 
     return ReviewLikeState(
       likeCount: likes.length,
-      dislikeCount: dislikes.length,
       isLiked: likes.contains(userId),
-      isDisliked: dislikes.contains(userId),
     );
-  }
-
-  static Set<int> _parseUserIds(dynamic json) {
-    if (json == null) return {};
-    return (json as List)
-        .map((e) => int.tryParse((e as Map)['user_id']?.toString() ?? ''))
-        .whereType<int>()
-        .toSet();
   }
 
   ReviewLikeState copyWith({
     int? likeCount,
-    int? dislikeCount,
     bool? isLiked,
-    bool? isDisliked,
   }) =>
       ReviewLikeState(
         likeCount: likeCount ?? this.likeCount,
-        dislikeCount: dislikeCount ?? this.dislikeCount,
         isLiked: isLiked ?? this.isLiked,
-        isDisliked: isDisliked ?? this.isDisliked,
       );
+}
+
+Set<int> parseUserIdEntries(dynamic json) {
+  if (json is! List) return {};
+
+  return json
+      .map((entry) {
+        if (entry is Map) {
+          return int.tryParse(entry['user_id']?.toString() ?? '');
+        }
+        return int.tryParse(entry.toString());
+      })
+      .whereType<int>()
+      .toSet();
+}
+
+List<Map<String, dynamic>> parseUserIdEntryList(dynamic json) {
+  return parseUserIdEntries(json)
+      .map((userId) => <String, dynamic>{'user_id': userId})
+      .toList();
 }

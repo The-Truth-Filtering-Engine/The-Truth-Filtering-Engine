@@ -38,7 +38,7 @@ class PanelHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.muted,
+                      color: AppColors.textSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -48,7 +48,7 @@ class PanelHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppColors.text,
+                    color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
@@ -79,7 +79,7 @@ class _RoundIconButton extends StatelessWidget {
         icon: Icon(icon, size: 19),
         style: IconButton.styleFrom(
           backgroundColor: Colors.white,
-          foregroundColor: AppColors.dark,
+          foregroundColor: AppColors.textPrimary,
           side: const BorderSide(color: AppColors.border),
         ),
       ),

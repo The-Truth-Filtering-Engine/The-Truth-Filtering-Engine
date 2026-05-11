@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:truth_mouth/models/blog_review_model.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/design_system/app_tokens.dart';
+import '../../../core/design_system/widgets/widgets.dart';
+import '../../1-3_restaurant_detail/providers/blog_review.dart';
 
 class ReviewGradeBadge extends StatelessWidget {
   final ReviewStatus status;
@@ -10,35 +11,12 @@ class ReviewGradeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = switch (status) {
-      ReviewStatus.real => (AppColors.successBg, AppColors.success),
-      ReviewStatus.suspicious => (AppColors.warningBg, AppColors.warning),
-      ReviewStatus.ad => (AppColors.dangerBg, AppColors.danger),
+    final (label, tone) = switch (status) {
+      ReviewStatus.real => ('진성', DsTone.real),
+      ReviewStatus.suspicious => ('의심', DsTone.suspicious),
+      ReviewStatus.ad => ('광고', DsTone.ad),
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: colors.$1,
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Text(
-        _labelOf(status),
-        style: TextStyle(
-          color: colors.$2,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-
-  String _labelOf(ReviewStatus status) {
-    return switch (status) {
-      ReviewStatus.real => '리얼',
-      ReviewStatus.suspicious => '의심',
-      ReviewStatus.ad => '광고',
-    };
+    return DsBadge(label: label, tone: tone);
   }
 }
-

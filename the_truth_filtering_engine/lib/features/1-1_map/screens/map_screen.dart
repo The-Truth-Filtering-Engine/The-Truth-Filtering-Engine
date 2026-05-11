@@ -23,7 +23,9 @@ import '../../1-2_restaurant_list/screens/restaurant_list_screen.dart';
 import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key});
+  final VoidCallback? onOpenSettings;
+
+  const MapScreen({super.key, this.onOpenSettings});
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -40,7 +42,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
 
-  static const _initialCenter = MapPoint(latitude: 37.5245, longitude: 127.0370);
+  static const _initialCenter =
+      MapPoint(latitude: 37.5245, longitude: 127.0370);
   static const _initialLevel = 4;
 
   List<RestaurantModel>? _viewportRestaurants;
@@ -354,8 +357,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _calculateViewportRadius(MapBounds bounds, MapPoint center) {
     final northEast = bounds.northEast;
     final southWest = bounds.southWest;
-    final northWest = MapPoint(latitude: northEast.latitude, longitude: southWest.longitude);
-    final southEast = MapPoint(latitude: southWest.latitude, longitude: northEast.longitude);
+    final northWest =
+        MapPoint(latitude: northEast.latitude, longitude: southWest.longitude);
+    final southEast =
+        MapPoint(latitude: southWest.latitude, longitude: northEast.longitude);
 
     final candidates = [
       distanceMeters(center, northWest),
@@ -566,7 +571,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final location = MapPoint(latitude: position.latitude, longitude: position.longitude);
+      final location =
+          MapPoint(latitude: position.latitude, longitude: position.longitude);
       ref.read(currentLocationProvider.notifier).state = location;
       _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}

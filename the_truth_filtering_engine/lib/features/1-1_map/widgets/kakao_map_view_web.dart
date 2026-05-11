@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:js_util';
 import 'dart:html' as html;
 import 'dart:js' as js;
 import 'dart:ui_web' as ui_web;
@@ -174,7 +173,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
   static void _loadKakaoMaps() {
     final maps = js.context['kakao']['maps'] as js.JsObject;
     maps.callMethod('load', [
-      js.allowInterop(() {
+      js.JsFunction.withThis((_) {
         if (!(_sdkLoader?.isCompleted ?? true)) {
           _sdkLoader?.complete();
         }
@@ -192,7 +191,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
     _maps['event'].callMethod('addListener', [
       _map,
       eventName,
-      js.allowInterop(callback),
+      js.JsFunction.withThis((_) => callback()),
     ]);
   }
 

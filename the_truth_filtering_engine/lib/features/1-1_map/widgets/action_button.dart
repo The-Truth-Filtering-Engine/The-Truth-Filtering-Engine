@@ -27,15 +27,15 @@ class ActionButton extends StatelessWidget {
             height: 44,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryLight,
+              color: AppColors.primary50,
             ),
-            child: Icon(icon, color: AppColors.primary, size: 21),
+            child: Icon(icon, color: AppColors.primary500, size: 21),
           ),
           const SizedBox(height: 7),
           Text(
             label,
             style: const TextStyle(
-              color: AppColors.primary,
+              color: AppColors.primary500,
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),

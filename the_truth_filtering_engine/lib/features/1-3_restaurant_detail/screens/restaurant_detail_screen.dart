@@ -182,13 +182,11 @@ Map<String, String> _reviewQueryParameters(
     if (trimmed != null && trimmed.isNotEmpty) params[key] = trimmed;
   }
 
-  addIfNotBlank('storeId', restaurant.effectiveStoreId);
-  addIfNotBlank('categoryName', restaurant.categoryName ?? restaurant.category);
-  addIfNotBlank('categoryGroupCode', restaurant.categoryGroupCode);
-  addIfNotBlank('categoryGroupName', restaurant.categoryGroupName);
+  addIfNotBlank('storeId', restaurant.id);
+  addIfNotBlank('categoryName', restaurant.category);
   addIfNotBlank('phone', restaurant.phone);
-  addIfNotBlank('addressName', restaurant.addressName);
-  addIfNotBlank('roadAddressName', restaurant.roadAddressName);
+  addIfNotBlank('addressName', restaurant.address);
+  addIfNotBlank('roadAddressName', restaurant.address);
   addIfNotBlank('placeUrl', restaurant.placeUrl);
 
   return params;
@@ -388,7 +386,7 @@ class _RestaurantDetailScreenState
   Widget build(BuildContext context) {
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
     final isBookmarked = bookmarkedRestaurants.any(
-      (item) => item.effectiveStoreId == _r.effectiveStoreId,
+      (item) => item.id == _r.id,
     );
 
     return Scaffold(
@@ -567,7 +565,7 @@ class _RestaurantDetailScreenState
   void _toggleBookmark() {
     final previous = ref.read(bookmarkRestaurantsProvider);
     final alreadyBookmarked = previous.any(
-      (item) => item.effectiveStoreId == _r.effectiveStoreId,
+      (item) => item.id == _r.id,
     );
     ref.read(bookmarkRestaurantsProvider.notifier).toggle(_r);
     _showSnack(alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다');

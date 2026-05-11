@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/models/ai_recommend_item.dart';
@@ -141,8 +141,8 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
 
   String formatDistance(double distance) {
     if (distance <= 0) return '거리 정보 없음';
-    if (distance >= 1000) return '\${(distance / 1000).toStringAsFixed(1)}km';
-    return '\${distance.round()}m';
+    if (distance >= 1000) return '${(distance / 1000).toStringAsFixed(1)}km';
+    return '${distance.round()}m';
   }
 
   bool isBookmarked(String restaurantId) {
@@ -287,9 +287,22 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
     final counts = <String, int>{};
 
     const stopWords = {
-      '입니다', '추천', '하려고', '오늘', '리뷰', '정말',
-      '이렇게', '있는', '없는', '그리고', '여기서', '으로',
-      '그래서', '맛있는', '방문', '위치',
+      '입니다',
+      '추천',
+      '하려고',
+      '오늘',
+      '리뷰',
+      '정말',
+      '이렇게',
+      '있는',
+      '없는',
+      '그리고',
+      '여기서',
+      '으로',
+      '그래서',
+      '맛있는',
+      '방문',
+      '위치',
     };
 
     for (final review in detailReviews) {
@@ -404,7 +417,8 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
       right: 14,
       child: Column(
         children: [
-          _MapToolButton(icon: Icons.my_location, onTap: _loadNearbyRestaurants),
+          _MapToolButton(
+              icon: Icons.my_location, onTap: _loadNearbyRestaurants),
           const SizedBox(height: 6),
           _MapToolButton(
             icon: Icons.bookmark,
@@ -441,11 +455,11 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
           color: Colors.white,
           child: switch (activePanel) {
             ActivePanel.restaurant => _buildRestaurantPanel(),
-            ActivePanel.detail    => _buildDetailPanel(),
+            ActivePanel.detail => _buildDetailPanel(),
             ActivePanel.bookmarks => _buildBookmarksPanel(),
-            ActivePanel.ai        => _buildAiPanel(),
-            ActivePanel.profile   => _buildProfilePanel(),
-            ActivePanel.none      => const SizedBox.shrink(),
+            ActivePanel.ai => _buildAiPanel(),
+            ActivePanel.profile => _buildProfilePanel(),
+            ActivePanel.none => const SizedBox.shrink(),
           },
         ),
       ),
@@ -522,7 +536,7 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            '\${restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address} · \${formatDistance(restaurant.distance.toDouble())}',
+                            '${restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address} · ${formatDistance(restaurant.distance.toDouble())}',
                             style: const TextStyle(
                               color: AppColors.sheetSubtext,
                               height: 1.45,
@@ -554,12 +568,14 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
                         ActionButton(
                           icon: Icons.navigation,
                           label: 'Route',
-                          onTap: () => openUrl(restaurant.placeUrl, '경로 URL이 없습니다.'),
+                          onTap: () =>
+                              openUrl(restaurant.placeUrl, '경로 URL이 없습니다.'),
                         ),
                         ActionButton(
                           icon: Icons.share,
                           label: 'Share',
-                          onTap: () => openUrl(restaurant.placeUrl, '공유할 수 있는 URL이 없습니다.'),
+                          onTap: () => openUrl(
+                              restaurant.placeUrl, '공유할 수 있는 URL이 없습니다.'),
                         ),
                       ],
                     ),
@@ -633,7 +649,8 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
                   ActionButton(
                     icon: Icons.share,
                     label: 'Share',
-                    onTap: () => openUrl(restaurant.placeUrl, '공유할 수 있는 URL이 없습니다.'),
+                    onTap: () =>
+                        openUrl(restaurant.placeUrl, '공유할 수 있는 URL이 없습니다.'),
                   ),
                 ],
               ),
@@ -773,7 +790,7 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
       children: [
         PanelHeader(
           title: 'AI 추천',
-          subtitle: '\$aiPage 페이지',
+          subtitle: '$aiPage 페이지',
           onBack: goHome,
           onHome: goHome,
         ),
@@ -884,7 +901,8 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
               const CircleAvatar(
                 radius: 42,
                 backgroundColor: Color(0xFFEEF2FF),
-                child: Icon(Icons.person, size: 40, color: AppColors.markerVerified),
+                child: Icon(Icons.person,
+                    size: 40, color: AppColors.markerVerified),
               ),
               const SizedBox(height: 12),
               const Center(
@@ -946,7 +964,8 @@ class _StatusChip extends StatelessWidget {
           child: Text(
             message,
             style: TextStyle(
-              color: isError ? const Color(0xFFE85C5C) : const Color(0xFF172033),
+              color:
+                  isError ? const Color(0xFFE85C5C) : const Color(0xFF172033),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1036,10 +1055,11 @@ class _RestaurantMiniCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '\${restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address} · \$distanceLabel',
+                  '${restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address} · $distanceLabel',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.sheetSubtext, fontSize: 12),
+                  style: const TextStyle(
+                      color: AppColors.sheetSubtext, fontSize: 12),
                 ),
               ],
             ),
@@ -1220,7 +1240,7 @@ class _ReviewCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '\${review.author}\${review.date.isNotEmpty ? ' · \${review.date}' : ''}',
+                '${review.author}${review.date.isNotEmpty ? ' · ${review.date}' : ''}',
                 style: const TextStyle(
                   color: AppColors.sheetSubtext,
                   fontSize: 11,
@@ -1240,7 +1260,8 @@ class _ReviewCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: 4),
-                  Icon(Icons.open_in_new, size: 13, color: AppColors.markerVerified),
+                  Icon(Icons.open_in_new,
+                      size: 13, color: AppColors.markerVerified),
                 ],
               ),
             ],
@@ -1300,7 +1321,7 @@ class _BookmarkTile extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '\${restaurant.category} · \${restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address}',
+                          '${restaurant.category} · ${restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1407,7 +1428,8 @@ class _AiRecommendCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: AppColors.sheetDivider),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, 5)),
+          BoxShadow(
+              color: Colors.black12, blurRadius: 16, offset: Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -1424,7 +1446,7 @@ class _AiRecommendCard extends StatelessWidget {
                 ),
               ),
               Chip(
-                label: Text('광고 \${item.adPercent}%'),
+                label: Text('광고 ${item.adPercent}%'),
                 backgroundColor: const Color(0xFFEEF2FF),
                 labelStyle: const TextStyle(
                   color: Color(0xFF26336B),
