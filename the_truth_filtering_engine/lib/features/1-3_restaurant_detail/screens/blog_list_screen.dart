@@ -4,8 +4,6 @@ import '../providers/blog_review.dart';
 import '../utils/blog_review_url.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../common/app_bar_logo.dart';
-import '../../../common/stat_progress_bar.dart';
-import '../../../common/trust_circle.dart';
 import '../widgets/review_item.dart';
 
 // ───────────────────────────────────────────
@@ -185,7 +183,6 @@ class _BlogListScreenState extends State<BlogListScreen>
 
   @override
   Widget build(BuildContext context) {
-    final shop = widget.shopInfo;
     return Scaffold(
       appBar: AppBar(
         title: const AppBarLogo(),

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { createClient, type Session } from '@supabase/supabase-js'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
+import appLogoUrl from '../logo.png'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -47,6 +48,7 @@ type Restaurant = {
   addressName: string
   roadAddressName: string
   placeUrl: string
+  imageUrl: string
   latitude: number
   longitude: number
 }
@@ -105,6 +107,7 @@ type AiRecommendItem = {
   longitude: number | null
   placeUrl: string
   phone: string
+  imageUrl?: string
 }
 
 type AiRecommendState = {
@@ -387,6 +390,117 @@ function isCafe(restaurant: Pick<Restaurant, 'category'>) {
   return restaurant.category.includes('카페') || normalizedCategory.includes('cafe')
 }
 
+const CATEGORY_THUMBNAIL_BASE = '/images/thumbnails'
+
+const CATEGORY_THUMBNAILS: Record<string, string> = {
+  한식: 'korean',
+  일식: 'japanese',
+  중식: 'chinese',
+  양식: 'western',
+  패스트푸드: 'fastfood',
+  분식: 'bunsik',
+  카페: 'cafe',
+  술집: 'bar',
+  주점: 'bar',
+  아시안: 'asian',
+  '아시안/퓨전': 'asian',
+  뷔페: 'buffet',
+  치킨: 'chicken',
+  피자: 'pizza',
+  '고기/구이': 'meat',
+  고기: 'meat',
+  구이: 'meat',
+  면: 'noodle',
+  국수: 'noodle',
+  해산물: 'seafood',
+  횟집: 'seafood',
+}
+
+function primaryRestaurantCategory(
+  restaurant: Pick<Restaurant, 'category' | 'categoryName' | 'categoryGroupName'>,
+) {
+  const rawCategory =
+    restaurant.categoryName || restaurant.category || restaurant.categoryGroupName || ''
+  const parts = rawCategory
+    .split('>')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (parts[0] === '음식점' && parts[1]) return parts[1]
+  return parts[1] || parts[0] || rawCategory.trim()
+}
+
+function restaurantThumbnailKey(
+  restaurant: Pick<Restaurant, 'category' | 'categoryName' | 'categoryGroupName'>,
+) {
+  const primaryCategory = primaryRestaurantCategory(restaurant)
+  if (CATEGORY_THUMBNAILS[primaryCategory]) {
+    return CATEGORY_THUMBNAILS[primaryCategory]
+  }
+
+  const categoryText = [
+    restaurant.category,
+    restaurant.categoryName,
+    restaurant.categoryGroupName,
+  ].join(' ')
+
+  if (/카페|커피/i.test(categoryText)) return 'cafe'
+  if (/중식|중국|짜장|짬뽕/i.test(categoryText)) return 'chinese'
+  if (/일식|일본|초밥|스시|돈까스/i.test(categoryText)) return 'japanese'
+  if (/양식|파스타|스테이크/i.test(categoryText)) return 'western'
+  if (/패스트푸드|버거|햄버거/i.test(categoryText)) return 'fastfood'
+  if (/분식|떡볶이|김밥/i.test(categoryText)) return 'bunsik'
+  if (/술집|주점|맥주|호프|와인/i.test(categoryText)) return 'bar'
+  if (/아시안|퓨전|태국|베트남|쌀국수/i.test(categoryText)) return 'asian'
+  if (/뷔페|부페/i.test(categoryText)) return 'buffet'
+  if (/치킨/i.test(categoryText)) return 'chicken'
+  if (/피자/i.test(categoryText)) return 'pizza'
+  if (/고기|구이|갈비|삼겹/i.test(categoryText)) return 'meat'
+  if (/면|국수|라멘|우동|냉면/i.test(categoryText)) return 'noodle'
+  if (/해산물|횟집|회|생선|수산/i.test(categoryText)) return 'seafood'
+  if (/한식|국밥|찌개|백반/i.test(categoryText)) return 'korean'
+  return 'default'
+}
+
+function restaurantThumbnailSrc(
+  restaurant: Pick<
+    Restaurant,
+    'category' | 'categoryName' | 'categoryGroupName' | 'imageUrl'
+  >,
+) {
+  const imageUrl = cleanImageUrl(restaurant.imageUrl)
+  if (imageUrl) return imageUrl
+
+  return `${CATEGORY_THUMBNAIL_BASE}/${restaurantThumbnailKey(restaurant)}.png`
+}
+
+function RestaurantThumb({
+  restaurant,
+  className = '',
+}: {
+  restaurant: Pick<
+    Restaurant,
+    'category' | 'categoryName' | 'categoryGroupName' | 'imageUrl'
+  >
+  className?: string
+}) {
+  return (
+    <img
+      className={['restaurant-card-image', className].filter(Boolean).join(' ')}
+      src={restaurantThumbnailSrc(restaurant)}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      draggable={false}
+      onError={(event) => {
+        if (!event.currentTarget.src.includes('/images/thumbnails/default.png')) {
+          event.currentTarget.src = `${CATEGORY_THUMBNAIL_BASE}/default.png`
+        }
+      }}
+    />
+  )
+}
+
 function pointFromLatLng(latLng: KakaoLatLng): MapPoint {
   return {
     latitude: latLng.getLat(),
@@ -471,6 +585,7 @@ async function fetchNearbyRestaurants(center: MapPoint, radius: number) {
         addressName?: string
         roadAddressName?: string
         placeUrl?: string
+        imageUrl?: string
         lat?: number | string
         lng?: number | string
       }>
@@ -520,6 +635,7 @@ async function fetchSearchRestaurants(query: string, center: MapPoint) {
         addressName?: string
         roadAddressName?: string
         placeUrl?: string
+        imageUrl?: string
         lat?: number | string
         lng?: number | string
       }>
@@ -552,6 +668,7 @@ function parseRestaurantPayloadItem(item: {
   addressName?: string
   roadAddressName?: string
   placeUrl?: string
+  imageUrl?: string
   lat?: number | string
   lng?: number | string
 }): Restaurant {
@@ -573,6 +690,7 @@ function parseRestaurantPayloadItem(item: {
     addressName: item.addressName?.toString() ?? '',
     roadAddressName: item.roadAddressName?.toString() ?? '',
     placeUrl,
+    imageUrl: item.imageUrl?.toString() ?? '',
     latitude: Number(item.lat),
     longitude: Number(item.lng),
   }
@@ -592,6 +710,16 @@ function cleanText(value: unknown) {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .trim()
+}
+
+function cleanExternalUrl(value: unknown) {
+  const url = cleanText(value)
+  return /^https?:\/\//i.test(url) ? url : ''
+}
+
+function cleanImageUrl(value: unknown) {
+  const url = cleanText(value)
+  return /^(https?:\/\/|\/)/i.test(url) ? url : ''
 }
 
 function formatReviewDate(value: unknown) {
@@ -642,7 +770,7 @@ function parseBlogReview(item: Record<string, unknown>): BlogReview {
     author: cleanText(item.review_bloggername) || '알 수 없음',
     date: formatReviewDate(item.review_postdate),
     preview,
-    url: cleanText(item.review_url),
+    url: cleanExternalUrl(item.review_url ?? item.reviewUrl ?? item.link),
     adScore,
     adProbability: adScore === null ? 50 : Math.round(adScore * 100),
     grade: gradeFromScore(adScore),
@@ -813,6 +941,7 @@ function aiRecommendToRestaurant(item: AiRecommendItem): Restaurant | null {
     addressName: item.addressName,
     roadAddressName: item.roadAddressName,
     placeUrl: item.placeUrl,
+    imageUrl: item.imageUrl ?? '',
     latitude: item.latitude,
     longitude: item.longitude,
   }
@@ -1053,6 +1182,7 @@ function normalizeRestaurant(value: unknown): Restaurant | null {
     addressName: item.addressName?.toString() ?? '',
     roadAddressName: item.roadAddressName?.toString() ?? '',
     placeUrl: (item.placeUrl ?? item.link)?.toString() ?? '',
+    imageUrl: item.imageUrl?.toString() ?? '',
     latitude,
     longitude,
   }
@@ -1223,6 +1353,7 @@ function parseRecentAnalysisRestaurant(
     addressName: cleanText(source.addressName),
     roadAddressName: cleanText(source.roadAddressName),
     placeUrl,
+    imageUrl: cleanText(source.imageUrl),
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
   }
@@ -2541,7 +2672,7 @@ function App() {
           <section className="login-panel-body">
             <div className="login-panel-header">
               <div className="login-mark" aria-hidden="true">
-                T
+                <img src={appLogoUrl} alt="" />
               </div>
               <div>
                 <p>Sign in</p>
@@ -2677,9 +2808,10 @@ function App() {
                         className="search-result-card"
                         onClick={() => selectSearchResult(restaurant)}
                       >
-                        <span className="bookmark-thumb search-result-thumb">
-                          {isCafe(restaurant) ? '☕' : '🍽'}
-                        </span>
+                        <RestaurantThumb
+                          restaurant={restaurant}
+                          className="bookmark-thumb search-result-thumb"
+                        />
                         <span className="search-result-copy">
                           <strong>{restaurant.name}</strong>
                           <small>{restaurant.category}</small>
@@ -2712,9 +2844,10 @@ function App() {
           </button>
 
           <div className="restaurant-panel-hero">
-            <div className="restaurant-thumbnail" aria-hidden="true">
-              {isCafe(selectedRestaurant) ? '☕' : '🍽'}
-            </div>
+            <RestaurantThumb
+              restaurant={selectedRestaurant}
+              className="restaurant-thumbnail"
+            />
           </div>
 
           <section className="restaurant-panel-body">
@@ -2792,9 +2925,10 @@ function App() {
 
           <section className="detail-panel-body">
             <div className="detail-restaurant-card">
-              <div className="bookmark-thumb detail-thumb" aria-hidden="true">
-                {isCafe(selectedRestaurant) ? '☕' : '🍽'}
-              </div>
+              <RestaurantThumb
+                restaurant={selectedRestaurant}
+                className="bookmark-thumb detail-thumb"
+              />
               <div>
                 <p>{selectedRestaurant.category}</p>
                 <h2>{selectedRestaurant.name}</h2>
@@ -2943,37 +3077,39 @@ function App() {
                           </li>
                         ))
                       : visibleDetailReviews.map((review) => (
-                      <li key={`${review.id}-${review.url}`}>
-                        <button
-                          type="button"
-                          className="review-card"
-                          onClick={() => {
-                            if (review.url) {
-                              window.open(review.url, '_blank', 'noopener,noreferrer')
-                            } else {
-                              showToast('열 수 있는 리뷰 링크가 없습니다')
-                            }
-                          }}
-                        >
-                          <span className={`review-grade ${review.grade}`}>
-                            {gradeLabel(review.grade)}
-                          </span>
-                          <strong>{review.title}</strong>
-                          <p>{review.preview}</p>
-                          <small>
-                            {review.author}
-                            {review.date ? ` · ${review.date}` : ''}
-                          </small>
-                          <span className="review-open">
-                            원문 보기
-                            <ExternalLink
-                              aria-hidden="true"
-                              size={13}
-                              strokeWidth={2.2}
-                            />
-                          </span>
-                        </button>
-                      </li>
+                          <li key={`${review.id}-${review.url || review.title}`}>
+                            {review.url ? (
+                              <a
+                                className="review-card"
+                                href={review.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`${review.title} 원문 열기`}
+                              >
+                                <span className={`review-grade ${review.grade}`}>
+                                  {gradeLabel(review.grade)}
+                                </span>
+                                <strong>{review.title}</strong>
+                                <p>{review.preview}</p>
+                                <small>
+                                  {review.author}
+                                  {review.date ? ` · ${review.date}` : ''}
+                                </small>
+                              </a>
+                            ) : (
+                              <article className="review-card">
+                                <span className={`review-grade ${review.grade}`}>
+                                  {gradeLabel(review.grade)}
+                                </span>
+                                <strong>{review.title}</strong>
+                                <p>{review.preview}</p>
+                                <small>
+                                  {review.author}
+                                  {review.date ? ` · ${review.date}` : ''}
+                                </small>
+                              </article>
+                            )}
+                          </li>
                         ))}
                   </ul>
                   {reviewTotalPages > 1 && (
@@ -3037,9 +3173,10 @@ function App() {
                       className="bookmark-list-item"
                       onClick={() => selectBookmarkedRestaurant(restaurant)}
                     >
-                      <span className="bookmark-thumb" aria-hidden="true">
-                        {isCafe(restaurant) ? '☕' : '🍽'}
-                      </span>
+                      <RestaurantThumb
+                        restaurant={restaurant}
+                        className="bookmark-thumb"
+                      />
                       <span className="bookmark-copy">
                         <strong>{restaurant.name}</strong>
                         <small>
@@ -3154,9 +3291,10 @@ function App() {
                                 className="bookmark-list-item recent-analysis-item"
                                 onClick={() => focusRecentAnalysis(item)}
                               >
-                                <span className="bookmark-thumb" aria-hidden="true">
-                                  {isCafe(item.restaurant) ? '☕' : '🍽'}
-                                </span>
+                                <RestaurantThumb
+                                  restaurant={item.restaurant}
+                                  className="bookmark-thumb"
+                                />
                                 <span className="bookmark-copy">
                                   <strong>{item.restaurant.name}</strong>
                                   <small>
@@ -3193,9 +3331,10 @@ function App() {
                                 className="bookmark-list-item recent-analysis-item"
                                 onClick={() => focusRecentAnalysis(item)}
                               >
-                                <span className="bookmark-thumb" aria-hidden="true">
-                                  {isCafe(item.restaurant) ? '☕' : '🍽'}
-                                </span>
+                                <RestaurantThumb
+                                  restaurant={item.restaurant}
+                                  className="bookmark-thumb"
+                                />
                                 <span className="bookmark-copy">
                                   <strong>{item.restaurant.name}</strong>
                                   <small>
@@ -3593,6 +3732,9 @@ function App() {
         <div className="map-status map-status-error">{placesErrorMessage}</div>
       )}
       <nav className="map-tool-rail" aria-label="지도 메뉴">
+        <div className="map-tool-brand" aria-hidden="true">
+          <img src={appLogoUrl} alt="" />
+        </div>
         <button
           type="button"
           className="map-tool-button"

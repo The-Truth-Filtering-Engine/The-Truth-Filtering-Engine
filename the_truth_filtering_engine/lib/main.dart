@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
+import 'core/design_system/widgets/widgets.dart';
 import 'core/theme/app_theme.dart';
 import 'features/1-1_map/models/restaurant_model.dart';
 import 'features/1-1_map/providers/map_provider.dart';
 import 'features/1-1_map/screens/map_screen.dart';
 import 'features/1-1_map/screens/bookmark_screen.dart';
+import 'features/2_recent_analysis/screens/recent_analysis_screen.dart';
 import 'features/3_ai_recommend/screens/ai_recommend_screen.dart';
 import 'features/4_setting/screens/settings_screen.dart';
 import 'features/0-1_auth/screens/login_screen.dart'; // ← 추가
@@ -70,21 +72,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             // 탭 0번(탐색/홈)으로 이동
             ref.read(mainTabIndexProvider.notifier).state = 0;
           },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset('assets/logo.png', width: 32, height: 32),
-              const SizedBox(width: 8),
-              const Text(
-                '진실의 입',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary900,
-                ),
-              ),
-            ],
-          ),
+          child: const DsAppLogo(),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
@@ -94,8 +82,13 @@ class _MainShellState extends ConsumerState<MainShell> {
       body: IndexedStack(
         index: ref.watch(mainTabIndexProvider),
         children: [
-          const MapScreen(),
+          MapScreen(
+            onOpenSettings: () {
+              ref.read(mainTabIndexProvider.notifier).state = 4;
+            },
+          ),
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
+          RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
           const SettingsScreen(),
         ],
@@ -124,6 +117,11 @@ class _MainShellState extends ConsumerState<MainShell> {
               icon: Icon(Icons.bookmark_border_rounded),
               activeIcon: Icon(Icons.bookmark_rounded),
               label: '북마크',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              activeIcon: Icon(Icons.history_toggle_off_rounded),
+              label: '최근분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),

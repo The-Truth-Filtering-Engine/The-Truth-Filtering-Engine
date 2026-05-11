@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/design_system/app_tokens.dart';
 import '../../../core/theme/app_text_styles.dart';
 
 class TruthScoreBadge extends StatelessWidget {
@@ -14,7 +14,7 @@ class TruthScoreBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.truthBadgeBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

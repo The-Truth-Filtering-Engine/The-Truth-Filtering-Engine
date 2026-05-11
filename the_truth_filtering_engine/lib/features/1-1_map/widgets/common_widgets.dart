@@ -1,62 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:truth_mouth/models/blog_review_model.dart';
-import '../../../core/theme/app_theme.dart';
 
-// ?Ä?Ä ?±Î∞î Î°úÍ≥† ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
+import '../../../core/design_system/widgets/widgets.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../1-3_restaurant_detail/providers/blog_review.dart';
+
 class AppBarLogo extends StatelessWidget {
   const AppBarLogo({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset(
-          'assets/logo.png',
-          width: 32,
-          height: 32,
-        ),
-        const SizedBox(width: 7),
-        Text('ÏßÑÏã§????,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: AppColors.primary900,
-            )),
-      ],
-    );
+    return const DsAppLogo();
   }
 }
 
-// ?Ä?Ä ?†Î¢∞??Î∞∞Ï? ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
 class StatusBadge extends StatelessWidget {
   final ReviewStatus status;
+
   const StatusBadge(this.status, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    final (label, bg, fg) = switch (status) {
-      ReviewStatus.real => ('ÏßÑÏÑ±', AppColors.success50, AppColors.success700),
-      ReviewStatus.suspicious => (
-          '?òÏã¨',
-          AppColors.warning50,
-          AppColors.warning700
-        ),
-      ReviewStatus.ad => ('Í¥ëÍ≥†', AppColors.danger50, AppColors.danger700),
+    final (label, tone) = switch (status) {
+      ReviewStatus.real => ('ÏßÑÏÑ±', DsTone.real),
+      ReviewStatus.suspicious => ('ÏùòÏã¨', DsTone.suspicious),
+      ReviewStatus.ad => ('Í¥ëÍ≥†', DsTone.ad),
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(5)),
-      child: Text(label,
-          style:
-              TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: fg)),
-    );
+    return DsBadge(label: label, tone: tone);
   }
 }
 
-// ?Ä?Ä Trust ?êÌòï ?êÏàò ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
 class TrustCircle extends StatelessWidget {
   final int score;
+
   const TrustCircle(this.score, {super.key});
 
   Color get _color {
@@ -83,24 +58,25 @@ class TrustCircle extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('$score',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: _textColor)),
-          Text('TRUST',
-              style: TextStyle(fontSize: 8, color: AppColors.textHint)),
+          Text(
+            '$score',
+            style: AppText.subtitle().copyWith(
+              color: _textColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text('TRUST', style: AppText.label().copyWith(fontSize: 8)),
         ],
       ),
     );
   }
 }
 
-// ?Ä?Ä ÏßÑÌñâ Î∞??Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
 class StatProgressBar extends StatelessWidget {
   final String label;
-  final int value; // 0~100
+  final int value;
   final Color color;
+
   const StatProgressBar({
     super.key,
     required this.label,
@@ -117,14 +93,18 @@ class StatProgressBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: AppText.caption()),
-            Text('$value%',
-                style: TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w500, color: color)),
+            Text(
+              '$value%',
+              style: AppText.caption().copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.x1),
         ClipRRect(
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(AppRadius.xs),
           child: LinearProgressIndicator(
             value: value / 100,
             backgroundColor: AppColors.bg,
@@ -137,106 +117,99 @@ class StatProgressBar extends StatelessWidget {
   }
 }
 
-// ?Ä?Ä Î∏îÎ°úÍ∑?Ïπ¥Îìú ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
 class BlogCard extends StatelessWidget {
-  final BlogReviewModel blog;
+  final BlogReview blog;
   final VoidCallback onTap;
+
   const BlogCard({super.key, required this.blog, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return DsCard(
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border, width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(blog.title,
-                      style:
-                          AppText.body().copyWith(fontWeight: FontWeight.w500),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
+      margin: const EdgeInsets.only(bottom: AppSpacing.x2),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  blog.title,
+                  style: AppText.body().copyWith(fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 8),
-                StatusBadge(blog.status),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(blog.preview,
-                style: AppText.caption().copyWith(height: 1.5),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(blog.author, style: AppText.caption()),
-                Text(blog.date,
-                    style:
-                        AppText.caption().copyWith(color: AppColors.textHint)),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: AppSpacing.x2),
+              StatusBadge(blog.status),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            blog.preview,
+            style: AppText.caption().copyWith(height: 1.5),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(blog.author, style: AppText.caption()),
+              Text(
+                blog.date,
+                style: AppText.caption().copyWith(color: AppColors.textHint),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// ?Ä?Ä Í¥ëÍ≥† Í≤ΩÍ≥† Î∞∞ÎÑà ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
 class AdWarningBanner extends StatelessWidget {
-  final BlogReviewModel blog;
+  final BlogReview blog;
+
   const AdWarningBanner(this.blog, {super.key});
 
   @override
   Widget build(BuildContext context) {
     final isAd = blog.status == ReviewStatus.ad;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isAd ? AppColors.danger50 : AppColors.warning50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isAd
-              ? AppColors.danger400.withOpacity(.4)
-              : AppColors.warning400.withOpacity(.4),
-          width: 0.5,
-        ),
-      ),
+    final tone = isAd ? DsTone.ad : DsTone.suspicious;
+
+    return DsCard(
+      padding: const EdgeInsets.all(AppSpacing.x3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber_rounded,
-              size: 18,
-              color: isAd ? AppColors.danger700 : AppColors.warning700),
-          const SizedBox(width: 10),
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 18,
+            color: dsToneForeground(tone),
+          ),
+          const SizedBox(width: AppSpacing.x3),
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: TextStyle(
-                    fontSize: 11,
-                    color: isAd ? AppColors.danger700 : AppColors.warning700,
-                    height: 1.5),
+                style: AppText.caption().copyWith(
+                  color: dsToneForeground(tone),
+                  height: 1.5,
+                ),
                 children: [
-                  const TextSpan(text: '???¨Ïä§?ÖÏ? '),
+                  const TextSpan(text: 'Ïù¥ Ìè¨Ïä§ÌåÖÏùÄ '),
                   TextSpan(
-                      text: 'Í¥ëÍ≥† ?ïÎ•† ${blog.adProbability}%',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                    text: 'Í¥ëÍ≥† ÌôïÎ•† ${blog.adProbability}%',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   TextSpan(
-                      text: isAd
-                          ? 'Î°?Î∂ÑÏÑù?òÏóà?µÎãà??\n?ëÏ∞¨¬∑?êÍ≥†Î£??®ÌÑ¥??Í∞êÏ??òÏóà?¥Ïöî.'
-                          : 'Î°?Î∂ÑÏÑù?òÏóà?µÎãà??\n?ºÎ? ?çÎ≥¥???úÌòÑ??Í∞êÏ??òÏóà?¥Ïöî.'),
+                    text: isAd
+                        ? 'Î°ú Î∂ÑÏÑùÎêòÏóàÏäµÎãàÎã§.\nÌòëÏ∞¨¬∑ÏõêÍ≥†Î£å Ìå®ÌÑ¥Ïù¥ Í∞êÏßÄÎêòÏóàÏñ¥Ïöî.'
+                        : 'Î°ú Î∂ÑÏÑùÎêòÏóàÏäµÎãàÎã§.\nÏùºÎ∂Ä ÌôçÎ≥¥ÏÑ± ÌëúÌòÑÏù¥ Í∞êÏßÄÎêòÏóàÏñ¥Ïöî.',
+                  ),
                 ],
               ),
             ),
@@ -247,21 +220,23 @@ class AdWarningBanner extends StatelessWidget {
   }
 }
 
-// ?Ä?Ä ?πÏÖò ?Ä?¥Ì? ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
 class SectionTitle extends StatelessWidget {
   final String text;
+
   const SectionTitle(this.text, {super.key});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text.toUpperCase(),
-          style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textHint,
-              letterSpacing: .5)),
+      padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+      child: Text(
+        text.toUpperCase(),
+        style: AppText.label().copyWith(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }
-
