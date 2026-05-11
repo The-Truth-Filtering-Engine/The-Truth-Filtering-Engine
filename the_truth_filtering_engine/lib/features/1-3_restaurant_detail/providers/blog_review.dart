@@ -58,6 +58,7 @@ class BlogReview {
   final ReviewStatus status;
   final int adProbability; // 0~100
   final bool isSponsored;
+  final int likeCount;
 
   /// llm 또는 finetuned 확률값 (0.0~1.0, 없으면 null)
   final double? adScore;
@@ -75,6 +76,7 @@ class BlogReview {
     required this.status,
     required this.adProbability,
     required this.isSponsored,
+    this.likeCount = 0,
     this.adScore,
   });
 
@@ -136,9 +138,20 @@ class BlogReview {
       status: status,
       adProbability: adProb,
       isSponsored: status == ReviewStatus.ad,
+      likeCount: _likeCountFromJson(
+        json['likes'] ?? json['like_count'] ?? json['likeCount'],
+      ),
       adScore: adScore,
     );
   }
+}
+
+int _likeCountFromJson(Object? value) {
+  if (value is List) return value.length;
+  if (value is int) return value;
+  if (value is num) return value.round();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
 }
 
 /// YYYYMMDD → YYYY.MM.DD 변환. 그 외 형식은 그대로 반환.

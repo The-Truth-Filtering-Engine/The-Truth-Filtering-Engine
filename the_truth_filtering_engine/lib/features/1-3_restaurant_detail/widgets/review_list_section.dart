@@ -148,7 +148,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChange);
   }
 
@@ -182,11 +182,24 @@ class _ReviewListSectionState extends State<ReviewListSection>
           .where((blog) => !_hiddenReviewIds.contains(blog.id))
           .toList();
 
-  List<BlogReview> get _sortedByReal => [..._displayBlogs]
+  List<BlogReview> get _sortedByRecommended =>
+      [..._displayBlogs]..sort(_compareRecommended);
+
+  List<BlogReview> get _sortedByTrust => [..._displayBlogs]
     ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
   List<BlogReview> get _sortedByDate =>
       [..._displayBlogs]..sort((a, b) => b.date.compareTo(a.date));
+
+  int _compareRecommended(BlogReview a, BlogReview b) {
+    final likeCompare = b.likeCount.compareTo(a.likeCount);
+    if (likeCompare != 0) return likeCompare;
+
+    final trustCompare = a.adProbability.compareTo(b.adProbability);
+    if (trustCompare != 0) return trustCompare;
+
+    return b.date.compareTo(a.date);
+  }
 
   Future<void> _openUrl(BlogReview blog) async {
     final uri = mobileBlogReviewUri(blog.url);
@@ -199,8 +212,11 @@ class _ReviewListSectionState extends State<ReviewListSection>
     }
   }
 
-  List<BlogReview> get _currentBlogs =>
-      _tabController.index == 0 ? _sortedByReal : _sortedByDate;
+  List<BlogReview> get _currentBlogs => switch (_tabController.index) {
+        0 => _sortedByRecommended,
+        1 => _sortedByTrust,
+        _ => _sortedByDate,
+      };
 
   int get _totalPages {
     if (_currentBlogs.isEmpty) return 0;
@@ -327,8 +343,9 @@ class _ReviewListSectionState extends State<ReviewListSection>
                   unselectedLabelStyle: AppText.caption(),
                   dividerColor: Colors.transparent,
                   tabs: const [
-                    Tab(text: '✅  진성순'),
-                    Tab(text: '🕐  최신순'),
+                    Tab(text: '추천순'),
+                    Tab(text: '신뢰순'),
+                    Tab(text: '최신순'),
                   ],
                 ),
               ),
