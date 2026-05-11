@@ -1,9 +1,16 @@
-import httpx, os, re
+import httpx, os, re, unicodedata
+from typing import NamedTuple
 from html import unescape
-from services.review_limits import REVIEW_BATCH_SIZE, normalize_naver_start
+from services.review_limits import (
+    MAX_REVIEW_RESULTS,
+    REVIEW_BATCH_SIZE,
+    normalize_naver_start,
+)
 
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
+NAVER_BLOG_API_URL = "https://openapi.naver.com/v1/search/blog.json"
+NAVER_BLOG_MAX_DISPLAY = 100
 
 _PROVINCE_ALIASES = {
     "경기",
@@ -62,6 +69,13 @@ _CATEGORY_HINTS = (
     ("디저트", "디저트"),
 )
 
+
+class BlogFetchResult(NamedTuple):
+    items: list[dict]
+    raw_count: int
+    exhausted: bool
+
+
 def _clean(text: str) -> str:
     text = re.sub(r"<[^>]+>", "", text)  # <b>, </b> 등 HTML 태그 제거
     text = unescape(text)                 # &quot; &amp; 등 HTML 엔티티 디코딩
@@ -88,6 +102,36 @@ def build_naver_blog_query(query: str, place_metadata: dict | None = None) -> st
         parts.append("맛집")
 
     return " ".join(_dedupe_tokens(parts)) or query.strip()
+
+
+def normalize_store_name_for_match(value: object) -> str:
+    text = unicodedata.normalize("NFKC", _clean(str(value or ""))).casefold()
+    return re.sub(r"[^0-9a-z가-힣]", "", text)
+
+
+def blog_mentions_store_name(blog: dict, store_name: object) -> bool:
+    required = normalize_store_name_for_match(store_name)
+    if not required:
+        return True
+
+    candidates = (
+        blog.get("title"),
+        blog.get("description"),
+        blog.get("review_title"),
+        blog.get("review_description"),
+    )
+    return any(
+        required in normalize_store_name_for_match(candidate)
+        for candidate in candidates
+    )
+
+
+def filter_blogs_by_store_name(blogs: list[dict], store_name: object) -> list[dict]:
+    return [
+        blog
+        for blog in blogs
+        if blog_mentions_store_name(blog, store_name)
+    ]
 
 
 def _clean_query_token(value: object) -> str:
@@ -150,30 +194,112 @@ async def fetch_blog_previews(
     start: int = 1,
     display: int = REVIEW_BATCH_SIZE,
 ) -> list[dict]:
-    url = "https://openapi.naver.com/v1/search/blog.json"
+    async with httpx.AsyncClient() as client:
+        return await _fetch_blog_previews_page(
+            client,
+            query,
+            start=start,
+            display=display,
+        )
+
+
+async def fetch_store_blog_previews(
+    query: str,
+    store_name: str,
+    *,
+    start: int = 1,
+    display: int = REVIEW_BATCH_SIZE,
+    max_results: int = MAX_REVIEW_RESULTS,
+    client: httpx.AsyncClient | None = None,
+) -> BlogFetchResult:
+    if client is not None:
+        return await _fetch_store_blog_previews(
+            client,
+            query,
+            store_name,
+            start=start,
+            display=display,
+            max_results=max_results,
+        )
+
+    async with httpx.AsyncClient() as owned_client:
+        return await _fetch_store_blog_previews(
+            owned_client,
+            query,
+            store_name,
+            start=start,
+            display=display,
+            max_results=max_results,
+        )
+
+
+async def _fetch_store_blog_previews(
+    client: httpx.AsyncClient,
+    query: str,
+    store_name: str,
+    *,
+    start: int,
+    display: int,
+    max_results: int,
+) -> BlogFetchResult:
+    page_display = NAVER_BLOG_MAX_DISPLAY
+    first_start = normalize_naver_start(start)
+    max_start = min(max(max_results, 1), MAX_REVIEW_RESULTS)
+    page_starts = range(first_start, max_start + 1, page_display)
+    filtered = []
+    raw_count = 0
+    exhausted = False
+
+    for page_start in page_starts:
+        page = await _fetch_blog_previews_page(
+            client,
+            query,
+            start=page_start,
+            display=page_display,
+        )
+        raw_count += len(page)
+        filtered.extend(filter_blogs_by_store_name(page, store_name))
+        if len(page) < page_display or page_start + page_display - 1 >= max_start:
+            exhausted = True
+            break
+
+    return BlogFetchResult(
+        items=filtered[:max_results],
+        raw_count=raw_count,
+        exhausted=exhausted,
+    )
+
+
+async def _fetch_blog_previews_page(
+    client: httpx.AsyncClient,
+    query: str,
+    *,
+    start: int,
+    display: int,
+) -> list[dict]:
     headers = {
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
     }
     params = {
         "query": query,
-        "display": min(max(display, 1), REVIEW_BATCH_SIZE),
+        "display": min(max(display, 1), NAVER_BLOG_MAX_DISPLAY),
         "start": normalize_naver_start(start),
         "sort": "sim",
     }
 
-    async with httpx.AsyncClient() as client:
-        res = await client.get(url, headers=headers, params=params)
-        res.raise_for_status()
-        items = res.json().get("items", [])
+    res = await client.get(NAVER_BLOG_API_URL, headers=headers, params=params)
+    res.raise_for_status()
+    items = res.json().get("items", [])
 
-    return [
-        {
-            "title":       _clean(item["title"]),
-            "description": _clean(item["description"]),
-            "link":        item["link"],
-            "bloggername": item["bloggername"],
-            "postdate":    item["postdate"],
-        }
-        for item in items
-    ]
+    return [_normalize_blog_item(item) for item in items]
+
+
+def _normalize_blog_item(item: dict) -> dict:
+    return {
+        "title": _clean(item.get("title", "")),
+        "description": _clean(item.get("description", "")),
+        "link": item.get("link", ""),
+        "bloggername": item.get("bloggername", ""),
+        "postdate": item.get("postdate"),
+    }

@@ -5,7 +5,12 @@ import time
 from services.preprocess import preprocess
 from services.electra_service import predict_is_ad, score_is_ad, predict_and_score_batch
 from services.llm_service import classify_ad, summarize_reviews
-from services.naver_service import build_naver_blog_query, fetch_blog_previews
+from services.naver_service import (
+    build_naver_blog_query,
+    fetch_blog_previews,
+    fetch_store_blog_previews,
+    filter_blogs_by_store_name,
+)
 from services.review_limits import (
     MAX_REVIEW_RESULTS,
     REVIEW_BATCH_SIZE,
@@ -38,6 +43,9 @@ async def search_cached(
 ):
     review_limit = clamp_max_results(limit)
     cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id)
+    place_detail_request = _is_place_detail_request(store_id)
+    if place_detail_request:
+        cached = filter_blogs_by_store_name(cached, query)
     usage = None
     auth_email = await _get_optional_auth_email(authorization)
 
@@ -49,7 +57,9 @@ async def search_cached(
         "reviews": cached or [],
         "reviewBatchSize": REVIEW_BATCH_SIZE,
         "maxReviewResults": MAX_REVIEW_RESULTS,
-        "hasMore": bool(cached) and len(cached) >= REVIEW_BATCH_SIZE,
+        "hasMore": False
+        if place_detail_request
+        else bool(cached) and len(cached) >= REVIEW_BATCH_SIZE,
     }
     if usage is not None:
         response["usage"] = usage
@@ -105,10 +115,14 @@ async def search(
         limit=max_review_results,
         store_id=store_id,
     )
+    place_detail_request = _is_place_detail_request(store_id)
+    if place_detail_request:
+        cached = _filter_reviews_for_place(cached, place_metadata)
     cached_count = len(cached)
     requested_batch_end = normalized_start + review_limit - 1
     should_fetch = refresh or cached_count < requested_batch_end
     fetched_count = 0
+    raw_fetched_count = 0
     naver_query = build_naver_blog_query(query, place_metadata)
     usage = None
     auth_email = await _get_optional_auth_email(authorization)
@@ -118,13 +132,28 @@ async def search(
             await _ensure_analysis_usage_available(auth_email, store_id)
 
         print(f"[DEBUG] → Naver API 호출 | naverQuery: {naver_query}")
-        blogs = await fetch_blog_previews(
-            naver_query,
-            start=normalized_start,
-            display=review_limit,
-        )
+        if place_detail_request:
+            fetch_result = await fetch_store_blog_previews(
+                naver_query,
+                query,
+                start=normalized_start,
+                display=REVIEW_BATCH_SIZE,
+                max_results=max_review_results,
+            )
+            blogs = fetch_result.items
+            raw_fetched_count = fetch_result.raw_count
+        else:
+            blogs = await fetch_blog_previews(
+                naver_query,
+                start=normalized_start,
+                display=review_limit,
+            )
+            raw_fetched_count = len(blogs)
         fetched_count = len(blogs)
-        print(f"[DEBUG] Naver 블로그 수집 완료 | count: {fetched_count}")
+        print(
+            "[DEBUG] Naver 블로그 수집 완료 | "
+            f"raw: {raw_fetched_count} | matched: {fetched_count}"
+        )
 
         await save_reviews(query, blogs, place_metadata=place_metadata)
         print("[DEBUG] Supabase 저장 완료")
@@ -134,6 +163,8 @@ async def search(
             limit=max_review_results,
             store_id=store_id,
         )
+        if place_detail_request:
+            saved = _filter_reviews_for_place(saved, place_metadata)
         if not saved and blogs:
             saved = _blogs_to_reviews(
                 query,
@@ -153,10 +184,14 @@ async def search(
 
     loaded_count = len(saved)
     has_more = (
-        loaded_count < max_review_results
-        and (
-            fetched_count == review_limit
-            or (not should_fetch and loaded_count >= requested_batch_end)
+        False
+        if place_detail_request
+        else (
+            loaded_count < max_review_results
+            and (
+                fetched_count == review_limit
+                or (not should_fetch and loaded_count >= requested_batch_end)
+            )
         )
     )
 
@@ -360,6 +395,17 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
       review["is_ad_finetuned_pred"] = score  # 메모리 먼저 반영
 
     asyncio.create_task(_save_to_supabase(targets, all_scores))  # Supabase는 백그라운드
+
+
+def _is_place_detail_request(store_id: str | None) -> bool:
+    return bool(str(store_id or "").strip())
+
+
+def _filter_reviews_for_place(
+    reviews: list[dict],
+    place_metadata: dict,
+) -> list[dict]:
+    return filter_blogs_by_store_name(reviews, place_metadata.get("name"))
 
 
 def _build_place_metadata(
