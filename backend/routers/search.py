@@ -4,7 +4,7 @@ import time
 from services.preprocess import preprocess
 from services.electra_service import predict_is_ad, score_is_ad, predict_and_score_batch
 from services.llm_service import classify_ad, summarize_reviews
-from services.naver_service import fetch_blog_previews
+from services.naver_service import build_naver_blog_query, fetch_blog_previews
 from services.review_limits import (
     MAX_REVIEW_RESULTS,
     REVIEW_BATCH_SIZE,
@@ -108,6 +108,7 @@ async def search(
     requested_batch_end = normalized_start + review_limit - 1
     should_fetch = refresh or cached_count < requested_batch_end
     fetched_count = 0
+    naver_query = build_naver_blog_query(query, place_metadata)
     usage = None
     auth_email = await _get_optional_auth_email(authorization)
 
@@ -115,9 +116,9 @@ async def search(
         if auth_email:
             await _ensure_analysis_usage_available(auth_email, store_id)
 
-        print("[DEBUG] → Naver API 호출")
+        print(f"[DEBUG] → Naver API 호출 | naverQuery: {naver_query}")
         blogs = await fetch_blog_previews(
-            query,
+            naver_query,
             start=normalized_start,
             display=review_limit,
         )
@@ -174,6 +175,7 @@ async def search(
         "reviewBatchSize": REVIEW_BATCH_SIZE,
         "maxReviewResults": max_review_results,
         "naverStart": normalized_start,
+        "naverQuery": naver_query,
         "fetchedCount": fetched_count,
         "hasMore": has_more,
     }
