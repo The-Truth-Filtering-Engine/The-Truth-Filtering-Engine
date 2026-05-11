@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../1-1_map/models/map_point.dart';
 import '../../1-1_map/models/restaurant_model.dart';
+import '../../1-1_map/providers/map_provider.dart';
 import '../providers/ai_recommend_provider.dart';
 import '../widgets/recommend_card.dart';
 
@@ -16,7 +18,13 @@ class AiRecommendScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(currentLocationProvider, (previous, next) {
+      if (next == null || _sameLocation(previous, next)) return;
+      ref.read(aiRecommendProvider.notifier).reloadForCurrentLocation();
+    });
+
     final state = ref.watch(aiRecommendProvider);
+    final currentLocation = ref.watch(currentLocationProvider);
     final notifier = ref.read(aiRecommendProvider.notifier);
 
     return Container(
@@ -35,21 +43,24 @@ class AiRecommendScreen extends ConsumerWidget {
             );
           }
 
-          if (state.items.isEmpty) {
-            return _EmptyState(onRefresh: notifier.refresh);
-          }
-
           return RefreshIndicator(
             onRefresh: notifier.refresh,
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-              itemCount: state.items.length + 2,
+              itemCount: state.items.isEmpty ? 2 : state.items.length + 2,
               separatorBuilder: (_, index) => index == 0
                   ? const SizedBox(height: 14)
                   : const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  return _Header(page: state.page);
+                  return _Header(
+                    state: state,
+                    currentLocation: currentLocation,
+                    onRegionScopeChanged: notifier.changeRegionScope,
+                  );
+                }
+                if (state.items.isEmpty) {
+                  return const _EmptyState();
                 }
                 if (index == state.items.length + 1) {
                   return _PaginationControls(
@@ -75,9 +86,15 @@ class AiRecommendScreen extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  final int page;
+  final AiRecommendState state;
+  final MapPoint? currentLocation;
+  final ValueChanged<AiRegionScope> onRegionScopeChanged;
 
-  const _Header({required this.page});
+  const _Header({
+    required this.state,
+    required this.currentLocation,
+    required this.onRegionScopeChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +113,7 @@ class _Header extends StatelessWidget {
               ),
             ),
             Text(
-              '$page 페이지',
+              '${state.page} 페이지',
               style: AppText.caption().copyWith(color: AppColors.textHint),
             ),
           ],
@@ -106,8 +123,85 @@ class _Header extends StatelessWidget {
           '가게별로 광고 가능성이 가장 낮게 감지된 리뷰입니다.',
           style: AppText.body().copyWith(color: AppColors.textSecondary),
         ),
+        const SizedBox(height: 14),
+        if (state.currentRegionLabel.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '현재 위치',
+                  style: AppText.caption().copyWith(color: AppColors.textHint),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  state.currentRegionLabel,
+                  style: AppText.subtitle().copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AiRegionScope.values.map((regionScope) {
+              final selected = state.regionScope == regionScope;
+              return ChoiceChip(
+                label: Text(_regionScopeLabel(regionScope)),
+                selected: selected,
+                onSelected: state.isLoading
+                    ? null
+                    : (_) => onRegionScopeChanged(regionScope),
+                selectedColor: AppColors.primary50,
+                checkmarkColor: AppColors.primary700,
+                labelStyle: AppText.caption().copyWith(
+                  color:
+                      selected ? AppColors.primary700 : AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+                side: BorderSide(
+                  color: selected ? AppColors.primary200 : AppColors.border,
+                ),
+              );
+            }).toList(),
+          ),
+        ] else
+          Text(
+            _locationStatusText,
+            style: AppText.caption().copyWith(color: AppColors.textHint),
+          ),
       ],
     );
+  }
+
+  String _regionScopeLabel(AiRegionScope regionScope) {
+    final label = switch (regionScope) {
+      AiRegionScope.si => state.currentRegionSi,
+      AiRegionScope.gu => state.currentRegionGu,
+      AiRegionScope.dong => state.currentRegionDong,
+    };
+    return label.trim().isNotEmpty ? label : regionScope.fallbackLabel;
+  }
+
+  String get _locationStatusText {
+    if (currentLocation == null) {
+      return '현재 위치를 확인하면 지역별 추천이 적용됩니다.';
+    }
+    if (state.isLoading) {
+      return '현재 위치를 확인하는 중입니다.';
+    }
+    return '현재 위치 지역을 확인하지 못해 전체 추천을 보여줍니다.';
   }
 }
 
@@ -157,18 +251,18 @@ class _PaginationControls extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  final Future<void> Function() onRefresh;
-
-  const _EmptyState({required this.onRefresh});
+  const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+    return Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.sizeOf(context).height * 0.12,
+        left: 8,
+        right: 8,
+      ),
+      child: Column(
         children: [
-          SizedBox(height: MediaQuery.sizeOf(context).height * 0.22),
           const Icon(
             Icons.auto_awesome_outlined,
             size: 48,
@@ -239,4 +333,9 @@ class _ErrorState extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _sameLocation(MapPoint? a, MapPoint? b) {
+  if (a == null || b == null) return a == b;
+  return a.latitude == b.latitude && a.longitude == b.longitude;
 }
