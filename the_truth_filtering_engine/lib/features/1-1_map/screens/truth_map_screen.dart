@@ -19,7 +19,7 @@ enum DetailState { idle, loading, analyzing, loaded, noData, error }
 
 enum ActivePanel { none, restaurant, detail, bookmarks, ai, profile }
 
-enum ReviewSort { real, latest }
+enum ReviewSort { recommended, trust, latest }
 
 enum AiRegionScope { si, gu, dong }
 
@@ -49,7 +49,7 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
 
   DetailState detailState = DetailState.idle;
   String detailErrorMessage = '';
-  ReviewSort reviewSort = ReviewSort.real;
+  ReviewSort reviewSort = ReviewSort.recommended;
 
   AiRegionScope aiRegionScope = AiRegionScope.si;
   int aiPage = 1;
@@ -188,7 +188,7 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
       detailState = forceFresh ? DetailState.analyzing : DetailState.loading;
       detailReviews = [];
       detailErrorMessage = '';
-      reviewSort = ReviewSort.real;
+      reviewSort = ReviewSort.recommended;
     });
 
     try {
@@ -274,13 +274,26 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
   List<BlogReviewModel> get sortedDetailReviews {
     final items = [...detailReviews];
 
-    if (reviewSort == ReviewSort.latest) {
-      items.sort((a, b) => b.date.compareTo(a.date));
-    } else {
-      items.sort((a, b) => a.adProbability.compareTo(b.adProbability));
+    switch (reviewSort) {
+      case ReviewSort.recommended:
+        items.sort(compareRecommendedReviews);
+      case ReviewSort.trust:
+        items.sort((a, b) => a.adProbability.compareTo(b.adProbability));
+      case ReviewSort.latest:
+        items.sort((a, b) => b.date.compareTo(a.date));
     }
 
     return items;
+  }
+
+  int compareRecommendedReviews(BlogReviewModel a, BlogReviewModel b) {
+    final likeCompare = b.likeCount.compareTo(a.likeCount);
+    if (likeCompare != 0) return likeCompare;
+
+    final trustCompare = a.adProbability.compareTo(b.adProbability);
+    if (trustCompare != 0) return trustCompare;
+
+    return b.date.compareTo(a.date);
   }
 
   List<MapEntry<String, int>> get keywords {
@@ -724,7 +737,11 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
         children: [
           SegmentedButton<ReviewSort>(
             segments: const [
-              ButtonSegment(value: ReviewSort.real, label: Text('신뢰순')),
+              ButtonSegment(
+                value: ReviewSort.recommended,
+                label: Text('추천순'),
+              ),
+              ButtonSegment(value: ReviewSort.trust, label: Text('신뢰순')),
               ButtonSegment(value: ReviewSort.latest, label: Text('최신순')),
             ],
             selected: {reviewSort},
