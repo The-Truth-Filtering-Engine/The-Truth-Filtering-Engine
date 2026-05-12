@@ -8,8 +8,8 @@
 /// report.category 에 int 코드로 저장됩니다.
 enum ReportCategory {
   ad(1, '광고'),
-  irrelevant(2, '관련없는 내용'),
-  inappropriate(3, '부적합한 내용'),
+  irrelevant(2, '관련 없는 내용'),
+  inappropriate(3, '부적절한 내용'),
   other(4, '기타');
 
   const ReportCategory(this.code, this.label);
@@ -90,7 +90,7 @@ class ReviewReport {
   alter table public.reviews
     alter column confirm set default 0;
 
-  -- report.category : 1=광고, 2=관련없는내용, 3=부적합, 4=기타
+  -- report.category : 1=광고, 2=관련 없는 내용, 3=부적절한 내용, 4=기타
   -- confirm         : 0=보류, 1=가짜신고, 2=진짜신고
   ──────────────────────────────────────────────
 */

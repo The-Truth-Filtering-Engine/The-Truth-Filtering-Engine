@@ -11,7 +11,6 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/backend_config.dart';
-import '../../../core/providers/user_profile_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
@@ -24,12 +23,9 @@ import '../../1-2_restaurant_list/screens/restaurant_list_screen.dart';
 import '../../1-3_restaurant_detail/screens/restaurant_detail_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({
-    super.key,
-    this.onOpenSettings,
-  });
-
   final VoidCallback? onOpenSettings;
+
+  const MapScreen({super.key, this.onOpenSettings});
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -46,7 +42,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
 
-  static const _initialCenter = MapPoint(37.5245, 127.0370);
+  static const _initialCenter =
+      MapPoint(latitude: 37.5245, longitude: 127.0370);
   static const _initialLevel = 4;
 
   List<RestaurantModel>? _viewportRestaurants;
@@ -61,7 +58,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncCurrentLocationToProvider();
-      ref.read(userProfileProvider.notifier).loadIfPossible();
     });
   }
 
@@ -88,7 +84,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _mapViewKey.currentState?.moveTo(
-          MapPoint(next.latitude, next.longitude),
+          MapPoint(latitude: next.latitude, longitude: next.longitude),
           level: 3,
         );
       });
@@ -98,7 +94,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final currentLocation = ref.watch(currentLocationProvider);
     final focusedRestaurant = ref.watch(mapFocusRestaurantProvider);
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
-    final userProfile = ref.watch(userProfileProvider).asData?.value;
     final displayRestaurants = _reduceRestaurantOverdraw(
       restaurants: _appendRestaurantIfMissing(
         _viewportRestaurants,
@@ -107,10 +102,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       level: _latestMapLevel,
     );
     final isSelectedBookmarked = selectedRestaurant != null &&
-        bookmarkedRestaurants.any(
-          (item) =>
-              item.effectiveStoreId == selectedRestaurant.effectiveStoreId,
-        );
+        bookmarkedRestaurants.any((item) => item.id == selectedRestaurant.id);
 
     return Scaffold(
       backgroundColor: AppColors.mapTeal,
@@ -214,16 +206,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: RestaurantBottomSheet(
                   restaurant: selectedRestaurant,
                   isBookmarked: isSelectedBookmarked,
-                  detailButtonLabel:
-                      _detailButtonLabel(selectedRestaurant, userProfile),
-                  onDetailTap: () => _openRestaurantDetail(selectedRestaurant),
+                  onDetailTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RestaurantDetailScreen(
+                          restaurant: selectedRestaurant,
+                        ),
+                      ),
+                    );
+                  },
                   onBookmarkTap: () {
                     final previous = ref.read(bookmarkRestaurantsProvider);
-                    final alreadyBookmarked = previous.any(
-                      (item) =>
-                          item.effectiveStoreId ==
-                          selectedRestaurant.effectiveStoreId,
-                    );
+                    final alreadyBookmarked = previous
+                        .any((item) => item.id == selectedRestaurant.id);
                     ref
                         .read(bookmarkRestaurantsProvider.notifier)
                         .toggle(selectedRestaurant);
@@ -270,84 +266,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _showRestaurantFromSearchResult(RestaurantModel restaurant) {
     ref.read(mapFocusRestaurantProvider.notifier).state = restaurant;
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
-  }
-
-  String _detailButtonLabel(
-    RestaurantModel restaurant,
-    UserProfile? profile,
-  ) {
-    if (profile == null) return '상세 보기';
-
-    final storeId = restaurant.effectiveStoreId.trim();
-    if (storeId.isNotEmpty && profile.hasRecentAnalysisFor(storeId)) {
-      return '상세 보기 (무료-1일 남음)';
-    }
-    if (profile.hasCountAnalysis) {
-      return '상세 보기 (분석횟수 -1회)';
-    }
-    if (profile.hasCoinAnalysis) {
-      return '상세 보기 (-100 coin)';
-    }
-    return '상세 보기';
-  }
-
-  Future<void> _openRestaurantDetail(RestaurantModel restaurant) async {
-    final canOpen = await _canOpenRestaurantDetail(restaurant);
-    if (!canOpen || !mounted) return;
-
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RestaurantDetailScreen(
-          restaurant: restaurant,
-        ),
-      ),
-    );
-
-    if (!mounted) return;
-    await ref.read(userProfileProvider.notifier).loadIfPossible(force: true);
-  }
-
-  Future<bool> _canOpenRestaurantDetail(RestaurantModel restaurant) async {
-    final profileNotifier = ref.read(userProfileProvider.notifier);
-    if (!profileNotifier.hasGoogleSession) return true;
-
-    var profile = ref.read(userProfileProvider).asData?.value;
-    profile ??= await profileNotifier.loadIfPossible(force: true);
-    if (!mounted) return false;
-
-    if (profile == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('사용량 정보를 확인하지 못했습니다')),
-        );
-      return false;
-    }
-
-    if (_hasAvailableDetailAnalysis(restaurant, profile)) {
-      return true;
-    }
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('분석을 위해 코인을 충전해주세요')),
-      );
-    widget.onOpenSettings?.call();
-    return false;
-  }
-
-  bool _hasAvailableDetailAnalysis(
-    RestaurantModel restaurant,
-    UserProfile profile,
-  ) {
-    final storeId = restaurant.effectiveStoreId.trim();
-    if (storeId.isNotEmpty && profile.hasRecentAnalysisFor(storeId)) {
-      return true;
-    }
-
-    return profile.hasCountAnalysis || profile.hasCoinAnalysis;
   }
 
   void _onCameraIdle(KakaoMapCamera camera) {
@@ -439,8 +357,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _calculateViewportRadius(MapBounds bounds, MapPoint center) {
     final northEast = bounds.northEast;
     final southWest = bounds.southWest;
-    final northWest = MapPoint(northEast.latitude, southWest.longitude);
-    final southEast = MapPoint(southWest.latitude, northEast.longitude);
+    final northWest =
+        MapPoint(latitude: northEast.latitude, longitude: southWest.longitude);
+    final southEast =
+        MapPoint(latitude: southWest.latitude, longitude: northEast.longitude);
 
     final candidates = [
       distanceMeters(center, northWest),
@@ -495,21 +415,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final restaurants = items
           .map((item) => RestaurantModel(
                 id: item['id']?.toString() ?? '',
-                storeId:
-                    item['storeId']?.toString() ?? item['id']?.toString() ?? '',
                 name: item['name'] ?? '',
                 category: item['category'] ?? '음식점',
-                categoryName: item['categoryName']?.toString(),
-                categoryGroupCode: item['categoryGroupCode']?.toString(),
-                categoryGroupName: item['categoryGroupName']?.toString(),
                 address: item['address'] ?? '',
                 truthScore: _mockTrustScore(item['id']?.toString() ?? ''),
                 distance: item['distance'] ?? 0,
                 phone: item['phone']?.toString(),
-                placeUrl:
-                    item['placeUrl']?.toString() ?? item['link']?.toString(),
-                addressName: item['addressName']?.toString(),
-                roadAddressName: item['roadAddressName']?.toString(),
+                placeUrl: item['link'],
                 reviewSummary: item['name'] ?? '검색 결과',
                 imageUrl: null,
                 latitude: (item['lat'] as num).toDouble(),
@@ -527,9 +439,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           restaurants;
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
       if (selectedRestaurant != null &&
-          mergedRestaurants.every(
-            (r) => r.effectiveStoreId != selectedRestaurant.effectiveStoreId,
-          )) {
+          mergedRestaurants.every((r) => r.id != selectedRestaurant.id)) {
         ref.read(selectedRestaurantProvider.notifier).state = null;
       }
 
@@ -626,11 +536,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (restaurant == null) return restaurants;
 
     final source = restaurants ?? const <RestaurantModel>[];
-    if (source.any(
-      (item) => item.effectiveStoreId == restaurant.effectiveStoreId,
-    )) {
-      return restaurants;
-    }
+    if (source.any((item) => item.id == restaurant.id)) return restaurants;
 
     return [restaurant, ...source];
   }
@@ -665,7 +571,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final location = MapPoint(position.latitude, position.longitude);
+      final location =
+          MapPoint(latitude: position.latitude, longitude: position.longitude);
       ref.read(currentLocationProvider.notifier).state = location;
       _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}

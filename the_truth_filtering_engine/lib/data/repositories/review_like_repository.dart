@@ -14,30 +14,21 @@ class ReviewLikeRepository {
     return ReviewLikeState.fromRow(row, userId);
   }
 
-  Future<ReviewLikeState> toggle({
+  Future<ReviewLikeState> toggleHeart({
     required String reviewId,
     required int userId,
-    required LikeType type,
     String? accessToken,
   }) async {
     final row = await _source.fetchLikes(reviewId);
-    var likes = _parseList(row['likes']);
-    var dislikes = _parseList(row['dislikes']);
+    final likes = parseUserIdEntryList(row['likes']);
+    final dislikes = parseUserIdEntryList(row['dislikes']);
+    final isAlreadyLiked = likes.any((entry) => entry['user_id'] == userId);
 
-    if (type == LikeType.like) {
-      if (likes.any((e) => e['user_id'] == userId)) {
-        likes.removeWhere((e) => e['user_id'] == userId);
-      } else {
-        likes.add({'user_id': userId});
-        dislikes.removeWhere((e) => e['user_id'] == userId);
-      }
+    if (isAlreadyLiked) {
+      likes.removeWhere((entry) => entry['user_id'] == userId);
     } else {
-      if (dislikes.any((e) => e['user_id'] == userId)) {
-        dislikes.removeWhere((e) => e['user_id'] == userId);
-      } else {
-        dislikes.add({'user_id': userId});
-        likes.removeWhere((e) => e['user_id'] == userId);
-      }
+      likes.add(<String, dynamic>{'user_id': userId});
+      dislikes.removeWhere((entry) => entry['user_id'] == userId);
     }
 
     await _source.updateLikes(
@@ -48,9 +39,7 @@ class ReviewLikeRepository {
 
     final nextState = ReviewLikeState(
       likeCount: likes.length,
-      dislikeCount: dislikes.length,
-      isLiked: likes.any((e) => e['user_id'] == userId),
-      isDisliked: dislikes.any((e) => e['user_id'] == userId),
+      isLiked: likes.any((entry) => entry['user_id'] == userId),
     );
 
     final token = accessToken?.trim() ?? '';
@@ -59,27 +48,13 @@ class ReviewLikeRepository {
         await _source.syncUserReaction(
           accessToken: token,
           reviewId: reviewId,
-          reaction: nextState.isLiked
-              ? LikeType.like
-              : nextState.isDisliked
-                  ? LikeType.dislike
-                  : null,
+          reaction: nextState.isLiked ? LikeType.like : null,
         );
       } catch (_) {
-        // 리뷰 카운트 반영은 유지하고, 계정 동기화 실패만 삼킨다.
+        // Review count is already updated; account sync can recover later.
       }
     }
 
     return nextState;
-  }
-
-  List<Map<String, dynamic>> _parseList(dynamic json) {
-    if (json == null) return [];
-    return List<Map<String, dynamic>>.from(
-      (json as List)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .where((e) => int.tryParse(e['user_id']?.toString() ?? '') != null)
-          .map((e) => {'user_id': int.parse(e['user_id'].toString())}),
-    );
   }
 }

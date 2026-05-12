@@ -65,10 +65,7 @@ class TrustCircle extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          Text(
-            'TRUST',
-            style: AppText.label().copyWith(fontSize: 8),
-          ),
+          Text('TRUST', style: AppText.label().copyWith(fontSize: 8)),
         ],
       ),
     );
@@ -124,11 +121,7 @@ class BlogCard extends StatelessWidget {
   final BlogReview blog;
   final VoidCallback onTap;
 
-  const BlogCard({
-    super.key,
-    required this.blog,
-    required this.onTap,
-  });
+  const BlogCard({super.key, required this.blog, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -79,18 +79,21 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
     state = state.copyWith(isLoading: false, likeState: likeState);
   }
 
-  Future<void> toggle(LikeType type) async {
+  Future<void> toggleHeart() async {
     if (state.isLoading) return;
     state = state.copyWith(isLoading: true);
 
-    final likeState = await _repo.toggle(
-      reviewId: _reviewId,
-      userId: _userId,
-      type: type,
-      accessToken: _accessToken,
-    );
+    try {
+      final likeState = await _repo.toggleHeart(
+        reviewId: _reviewId,
+        userId: _userId,
+        accessToken: _accessToken,
+      );
 
-    state = state.copyWith(isLoading: false, likeState: likeState);
+      state = state.copyWith(isLoading: false, likeState: likeState);
+    } catch (_) {
+      state = state.copyWith(isLoading: false);
+    }
   }
 }
 

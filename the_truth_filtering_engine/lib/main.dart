@@ -26,11 +26,7 @@ Future<void> main() async {
     );
   }
 
-  runApp(
-    const ProviderScope(
-      child: TruthMouthApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: TruthMouthApp()));
 }
 
 class TruthMouthApp extends StatelessWidget {
@@ -99,17 +95,17 @@ class _MainShellState extends ConsumerState<MainShell> {
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 0.5),
-          ),
+          border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
         ),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
           currentIndex: ref.watch(mainTabIndexProvider),
           onTap: (index) =>
               ref.read(mainTabIndexProvider.notifier).state = index,
-          selectedLabelStyle:
-              const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
           items: const [
             BottomNavigationBarItem(
@@ -125,7 +121,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
               activeIcon: Icon(Icons.history_toggle_off_rounded),
-              label: '최근분석',
+              label: '최근 분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),
