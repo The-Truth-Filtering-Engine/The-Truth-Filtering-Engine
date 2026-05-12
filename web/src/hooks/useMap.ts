@@ -25,7 +25,7 @@ const REFRESH_DISTANCE_METERS = 150
 type LoadState = 'loading' | 'ready' | 'error'
 
 export type UseMapReturn = {
-  mapContainerRef: React.RefObject<HTMLDivElement>
+  mapContainerRef: React.RefObject<HTMLDivElement | null>
   loadState: LoadState
   errorMessage: string
   placesErrorMessage: string

@@ -94,12 +94,13 @@ export function useBookmarks(
       return
     }
 
+    const accessToken = token
     let canceled = false
     const sessionKey = authSession.user?.id || token
 
     async function syncBookmarks() {
       try {
-        let bookmarks = await fetchUserBookmarks(token)
+        let bookmarks = await fetchUserBookmarks(accessToken)
         const localBookmarks = loadBookmarkedRestaurants()
 
         if (localBookmarks.length > 0 && bookmarkSyncSessionRef.current !== sessionKey) {
@@ -111,7 +112,7 @@ export function useBookmarks(
             if (!storeId || (bookmarks.storeIds.includes(storeId) && hasRemoteStore)) {
               continue
             }
-            bookmarks = await addUserBookmark(token, restaurant)
+            bookmarks = await addUserBookmark(accessToken, restaurant)
           }
           window.localStorage.removeItem(BOOKMARK_STORAGE_KEY)
         }
