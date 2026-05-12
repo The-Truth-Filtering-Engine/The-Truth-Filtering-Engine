@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/config/supabase_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../providers/recent_analysis_provider.dart';
@@ -21,11 +19,6 @@ class RecentAnalysisScreen extends ConsumerStatefulWidget {
 }
 
 class _RecentAnalysisScreenState extends ConsumerState<RecentAnalysisScreen> {
-  bool get _hasGoogleSession {
-    if (!SupabaseConfig.isConfigured) return false;
-    return Supabase.instance.client.auth.currentSession != null;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -37,18 +30,6 @@ class _RecentAnalysisScreenState extends ConsumerState<RecentAnalysisScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(recentAnalysesProvider);
-
-    if (!_hasGoogleSession) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Google 로그인 후 최근분석을 확인할 수 있습니다',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
 
     return RefreshIndicator(
       onRefresh: () => ref.read(recentAnalysesProvider.notifier).load(),
@@ -75,7 +56,7 @@ class _RecentAnalysisScreenState extends ConsumerState<RecentAnalysisScreen> {
               children: const [
                 _MessageCard(
                   icon: Icons.history,
-                  title: '아직 분석한 가게가 없습니다',
+                  title: '최근 분석이 없습니다.',
                   message: '상세보기를 열어 분석한 가게가 여기에 표시됩니다.',
                 ),
               ],

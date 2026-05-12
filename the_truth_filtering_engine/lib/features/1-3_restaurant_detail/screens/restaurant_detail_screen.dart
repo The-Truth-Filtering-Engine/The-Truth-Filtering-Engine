@@ -13,6 +13,7 @@ import '../../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../../1-1_map/providers/map_provider.dart';
+import '../../2_recent_analysis/providers/recent_analysis_provider.dart';
 import '../providers/blog_review.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
 import '../widgets/restaurant_header_widget.dart';
@@ -182,7 +183,7 @@ Map<String, String> _reviewQueryParameters(
     if (trimmed != null && trimmed.isNotEmpty) params[key] = trimmed;
   }
 
-  addIfNotBlank('storeId', restaurant.id);
+  addIfNotBlank('storeId', restaurant.effectiveStoreId);
   addIfNotBlank('categoryName', restaurant.category);
   addIfNotBlank('phone', restaurant.phone);
   addIfNotBlank('addressName', restaurant.address);
@@ -356,6 +357,12 @@ class _RestaurantDetailScreenState
       _isLoadingReviewBatch = false;
       _state = _ScreenState.loaded;
     });
+    _refreshRecentAnalyses();
+  }
+
+  void _refreshRecentAnalyses() {
+    if (!mounted) return;
+    Future.microtask(() => ref.read(recentAnalysesProvider.notifier).load());
   }
 
   void _showError(String message) {
