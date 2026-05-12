@@ -17,6 +17,7 @@ SUPABASE_KEY = (
 )
 USER_PROFILE_SELECT = "id,email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
+MAX_RECENT_VISITS = 30
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
 KST = timezone(timedelta(hours=9))
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
@@ -321,6 +322,20 @@ async def get_user_bookmarks(email: str) -> dict:
     return _normalize_user_bookmarks(profile)
 
 
+async def get_user_recent_visits(email: str) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("User email is required")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        recent_visits = await _fetch_user_recent_visits_by_email(
+            client,
+            normalized_email,
+        )
+    return _normalize_user_recent_visits(recent_visits)
+
+
 async def get_user_recent_analyses(email: str) -> dict:
     profile = await ensure_user_profile(email)
     store_date_map = _normalize_store_date_map(profile.get("store"))
@@ -574,6 +589,78 @@ async def remove_user_bookmark(email: str, store_id: str) -> dict:
     return _normalize_user_bookmarks(updated)
 
 
+async def add_user_recent_visit(
+    email: str,
+    store_id: str,
+    store: dict | None,
+) -> dict:
+    normalized_email = _text_or_none(email)
+    normalized_store_id = _text_or_none(store_id)
+    if not normalized_email:
+        raise RuntimeError("User email is required")
+    if not normalized_store_id:
+        raise RuntimeError("storeId is required")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        current = await _fetch_user_recent_visits_by_email(
+            client,
+            normalized_email,
+        ) or {}
+        recent_map = _normalize_recent_visit_map(current.get("recent_visits"))
+        recent_map[normalized_store_id] = _normalize_recent_visit_store(
+            normalized_store_id,
+            store,
+            touch=True,
+        )
+        recent_map = _limit_recent_visit_map(recent_map)
+        updated = await _patch_user_recent_visits(
+            client,
+            normalized_email,
+            recent_map,
+        )
+    return _normalize_user_recent_visits(updated)
+
+
+async def remove_user_recent_visit(email: str, store_id: str) -> dict:
+    normalized_email = _text_or_none(email)
+    normalized_store_id = _text_or_none(store_id)
+    if not normalized_email:
+        raise RuntimeError("User email is required")
+    if not normalized_store_id:
+        raise RuntimeError("storeId is required")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        current = await _fetch_user_recent_visits_by_email(
+            client,
+            normalized_email,
+        ) or {}
+        recent_map = _normalize_recent_visit_map(current.get("recent_visits"))
+        recent_map.pop(normalized_store_id, None)
+        updated = await _patch_user_recent_visits(
+            client,
+            normalized_email,
+            recent_map,
+        )
+    return _normalize_user_recent_visits(updated)
+
+
+async def clear_user_recent_visits(email: str) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("User email is required")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        updated = await _patch_user_recent_visits(
+            client,
+            normalized_email,
+            {},
+        )
+    return _normalize_user_recent_visits(updated)
+
+
 async def get_user_review_reactions(email: str) -> dict:
     normalized_email = _text_or_none(email)
     if not normalized_email:
@@ -647,6 +734,17 @@ def _normalize_user_bookmarks(profile: dict) -> dict:
     return {
         "bookmark": bookmark_map,
         "store": profile.get("store") if isinstance(profile.get("store"), dict) else {},
+    }
+
+
+def _normalize_user_recent_visits(profile: dict | None) -> dict:
+    profile = profile or {}
+    recent_map = _limit_recent_visit_map(
+        _normalize_recent_visit_map(profile.get("recent_visits"))
+    )
+    return {
+        "recentVisits": recent_map,
+        "items": _recent_visit_items(recent_map),
     }
 
 
@@ -733,6 +831,51 @@ def _normalize_bookmark_store(
         normalized["updatedAt"] = datetime.now(KST).isoformat()
 
     return normalized
+
+
+def _normalize_recent_visit_map(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+
+    recent_map = {}
+    for key, item in value.items():
+        store_id = _text_or_none(key)
+        if not store_id or not isinstance(item, dict):
+            continue
+        recent_map[store_id] = _normalize_recent_visit_store(store_id, item)
+
+    return recent_map
+
+
+def _normalize_recent_visit_store(
+    store_id: str,
+    store: dict | None,
+    *,
+    touch: bool = False,
+) -> dict:
+    normalized = _normalize_bookmark_store(store_id, store, touch=touch)
+    normalized["storeId"] = store_id
+    return normalized
+
+
+def _limit_recent_visit_map(recent_map: dict) -> dict:
+    items = sorted(
+        recent_map.items(),
+        key=lambda pair: _text_or_none(pair[1].get("updatedAt")) or "",
+        reverse=True,
+    )
+    return dict(items[:MAX_RECENT_VISITS])
+
+
+def _recent_visit_items(recent_map: dict) -> list[dict]:
+    return [
+        item
+        for _, item in sorted(
+            recent_map.items(),
+            key=lambda pair: _text_or_none(pair[1].get("updatedAt")) or "",
+            reverse=True,
+        )
+    ]
 
 
 def _float_or_none(value) -> float | None:
@@ -835,6 +978,58 @@ async def _fetch_user_profile_by_email(
 
     rows = resp.json() if resp.text else []
     return _normalize_user_profile(rows[0]) if rows else None
+
+
+async def _fetch_user_recent_visits_by_email(
+    client: httpx.AsyncClient,
+    email: str,
+) -> dict | None:
+    resp = await client.get(
+        f"{SUPABASE_URL}/rest/v1/users",
+        headers=_h(),
+        params={
+            "email": f"eq.{email}",
+            "select": "recent_visits",
+            "limit": "1",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code != 200:
+        raise RuntimeError(
+            "recent_visits column is required. "
+            "Run supabase/migrations/20260512_add_user_recent_visits.sql. "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() if resp.text else []
+    return rows[0] if rows else None
+
+
+async def _patch_user_recent_visits(
+    client: httpx.AsyncClient,
+    email: str,
+    recent_visits: dict,
+) -> dict:
+    resp = await client.patch(
+        f"{SUPABASE_URL}/rest/v1/users",
+        headers=_h("return=representation"),
+        params={
+            "email": f"eq.{email}",
+            "select": "recent_visits",
+        },
+        json={"recent_visits": recent_visits},
+        timeout=10,
+    )
+
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(
+            "Could not update recent_visits. "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() if resp.text else []
+    return rows[0] if rows else {"recent_visits": recent_visits}
 
 
 async def _fetch_user_review_reactions_by_email(

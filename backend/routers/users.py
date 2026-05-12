@@ -6,12 +6,16 @@ from pydantic import BaseModel, Field
 from services.supabase_service import (
     add_user_coins,
     add_user_bookmark,
+    add_user_recent_visit,
+    clear_user_recent_visits,
     ensure_user_profile,
     get_auth_email,
     get_user_recent_analyses,
     get_user_bookmarks,
+    get_user_recent_visits,
     get_user_review_reactions,
     remove_user_bookmark,
+    remove_user_recent_visit,
     set_user_premium,
     update_user_review_reaction,
 )
@@ -30,6 +34,11 @@ class CoinChargeRequest(BaseModel):
 
 
 class BookmarkUpdateRequest(BaseModel):
+    storeId: str
+    store: dict = Field(default_factory=dict)
+
+
+class RecentVisitUpdateRequest(BaseModel):
     storeId: str
     store: dict = Field(default_factory=dict)
 
@@ -150,6 +159,18 @@ async def get_my_recent_analyses(
         ) from error
 
 
+@router.get("/user/me/recent-visits")
+async def get_my_recent_visits(authorization: str | None = Header(default=None)):
+    email = await _require_email(authorization)
+    try:
+        return await get_user_recent_visits(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
 @router.post("/user/me/bookmarks")
 async def add_my_bookmark(
     payload: BookmarkUpdateRequest,
@@ -165,6 +186,64 @@ async def add_my_bookmark(
     email = await _require_email(authorization)
     try:
         return await add_user_bookmark(email, store_id, payload.store)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/user/me/recent-visits")
+async def add_my_recent_visit(
+    payload: RecentVisitUpdateRequest,
+    authorization: str | None = Header(default=None),
+):
+    store_id = payload.storeId.strip()
+    if not store_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="storeId is required",
+        )
+
+    email = await _require_email(authorization)
+    try:
+        return await add_user_recent_visit(email, store_id, payload.store)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/user/me/recent-visits")
+async def clear_my_recent_visits(
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await clear_user_recent_visits(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/user/me/recent-visits/{store_id}")
+async def delete_my_recent_visit(
+    store_id: str,
+    authorization: str | None = Header(default=None),
+):
+    normalized_store_id = store_id.strip()
+    if not normalized_store_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="storeId is required",
+        )
+
+    email = await _require_email(authorization)
+    try:
+        return await remove_user_recent_visit(email, normalized_store_id)
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
