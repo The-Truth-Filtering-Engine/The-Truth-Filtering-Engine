@@ -623,21 +623,6 @@ class _RestaurantDetailScreenState
         onPressed: () => Navigator.pop(context),
       ),
       leadingWidth: 40,
-      title: Row(
-        children: [
-          IconButton(
-            icon: const Icon(
-              Icons.home_outlined,
-              size: 20,
-              color: AppColors.primary,
-            ),
-            onPressed: () =>
-                Navigator.popUntil(context, (route) => route.isFirst),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
-      ),
       centerTitle: true,
       flexibleSpace: Center(
         child: Text(
