@@ -220,6 +220,7 @@ class _RestaurantDetailScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       // 최근 본 식당 기록 저장
       ref.read(recentVisitProvider.notifier).add(widget.restaurant); // ← 추가
       _onDetailTap();
@@ -227,11 +228,13 @@ class _RestaurantDetailScreenState
   }
 
   Future<void> _onDetailTap() async {
+    if (!mounted) return;
     setState(() => _state = _ScreenState.checking); // 로딩 스피너만 표시
 
     try {
       final mode = ref.read(analysisModeProvider);
       final cached = await _fetchCachedReviews(_r, mode);
+      if (!mounted) return;
       final shouldLoadFirstBatch =
           cached.reviews.isEmpty || cached.reviews.length < _reviewBatchSize;
 
@@ -239,8 +242,10 @@ class _RestaurantDetailScreenState
         // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
         try {
           final fresh = await _fetchFreshReviews(_r, mode, naverStart: 1);
+          if (!mounted) return;
           _applyReviews(fresh);
         } catch (e) {
+          if (!mounted) return;
           if (_isUsageRequiredError(e)) {
             setState(() => _state = _ScreenState.noData);
             _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
@@ -259,12 +264,14 @@ class _RestaurantDetailScreenState
         _applyReviews(cached);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _state = _ScreenState.noData);
       _showError('데이터 조회 중 오류가 발생했어요: $e');
     }
   }
 
   Future<void> _onAnalyzeTap() async {
+    if (!mounted) return;
     setState(() => _state = _ScreenState.analyzing);
 
     try {
@@ -275,8 +282,10 @@ class _RestaurantDetailScreenState
         refresh: true,
         naverStart: 1,
       );
+      if (!mounted) return;
       _applyReviews(fresh);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _state = _ScreenState.noData);
       _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
     }
@@ -296,6 +305,7 @@ class _RestaurantDetailScreenState
     try {
       final mode = ref.read(analysisModeProvider);
       final fresh = await _fetchFreshReviews(_r, mode, naverStart: naverStart);
+      if (!mounted) return;
       final merged = _mergeReviews(_reviews, fresh.reviews);
       _applyReviews(
         _ReviewFetchResult(reviews: merged, hasMore: fresh.hasMore),
@@ -325,6 +335,8 @@ class _RestaurantDetailScreenState
   }
 
   void _applyReviews(_ReviewFetchResult result) {
+    if (!mounted) return;
+
     final reviews = result.reviews;
 
     if (reviews.isEmpty) {
