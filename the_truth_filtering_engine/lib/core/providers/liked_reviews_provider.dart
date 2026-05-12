@@ -36,9 +36,9 @@ class LikedReview {
 
   factory LikedReview.fromRow(Map<String, dynamic> row) => LikedReview(
         id: row['id']?.toString() ?? '',
-        title: row['title']?.toString() ?? '',
+        title: row['review_title']?.toString() ?? '',
         description: row['review_description']?.toString() ?? '',
-        restaurantName: row['restaurant_name']?.toString() ?? '',
+        restaurantName: row['name']?.toString() ?? '',
       );
 }
 
@@ -61,7 +61,7 @@ class LikedReviewsNotifier
     try {
       final rows = await Supabase.instance.client
           .from('reviews')
-          .select('id, title, review_description, restaurant_name, likes')
+          .select('id, review_title, review_description, name, likes')
           .contains('likes', [
         {'user_id': userId}
       ]).limit(200);
