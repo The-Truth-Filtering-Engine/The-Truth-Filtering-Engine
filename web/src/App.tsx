@@ -25,6 +25,7 @@ import {
 import { createClient, type Session } from '@supabase/supabase-js'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import appLogoUrl from '../logo.png'
+import { flushSync } from 'react-dom'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -829,26 +830,41 @@ function buildKeywords(reviews: BlogReview[]) {
 }
 
 async function fetchDetailJson(
-  path: string,
-  signal: AbortSignal,
-  accessToken?: string,
-): Promise<DetailJson> {
-  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
-    signal,
-    headers: accessToken
-      ? {
-          Authorization: `Bearer ${accessToken}`,
+path: string,
+    signal: AbortSignal,
+    accessToken?: string,
+  ): AsyncGenerator<{ reviews: unknown[]; done: boolean }> {
+    const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+      signal,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    })
+    if (!response.ok) {
+      throw new ApiRequestError(await readErrorMessage(response), response.status)
+    }
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+        for (const part of parts) {
+          const line = part.trim()
+          if (line.startsWith('data: ')) {
+            yield JSON.parse(line.slice(6)) as { reviews: unknown[]; done: boolean }
+          }
         }
-      : undefined,
-  })
-  if (!response.ok) {
-    throw new ApiRequestError(await readErrorMessage(response), response.status)
+      }
+    } finally {
+      reader.releaseLock()
+    }
   }
-  return (await response.json()) as DetailJson
-}
 
 function buildReviewSearchPath(
-  endpoint: '/api/search' | '/api/search/cached',
+  endpoint: '/api/search' | '/api/search/cached' | '/api/search/reviews',
   query: string,
   options: {
     mode?: string
@@ -2165,32 +2181,63 @@ function App() {
           detailJson = cached
         } else {
           setDetailState('analyzing')
+          let streamedReviews: ReturnType<typeof parseBlogReview>[] = []
           try {
-            detailJson = await fetchDetailJson(
-              buildReviewSearchPath('/api/search', query, {
-                naverStart: 1,
-                restaurant,
-              }),
+            for await (const chunk of streamReviews(
+              buildReviewSearchPath('/api/search/stream', query, { naverStart: 1, restaurant }),
               controller.signal,
               accessToken,
-            )
+            )) {
+              if (requestId !== detailRequestIdRef.current) return
+              const batch = (chunk.reviews ?? []).map(parseBlogReview)
+              streamedReviews = mergeReviews(streamedReviews, batch)
+              if (streamedReviews.length > 0) {
+                flushSync(() => {
+                  setDetailData({ reviews: [...streamedReviews], keywords: buildKeywords(streamedReviews) })
+                  setDetailState('loaded')
+                })
+              }
+              if (chunk.done) break
+            }
           } catch (error) {
             if (isAnalysisUsageRequiredError(error)) throw error
             if ((cached.reviews ?? []).length === 0) throw error
-            detailJson = cached
             showToast('추가 리뷰를 불러오지 못해 저장된 리뷰만 표시합니다')
           }
+          if (requestId !== detailRequestIdRef.current) return
+          if (streamedReviews.length === 0 && (cached.reviews ?? []).length === 0) {
+            setDetailState('noData')
+            return
+          }
+          setDetailHasMoreReviews(false)
+          return
         }
-      } else {
-        detailJson = await fetchDetailJson(
-          buildReviewSearchPath('/api/search', query, {
-            naverStart: 1,
-            refresh: true,
-            restaurant,
-          }),
+      }  else {
+        setDetailState('analyzing')
+        let streamedReviews: ReturnType<typeof parseBlogReview>[] = []
+        for await (const chunk of streamReviews(
+          buildReviewSearchPath('/api/search/stream', query, { naverStart: 1, refresh: true, restaurant }),
           controller.signal,
           accessToken,
-        )
+        )) {
+          if (requestId !== detailRequestIdRef.current) return
+          const batch = (chunk.reviews ?? []).map(parseBlogReview)
+          streamedReviews = mergeReviews(streamedReviews, batch)
+          if (streamedReviews.length > 0) {
+            flushSync(() => {
+              setDetailData({ reviews: [...streamedReviews], keywords: buildKeywords(streamedReviews) })
+              setDetailState('loaded')
+            })
+          }
+          if (chunk.done) break
+        }
+        if (requestId !== detailRequestIdRef.current) return
+        if (streamedReviews.length === 0) {
+          setDetailState('noData')
+          return
+        }
+        setDetailHasMoreReviews(false)
+        return
       }
 
       if (requestId !== detailRequestIdRef.current) return
