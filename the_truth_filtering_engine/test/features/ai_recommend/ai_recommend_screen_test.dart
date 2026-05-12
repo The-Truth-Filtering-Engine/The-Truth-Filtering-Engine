@@ -17,7 +17,7 @@ void main() {
       ProviderScope(
         overrides: [
           currentLocationProvider.overrideWith(
-            (ref) => const MapPoint(37.3, 127.0),
+            (ref) => const MapPoint(latitude: 37.3, longitude: 127.0),
           ),
           aiRecommendProvider.overrideWith((ref) {
             notifier = FakeAiRecommendNotifier(
