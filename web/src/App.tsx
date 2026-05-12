@@ -87,6 +87,12 @@ type DetailJson = {
   usage?: AnalysisUsage
 }
 
+type ReviewStreamChunk = {
+  reviews?: Record<string, unknown>[]
+  done?: boolean
+  naverQuery?: string
+}
+
 type AiRecommendItem = {
   id: number
   name: string
@@ -830,41 +836,66 @@ function buildKeywords(reviews: BlogReview[]) {
 }
 
 async function fetchDetailJson(
-path: string,
-    signal: AbortSignal,
-    accessToken?: string,
-  ): AsyncGenerator<{ reviews: unknown[]; done: boolean }> {
-    const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
-      signal,
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    })
-    if (!response.ok) {
-      throw new ApiRequestError(await readErrorMessage(response), response.status)
-    }
-    const reader = response.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const parts = buffer.split('\n\n')
-        buffer = parts.pop() ?? ''
-        for (const part of parts) {
-          const line = part.trim()
-          if (line.startsWith('data: ')) {
-            yield JSON.parse(line.slice(6)) as { reviews: unknown[]; done: boolean }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock()
-    }
+  path: string,
+  signal: AbortSignal,
+  accessToken?: string,
+): Promise<DetailJson> {
+  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+    signal,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  })
+  if (!response.ok) {
+    throw new ApiRequestError(await readErrorMessage(response), response.status)
+  }
+  return (await response.json()) as DetailJson
+}
+
+async function* streamReviews(
+  path: string,
+  signal: AbortSignal,
+  accessToken?: string,
+): AsyncGenerator<ReviewStreamChunk> {
+  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+    signal,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  })
+  if (!response.ok) {
+    throw new ApiRequestError(await readErrorMessage(response), response.status)
   }
 
+  if (!response.body) {
+    throw new ApiRequestError('스트리밍 응답을 읽을 수 없습니다', response.status)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+      for (const part of parts) {
+        const line = part.trim()
+        if (line.startsWith('data: ')) {
+          yield JSON.parse(line.slice(6)) as ReviewStreamChunk
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 function buildReviewSearchPath(
-  endpoint: '/api/search' | '/api/search/cached' | '/api/search/reviews',
+  endpoint:
+    | '/api/search'
+    | '/api/search/cached'
+    | '/api/search/reviews'
+    | '/api/search/stream',
   query: string,
   options: {
     mode?: string
@@ -901,7 +932,7 @@ function buildReviewSearchPath(
     }
   }
 
-  if (endpoint === '/api/search') {
+  if (endpoint === '/api/search' || endpoint === '/api/search/stream') {
     params.set('mode', options.mode ?? 'model')
     params.set('naverStart', String(options.naverStart ?? 1))
     params.set('maxResults', String(options.maxResults ?? MAX_REVIEW_RESULTS))

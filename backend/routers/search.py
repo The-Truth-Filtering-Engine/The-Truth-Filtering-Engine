@@ -474,7 +474,7 @@ async def search_stream(
         else:
             saved = cached
 
-        STREAM_BATCH = 10
+        STREAM_BATCH = 32
         already_scored = [r for r in saved if r.get("is_ad_finetuned_pred") is not None]
         targets = [r for r in saved if r.get("is_ad_finetuned_pred") is None]
 
