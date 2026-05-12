@@ -2,6 +2,9 @@ import json
 import os
 from search import get_blog_reviews
 
+# 저장 폴더
+SAVE_DIR = "api_train_data"
+
 def get_save_path(restaurant_name):
     safe_name = restaurant_name.replace('/', '_').replace('\\', '_') \
                                .replace(':', '_').replace('*', '_') \
@@ -9,7 +12,7 @@ def get_save_path(restaurant_name):
                                .replace('<', '_').replace('>', '_') \
                                .replace('|', '_')
 
-    base_path = f"reviews_{safe_name}.json"
+    base_path = os.path.join(SAVE_DIR, f"reviews_{safe_name}.json")
     if not os.path.exists(base_path):
         return base_path
 
