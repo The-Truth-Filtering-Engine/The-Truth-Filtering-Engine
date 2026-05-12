@@ -960,6 +960,12 @@ async def _patch_user_profile_if_current(
 # 캐시 조회
 # ══════════════════════════════════════════════════════════════════════════════
 
+from datetime import datetime, timedelta, timezone
+
+# 캐시 만료 시간 
+CACHE_TTL_DAYS = 30
+PLACE_CACHE_TTL_DAYS = 14
+
 async def get_cached_reviews(
     query: str,
     limit: int = MAX_REVIEW_RESULTS,
@@ -977,6 +983,9 @@ async def get_cached_reviews(
         if store_id
         else {"name": f"eq.{query}"}
     )
+    # 캐시 만료
+    ttl_days = PLACE_CACHE_TTL_DAYS if store_id else CACHE_TTL_DAYS
+    expired_at = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -984,6 +993,7 @@ async def get_cached_reviews(
             headers={**_h(), "Range": f"0-{end}", "Range-Unit": "items"},
             params={
                 **lookup_params,
+                "created_at": f"gte.{expired_at}", # 캐시 만료 적용
                 "order": "created_at.desc",
                 "limit": str(review_limit),
             },
