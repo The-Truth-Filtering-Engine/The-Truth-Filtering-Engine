@@ -11,8 +11,9 @@ import '../../1-1_map/models/restaurant_model.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final ValueChanged<RestaurantModel>? onViewRestaurant;
+  final ValueChanged<int>? onSelectTab;
 
-  const SettingsScreen({super.key, this.onViewRestaurant});
+  const SettingsScreen({super.key, this.onViewRestaurant, this.onSelectTab});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -111,6 +112,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 8),
           _ReviewButtonsSection(
             onViewRestaurant: widget.onViewRestaurant,
+            onSelectTab: widget.onSelectTab,
           ),
         ],
       ),
@@ -403,8 +405,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
 class _ReviewButtonsSection extends StatelessWidget {
   final ValueChanged<RestaurantModel>? onViewRestaurant;
+  final ValueChanged<int>? onSelectTab;
 
-  const _ReviewButtonsSection({this.onViewRestaurant});
+  const _ReviewButtonsSection({this.onViewRestaurant, this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
@@ -420,7 +423,9 @@ class _ReviewButtonsSection extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const _LikedReviewsSettingsScreen(),
+                  builder: (_) => _LikedReviewsSettingsScreen(
+                    onSelectTab: onSelectTab,
+                  ),
                 ),
               );
             },
@@ -435,6 +440,7 @@ class _ReviewButtonsSection extends StatelessWidget {
                 MaterialPageRoute<void>(
                   builder: (_) => _RecentReviewsSettingsScreen(
                     onViewRestaurant: onViewRestaurant,
+                    onSelectTab: onSelectTab,
                   ),
                 ),
               );
@@ -474,12 +480,17 @@ class _ReviewNavigationButton extends StatelessWidget {
 }
 
 class _LikedReviewsSettingsScreen extends StatelessWidget {
-  const _LikedReviewsSettingsScreen();
+  final ValueChanged<int>? onSelectTab;
+
+  const _LikedReviewsSettingsScreen({this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('내 하트')),
+      bottomNavigationBar: _SettingsFlowBottomNavigationBar(
+        onTap: (index) => _selectMainTab(context, onSelectTab, index),
+      ),
       body: const _LikedReviewsSettingsList(),
     );
   }
@@ -487,13 +498,20 @@ class _LikedReviewsSettingsScreen extends StatelessWidget {
 
 class _RecentReviewsSettingsScreen extends StatelessWidget {
   final ValueChanged<RestaurantModel>? onViewRestaurant;
+  final ValueChanged<int>? onSelectTab;
 
-  const _RecentReviewsSettingsScreen({this.onViewRestaurant});
+  const _RecentReviewsSettingsScreen({
+    this.onViewRestaurant,
+    this.onSelectTab,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('최근 기록')),
+      bottomNavigationBar: _SettingsFlowBottomNavigationBar(
+        onTap: (index) => _selectMainTab(context, onSelectTab, index),
+      ),
       body: _RecentReviewsSettingsList(
         onViewRestaurant: onViewRestaurant == null
             ? null
@@ -501,6 +519,67 @@ class _RecentReviewsSettingsScreen extends StatelessWidget {
                 Navigator.of(context).pop();
                 onViewRestaurant?.call(restaurant);
               },
+      ),
+    );
+  }
+}
+
+void _selectMainTab(
+  BuildContext context,
+  ValueChanged<int>? onSelectTab,
+  int index,
+) {
+  onSelectTab?.call(index);
+  Navigator.of(context).popUntil((route) => route.isFirst);
+}
+
+class _SettingsFlowBottomNavigationBar extends StatelessWidget {
+  final ValueChanged<int> onTap;
+
+  const _SettingsFlowBottomNavigationBar({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE), width: 0.5)),
+      ),
+      child: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: 4,
+        onTap: onTap,
+        selectedLabelStyle: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+        unselectedLabelStyle: const TextStyle(fontSize: 10),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map_rounded),
+            label: '탐색',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bookmark_border_rounded),
+            activeIcon: Icon(Icons.bookmark_rounded),
+            label: '북마크',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_rounded),
+            activeIcon: Icon(Icons.history_toggle_off_rounded),
+            label: '최근 분석',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome_outlined),
+            activeIcon: Icon(Icons.auto_awesome_rounded),
+            label: 'AI 추천',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            activeIcon: Icon(Icons.settings_rounded),
+            label: '설정',
+          ),
+        ],
       ),
     );
   }
