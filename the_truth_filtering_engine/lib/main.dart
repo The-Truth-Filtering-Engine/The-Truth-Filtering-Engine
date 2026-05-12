@@ -90,7 +90,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
           RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
-          const SettingsScreen(),
+          SettingsScreen(onViewRestaurant: _showRestaurantOnMap),
         ],
       ),
       bottomNavigationBar: Container(
