@@ -6,8 +6,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
 import '../config/supabase_config.dart';
+import '../../data/models/review_like_model.dart';
+import '../../features/1-1_map/models/restaurant_model.dart';
 import 'current_user_provider.dart';
 import 'user_profile_provider.dart';
+
+const _likedReviewSelectColumns =
+    'id, review_title, review_description, name, likes, store_id, '
+    'category_name, category_group_code, category_group_name, phone, '
+    'address_name, road_address_name, place_url';
 
 final likedReviewsProvider =
     StateNotifierProvider<LikedReviewsNotifier, AsyncValue<List<LikedReview>>>(
@@ -31,20 +38,49 @@ class LikedReview {
   final String title;
   final String description;
   final String restaurantName;
+  final RestaurantModel restaurant;
 
   const LikedReview({
     required this.id,
     required this.title,
     required this.description,
     required this.restaurantName,
+    required this.restaurant,
   });
 
-  factory LikedReview.fromRow(Map<String, dynamic> row) => LikedReview(
-        id: row['id']?.toString() ?? '',
-        title: row['review_title']?.toString() ?? '',
-        description: row['review_description']?.toString() ?? '',
-        restaurantName: row['name']?.toString() ?? '',
-      );
+  factory LikedReview.fromRow(Map<String, dynamic> row) {
+    final restaurantName = row['name']?.toString() ?? '';
+    final storeId = row['store_id']?.toString() ?? '';
+    final categoryName = row['category_name']?.toString() ?? '';
+    final addressName = row['address_name']?.toString() ?? '';
+    final roadAddressName = row['road_address_name']?.toString() ?? '';
+    final address = roadAddressName.isNotEmpty ? roadAddressName : addressName;
+
+    return LikedReview(
+      id: row['id']?.toString() ?? '',
+      title: row['review_title']?.toString() ?? '',
+      description: row['review_description']?.toString() ?? '',
+      restaurantName: restaurantName,
+      restaurant: RestaurantModel(
+        id: storeId.isNotEmpty ? storeId : restaurantName,
+        storeId: storeId.isEmpty ? null : storeId,
+        name: restaurantName,
+        address: address,
+        category: categoryName.isEmpty ? '음식점' : categoryName,
+        categoryName: categoryName.isEmpty ? null : categoryName,
+        categoryGroupCode: row['category_group_code']?.toString(),
+        categoryGroupName: row['category_group_name']?.toString(),
+        truthScore: 0,
+        reviewSummary: '',
+        phone: row['phone']?.toString(),
+        placeUrl: row['place_url']?.toString(),
+        addressName: addressName.isEmpty ? null : addressName,
+        roadAddressName: roadAddressName.isEmpty ? null : roadAddressName,
+        latitude: 0,
+        longitude: 0,
+      ),
+    );
+  }
 }
 
 class LikedReviewsNotifier
@@ -106,7 +142,7 @@ class LikedReviewsNotifier
 
     final rows = await Supabase.instance.client
         .from('reviews')
-        .select('id, review_title, review_description, name, likes')
+        .select(_likedReviewSelectColumns)
         .contains('likes', likeFilter)
         .limit(200);
 
@@ -123,7 +159,7 @@ class LikedReviewsNotifier
 
     final rows = await Supabase.instance.client
         .from('reviews')
-        .select('id, review_title, review_description, name, likes')
+        .select(_likedReviewSelectColumns)
         .inFilter('id', reviewIds)
         .limit(200);
 
@@ -145,6 +181,36 @@ class LikedReviewsNotifier
       }
       return int.tryParse(entry.toString()) == currentUserId;
     });
+  }
+
+  Future<void> remove(String reviewId) async {
+    final currentUserId = userId;
+    if (currentUserId == null || reviewId.trim().isEmpty) return;
+
+    final previous = state.valueOrNull ?? const <LikedReview>[];
+    state = AsyncValue.data(
+      previous.where((review) => review.id != reviewId).toList(),
+    );
+
+    try {
+      final row = await Supabase.instance.client
+          .from('reviews')
+          .select('likes')
+          .eq('id', reviewId)
+          .single();
+
+      final likes = parseUserIdEntryList(row['likes'])
+        ..removeWhere((entry) => entry['user_id'] == currentUserId);
+
+      await Supabase.instance.client
+          .from('reviews')
+          .update({'likes': likes}).eq('id', reviewId);
+
+      await _syncAccountReaction(reviewId, null);
+    } catch (error, stackTrace) {
+      state = AsyncValue.data(previous);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<Set<String>> _loadAccountLikedReviewIds() async {
@@ -172,6 +238,27 @@ class LikedReviewsNotifier
           .toSet();
     } catch (_) {
       return {};
+    }
+  }
+
+  Future<void> _syncAccountReaction(String reviewId, String? reaction) async {
+    final token = _accessToken;
+    if (token == null) return;
+
+    final response = await http.put(
+      BackendConfig.apiUri('/user/me/review-reactions'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'reviewId': reviewId,
+        'reaction': reaction,
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('review reaction sync failed: ${response.statusCode}');
     }
   }
 

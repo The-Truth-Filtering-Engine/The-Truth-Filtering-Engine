@@ -424,6 +424,7 @@ class _ReviewButtonsSection extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => _LikedReviewsSettingsScreen(
+                    onViewRestaurant: onViewRestaurant,
                     onSelectTab: onSelectTab,
                   ),
                 ),
@@ -480,9 +481,13 @@ class _ReviewNavigationButton extends StatelessWidget {
 }
 
 class _LikedReviewsSettingsScreen extends StatelessWidget {
+  final ValueChanged<RestaurantModel>? onViewRestaurant;
   final ValueChanged<int>? onSelectTab;
 
-  const _LikedReviewsSettingsScreen({this.onSelectTab});
+  const _LikedReviewsSettingsScreen({
+    this.onViewRestaurant,
+    this.onSelectTab,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -491,7 +496,14 @@ class _LikedReviewsSettingsScreen extends StatelessWidget {
       bottomNavigationBar: _SettingsFlowBottomNavigationBar(
         onTap: (index) => _selectMainTab(context, onSelectTab, index),
       ),
-      body: const _LikedReviewsSettingsList(),
+      body: _LikedReviewsSettingsList(
+        onViewRestaurant: onViewRestaurant == null
+            ? null
+            : (restaurant) {
+                Navigator.of(context).pop();
+                onViewRestaurant?.call(restaurant);
+              },
+      ),
     );
   }
 }
@@ -586,7 +598,9 @@ class _SettingsFlowBottomNavigationBar extends StatelessWidget {
 }
 
 class _LikedReviewsSettingsList extends ConsumerWidget {
-  const _LikedReviewsSettingsList();
+  final ValueChanged<RestaurantModel>? onViewRestaurant;
+
+  const _LikedReviewsSettingsList({this.onViewRestaurant});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -616,7 +630,26 @@ class _LikedReviewsSettingsList extends ConsumerWidget {
           itemCount: reviews.length,
           separatorBuilder: (_, __) => const Divider(height: 0),
           itemBuilder: (context, index) {
-            return _LikedReviewSettingsTile(review: reviews[index]);
+            final review = reviews[index];
+
+            return _LikedReviewSettingsTile(
+              review: review,
+              onTap: onViewRestaurant == null
+                  ? null
+                  : () => onViewRestaurant?.call(review.restaurant),
+              onRemove: () async {
+                try {
+                  await ref.read(likedReviewsProvider.notifier).remove(
+                        review.id,
+                      );
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('내 하트를 해제하지 못했습니다.')),
+                  );
+                }
+              },
+            );
           },
         );
       },
@@ -626,15 +659,25 @@ class _LikedReviewsSettingsList extends ConsumerWidget {
 
 class _LikedReviewSettingsTile extends StatelessWidget {
   final LikedReview review;
+  final VoidCallback? onTap;
+  final VoidCallback onRemove;
 
-  const _LikedReviewSettingsTile({required this.review});
+  const _LikedReviewSettingsTile({
+    required this.review,
+    required this.onTap,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
     return ListTile(
-      leading: const Icon(Icons.favorite, color: Color(0xFFE85C5C)),
+      leading: IconButton(
+        tooltip: '내 하트 해제',
+        icon: const Icon(Icons.favorite, color: Color(0xFFE85C5C)),
+        onPressed: onRemove,
+      ),
       title: Text(
         review.title.isEmpty ? '제목 없는 리뷰' : review.title,
         maxLines: 1,
@@ -660,6 +703,7 @@ class _LikedReviewSettingsTile extends StatelessWidget {
             ),
         ],
       ),
+      onTap: onTap,
     );
   }
 }
@@ -720,7 +764,14 @@ class _RecentReviewSettingsTile extends StatelessWidget {
     ].where((value) => value.trim().isNotEmpty).join(' · ');
 
     return ListTile(
-      leading: const Icon(Icons.store_outlined),
+      leading: IconButton(
+        tooltip: '최근 기록 삭제',
+        icon: Icon(
+          Icons.history_rounded,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        onPressed: onRemove,
+      ),
       title: Text(
         restaurant.name,
         maxLines: 1,
@@ -733,11 +784,6 @@ class _RecentReviewSettingsTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-      trailing: IconButton(
-        tooltip: '최근 기록 삭제',
-        icon: const Icon(Icons.close, size: 18),
-        onPressed: onRemove,
-      ),
       onTap: onTap,
     );
   }
