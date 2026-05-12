@@ -73,6 +73,9 @@ class _RecentAnalysisScreenState extends ConsumerState<RecentAnalysisScreen> {
             final restaurant = item.restaurant;
 
             return ListTile(
+              leading: _RecentAnalysisDateBadge(
+                label: _recentAnalysisDateBadgeLabel(item),
+              ),
               title: Text(restaurant.name),
               subtitle: Text(_recentAnalysisSubtitle(item)),
               trailing: Icon(
@@ -104,12 +107,50 @@ class _RecentAnalysisScreenState extends ConsumerState<RecentAnalysisScreen> {
 String _recentAnalysisSubtitle(RecentAnalysisItem item) {
   final restaurant = item.restaurant;
   final address = restaurant.address.isEmpty ? '주소 정보 없음' : restaurant.address;
-  final date = _recentAnalysisDateLabel(item);
-  return '${restaurant.category} · $address · $date';
+  return '${restaurant.category} · $address';
 }
 
-String _recentAnalysisDateLabel(RecentAnalysisItem item) {
+String _recentAnalysisDateBadgeLabel(RecentAnalysisItem item) {
   if (item.daysElapsed == 0) return '오늘';
-  if (item.daysElapsed != null) return '${item.daysElapsed}일 전';
+  if (item.daysElapsed == 1) return '어제';
+
+  final date = DateTime.tryParse(item.analyzedDate);
+  if (date != null) return '${date.month}/${date.day}';
+
   return item.analyzedDate;
+}
+
+class _RecentAnalysisDateBadge extends StatelessWidget {
+  final String label;
+
+  const _RecentAnalysisDateBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 52,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.calendar_month_rounded,
+            color: AppColors.primary,
+            size: 20,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
