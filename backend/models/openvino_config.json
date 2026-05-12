@@ -1,0 +1,22 @@
+{
+  "dtype": "int8",
+  "input_info": null,
+  "optimum_version": "2.1.0",
+  "output_attentions": false,
+  "quantization_config": {
+    "bits": 8,
+    "dataset": null,
+    "dtype": "int8",
+    "fast_bias_correction": true,
+    "ignored_scope": null,
+    "model_type": "transformer",
+    "num_samples": null,
+    "overflow_fix": "disable",
+    "processor": null,
+    "smooth_quant_alpha": null,
+    "sym": false,
+    "tokenizer": null
+  },
+  "save_onnx_model": false,
+  "transformers_version": "4.57.6"
+}
