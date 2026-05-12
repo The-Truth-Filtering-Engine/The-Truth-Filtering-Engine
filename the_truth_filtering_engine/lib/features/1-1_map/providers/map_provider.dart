@@ -1,9 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
+import '../../../services/bookmark_service.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 
@@ -37,61 +35,29 @@ final bookmarkRestaurantsProvider =
 
 // 북마크 추가/삭제
 class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
-  static const _storageKey = 'bookmarked_restaurants';
+  final BookmarkService _bookmarkService;
 
-  BookmarkRestaurantsNotifier() : super(const []) {
+  BookmarkRestaurantsNotifier({
+    BookmarkService? bookmarkService,
+  })  : _bookmarkService = bookmarkService ?? BookmarkService(),
+        super(const []) {
     _load();
   }
 
-  void toggle(RestaurantModel restaurant) {
-    final index = state.indexWhere((item) => item.id == restaurant.id);
-    if (index >= 0) {
-      state = [
-        ...state.sublist(0, index),
-        ...state.sublist(index + 1),
-      ];
-      _save();
-      return;
-    }
-
-    state = [...state, restaurant];
-    _save();
+  Future<void> toggle(RestaurantModel restaurant) async {
+    state = await _bookmarkService.toggleBookmark(restaurant);
   }
 
-  void remove(RestaurantModel restaurant) {
-    state = state.where((item) => item.id != restaurant.id).toList();
-    _save();
+  Future<void> remove(RestaurantModel restaurant) async {
+    state = await _bookmarkService.removeBookmark(restaurant);
   }
 
   Future<void> _load() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw == null || raw.isEmpty) return;
-
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return;
-
-      state = decoded
-          .whereType<Map>()
-          .map((item) => RestaurantModel.fromJson(
-                item.cast<String, dynamic>(),
-              ))
-          .where((restaurant) => restaurant.id.isNotEmpty)
-          .toList();
+      state = await _bookmarkService.loadBookmarks();
     } catch (_) {
       state = const [];
     }
-  }
-
-  Future<void> _save() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final encoded = jsonEncode(
-        state.map((restaurant) => restaurant.toJson()).toList(),
-      );
-      await prefs.setString(_storageKey, encoded);
-    } catch (_) {}
   }
 }
 

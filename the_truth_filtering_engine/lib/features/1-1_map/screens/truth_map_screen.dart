@@ -145,13 +145,15 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
     return '${distance.round()}m';
   }
 
-  bool isBookmarked(String restaurantId) {
-    return bookmarkedRestaurants.any((item) => item.id == restaurantId);
+  bool isBookmarked(RestaurantModel restaurant) {
+    return bookmarkedRestaurants.any(
+      (item) => item.effectiveStoreId == restaurant.effectiveStoreId,
+    );
   }
 
   Future<void> toggleBookmark(RestaurantModel restaurant) async {
     final wasBookmarked = bookmarkedRestaurants.any(
-      (item) => item.id == restaurant.id,
+      (item) => item.effectiveStoreId == restaurant.effectiveStoreId,
     );
     final next = await bookmarkService.toggleBookmark(restaurant);
 
@@ -572,7 +574,7 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
                           ),
                         ),
                         ActionButton(
-                          icon: isBookmarked(restaurant.id)
+                          icon: isBookmarked(restaurant)
                               ? Icons.bookmark
                               : Icons.bookmark_border,
                           label: 'Save',
@@ -648,7 +650,7 @@ class _TruthMapScreenState extends State<TruthMapScreen> {
                     ),
                   ),
                   ActionButton(
-                    icon: isBookmarked(restaurant.id)
+                    icon: isBookmarked(restaurant)
                         ? Icons.bookmark
                         : Icons.bookmark_border,
                     label: 'Save',

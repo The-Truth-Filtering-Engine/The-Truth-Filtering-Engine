@@ -386,7 +386,7 @@ class _RestaurantDetailScreenState
   Widget build(BuildContext context) {
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
     final isBookmarked = bookmarkedRestaurants.any(
-      (item) => item.id == _r.id,
+      (item) => item.effectiveStoreId == _r.effectiveStoreId,
     );
 
     return Scaffold(
@@ -570,7 +570,7 @@ class _RestaurantDetailScreenState
   void _toggleBookmark() {
     final previous = ref.read(bookmarkRestaurantsProvider);
     final alreadyBookmarked = previous.any(
-      (item) => item.id == _r.id,
+      (item) => item.effectiveStoreId == _r.effectiveStoreId,
     );
     ref.read(bookmarkRestaurantsProvider.notifier).toggle(_r);
     _showSnack(alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다');
