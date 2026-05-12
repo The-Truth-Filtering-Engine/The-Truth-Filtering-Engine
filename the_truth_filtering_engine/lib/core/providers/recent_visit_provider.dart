@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,25 +8,35 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
 import '../config/supabase_config.dart';
+import 'current_user_provider.dart';
 import '../../features/1-1_map/models/restaurant_model.dart';
 
 /// 최근 본 식당 목록 (로컬 SharedPreferences, 최대 30개)
 final recentVisitProvider =
     StateNotifierProvider<RecentVisitNotifier, List<RestaurantModel>>(
-  (ref) => RecentVisitNotifier(),
+  (ref) {
+    final authState = ref.watch(appAuthProvider);
+    return RecentVisitNotifier(
+      enableRemoteSync: authState.isLoggedIn && !authState.isAdmin,
+    );
+  },
 );
 
 class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   static const _key = 'recent_visited_restaurants';
   static const _maxCount = 30;
 
-  RecentVisitNotifier() : super(const []) {
+  final bool enableRemoteSync;
+
+  RecentVisitNotifier({required this.enableRemoteSync}) : super(const []) {
     _load();
   }
 
   Future<void> _load() async {
     final localItems = await _loadLocal();
     state = localItems;
+
+    if (!enableRemoteSync) return;
 
     final remoteItems = await _loadRemote();
     if (remoteItems == null) return;
@@ -105,6 +116,7 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   }
 
   String? get _accessToken {
+    if (!enableRemoteSync) return null;
     if (!SupabaseConfig.isConfigured) return null;
     return Supabase.instance.client.auth.currentSession?.accessToken;
   }
@@ -119,6 +131,7 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint('Recent visits load failed: ${response.statusCode}');
         return null;
       }
 
@@ -143,7 +156,7 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return;
 
     try {
-      await http.post(
+      final response = await http.post(
         BackendConfig.apiUri('/user/me/recent-visits'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -154,7 +167,12 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
           'store': restaurant.toJson(),
         }),
       );
-    } catch (_) {}
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('recent visit add failed: ${response.statusCode}');
+      }
+    } catch (error) {
+      debugPrint('Recent visit remote add failed: $error');
+    }
   }
 
   Future<void> _syncRemoteRemove(String storeId) async {
@@ -162,13 +180,18 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return;
 
     try {
-      await http.delete(
+      final response = await http.delete(
         BackendConfig.apiUri(
           '/user/me/recent-visits/${Uri.encodeComponent(storeId)}',
         ),
         headers: {'Authorization': 'Bearer $token'},
       );
-    } catch (_) {}
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('recent visit remove failed: ${response.statusCode}');
+      }
+    } catch (error) {
+      debugPrint('Recent visit remote remove failed: $error');
+    }
   }
 
   Future<void> _syncRemoteClear() async {
@@ -176,11 +199,16 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return;
 
     try {
-      await http.delete(
+      final response = await http.delete(
         BackendConfig.apiUri('/user/me/recent-visits'),
         headers: {'Authorization': 'Bearer $token'},
       );
-    } catch (_) {}
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('recent visits clear failed: ${response.statusCode}');
+      }
+    } catch (error) {
+      debugPrint('Recent visits remote clear failed: $error');
+    }
   }
 
   List<RestaurantModel> _mergeRecent(
