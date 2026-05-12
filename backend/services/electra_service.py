@@ -10,13 +10,9 @@ _model = None
 _model_available = False
 
 def load_model() -> None:
-    global _tokenizer, _model, _model_available
     model_bin = MODEL_DIR / "openvino_model.bin"
     if not model_bin.exists():
-        logger.warning(
-            f"[MODEL_service] 모델 파일 없음: {model_bin}\n"
-            "MODEL 분석 기능은 비활성화됩니다. 나머지 기능은 정상 동작합니다."
-        )
+        logger.warning(f"[electra_service] 모델 파일이 존재하지 않습니다: {model_bin}")
         _model_available = False
         return
     try:
