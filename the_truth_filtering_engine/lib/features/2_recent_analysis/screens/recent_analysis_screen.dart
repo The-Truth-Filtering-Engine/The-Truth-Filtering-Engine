@@ -61,7 +61,7 @@ class _RecentAnalysisScreenState extends ConsumerState<RecentAnalysisScreen> {
 
         if (items.isEmpty) {
           return const Center(
-            child: Text('최근 분석이 없습니다.'),
+            child: Text('저장된 최근 분석이 없습니다.'),
           );
         }
 
