@@ -31,7 +31,7 @@ class BookmarkScreen extends ConsumerWidget {
         return ListTile(
           title: Text(restaurant.name),
           subtitle: Text('${restaurant.category} · ${restaurant.address}'),
-          trailing: IconButton(
+          leading: IconButton(
             icon: const Icon(Icons.bookmark, color: AppColors.primary),
             onPressed: () {
               ref.read(bookmarkRestaurantsProvider.notifier).remove(restaurant);
