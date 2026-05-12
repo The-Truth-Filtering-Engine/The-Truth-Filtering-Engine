@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Header, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
+import json
 
 import asyncio
 import time
@@ -307,7 +309,7 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
     INFER_BATCH = 32
     all_preds, all_scores = [], []
 
-    print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
+    print(f"[DEBUG] 모델 배치 판별 시작 | count: {len(targets)}")
     batch_start = time.time()
     for i in range(0, len(targets), INFER_BATCH):
         chunk = targets[i:i + INFER_BATCH]
@@ -322,15 +324,14 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
         preds, scores = predict_and_score_batch(descriptions)
         all_preds.extend(preds)
         all_scores.extend(scores)
-        print(f"[DEBUG] BERT 판별 진행 | {len(all_preds)}/{len(targets)}")
+        print(f"[DEBUG] 모델 판별 진행 | {len(all_preds)}/{len(targets)}")
     batch_elapsed = time.time() - batch_start
-    print(f"[DEBUG] BERT 배치 판별 완료 | 소요 시간: {batch_elapsed:.2f}s")
+    print(f"[DEBUG] 모델 배치 판별 완료 | 소요 시간: {batch_elapsed:.2f}s")
 
     for review, score in zip(targets, all_scores):
         review["is_ad_finetuned_pred"] = score  # 메모리 먼저 반영
 
     asyncio.create_task(_save_to_supabase(targets, all_scores))  # Supabase는 백그라운드
-
 
 def _is_place_detail_request(store_id: str | None) -> bool:
     return bool(str(store_id or "").strip())
@@ -397,3 +398,110 @@ def _blogs_to_reviews(
         }
         for index, blog in enumerate(blogs)
     ]
+
+@router.get("/search/stream")
+async def search_stream(
+    query: str,
+    mode: str = "model",
+    naver_start: int = Query(1, alias="naverStart", ge=1, le=MAX_REVIEW_RESULTS),
+    limit: int = Query(REVIEW_BATCH_SIZE, ge=1, le=REVIEW_BATCH_SIZE),
+    max_results: int = Query(MAX_REVIEW_RESULTS, alias="maxResults", ge=1, le=MAX_REVIEW_RESULTS),
+    refresh: bool = False,
+    store_id: str | None = Query(None, alias="storeId"),
+    category_name: str | None = Query(None, alias="categoryName"),
+    category_group_code: str | None = Query(None, alias="categoryGroupCode"),
+    category_group_name: str | None = Query(None, alias="categoryGroupName"),
+    phone: str | None = None,
+    address_name: str | None = Query(None, alias="addressName"),
+    road_address_name: str | None = Query(None, alias="roadAddressName"),
+    place_url: str | None = Query(None, alias="placeUrl"),
+    authorization: str | None = Header(default=None),
+):
+    review_limit = clamp_review_limit(limit)
+    max_review_results = clamp_max_results(max_results)
+    normalized_start = normalize_naver_start(naver_start)
+    place_metadata = _build_place_metadata(
+        query=query,
+        store_id=store_id,
+        category_name=category_name,
+        category_group_code=category_group_code,
+        category_group_name=category_group_name,
+        phone=phone,
+        address_name=address_name,
+        road_address_name=road_address_name,
+        place_url=place_url,
+    )
+    naver_query = build_naver_blog_query(query, place_metadata)
+    auth_email = await _get_optional_auth_email(authorization)
+
+    async def event_generator():
+        cached = await get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+        place_detail_request = _is_place_detail_request(store_id)
+        if place_detail_request:
+            cached = _filter_reviews_for_place(cached, place_metadata)
+        cached_count = len(cached)
+        requested_batch_end = normalized_start + review_limit - 1
+
+        should_fetch = refresh or (
+            not place_detail_request and cached_count < requested_batch_end
+        ) or (
+            place_detail_request and cached_count == 0
+        )
+
+        if should_fetch:
+            if auth_email:
+                await _ensure_analysis_usage_available(auth_email, store_id)
+
+            if place_detail_request:
+                fetch_result = await fetch_store_blog_previews(
+                    naver_query, query,
+                    start=normalized_start,
+                    display=REVIEW_BATCH_SIZE,
+                    max_results=max_review_results,
+                )
+                blogs = fetch_result.items
+            else:
+                blogs = await fetch_blog_previews(
+                    naver_query, start=normalized_start, display=review_limit,
+                )
+
+            await save_reviews(query, blogs, place_metadata=place_metadata)
+            saved = await get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+            if place_detail_request:
+                saved = _filter_reviews_for_place(saved, place_metadata)
+            if not saved and blogs:
+                saved = _blogs_to_reviews(query, blogs, normalized_start, place_metadata=place_metadata)
+        else:
+            saved = cached
+
+        STREAM_BATCH = 32
+        already_scored = [r for r in saved if r.get("is_ad_finetuned_pred") is not None]
+        targets = [r for r in saved if r.get("is_ad_finetuned_pred") is None]
+
+        if already_scored:
+            yield f"data: {json.dumps({'reviews': already_scored, 'done': False})}\n\n"
+
+        loop = asyncio.get_running_loop()
+        for i in range(0, len(targets), STREAM_BATCH):
+            chunk = targets[i:i + STREAM_BATCH]
+            descriptions = [
+                preprocess(
+                    title=r.get("review_title") or "",
+                    description=r.get("review_description") or "",
+                    store_name=r.get("name") or "",
+                )
+                for r in chunk
+            ]
+            preds, scores = await loop.run_in_executor(None, predict_and_score_batch, descriptions)
+            for review, score in zip(chunk, scores):
+                review["is_ad_finetuned_pred"] = score
+            asyncio.create_task(_save_to_supabase(chunk, scores))
+            yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
+
+        yield f"data: {json.dumps({'reviews': [], 'done': True, 'naverQuery': naver_query})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
