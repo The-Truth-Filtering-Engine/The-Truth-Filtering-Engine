@@ -12,7 +12,7 @@ import 'current_user_provider.dart';
 import 'user_profile_provider.dart';
 
 const _likedReviewSelectColumns =
-    'id, review_title, review_description, name, likes, store_id, '
+    'id, review_title, review_description, review_url, name, likes, store_id, '
     'category_name, category_group_code, category_group_name, phone, '
     'address_name, road_address_name, place_url';
 
@@ -37,6 +37,7 @@ class LikedReview {
   final String id;
   final String title;
   final String description;
+  final String reviewUrl;
   final String restaurantName;
   final RestaurantModel restaurant;
 
@@ -44,6 +45,7 @@ class LikedReview {
     required this.id,
     required this.title,
     required this.description,
+    required this.reviewUrl,
     required this.restaurantName,
     required this.restaurant,
   });
@@ -60,6 +62,7 @@ class LikedReview {
       id: row['id']?.toString() ?? '',
       title: row['review_title']?.toString() ?? '',
       description: row['review_description']?.toString() ?? '',
+      reviewUrl: row['review_url']?.toString() ?? '',
       restaurantName: restaurantName,
       restaurant: RestaurantModel(
         id: storeId.isNotEmpty ? storeId : restaurantName,

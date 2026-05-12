@@ -91,7 +91,6 @@ class _MainShellState extends ConsumerState<MainShell> {
           RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
           AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
           SettingsScreen(
-            onViewRestaurant: _showRestaurantOnMap,
             onSelectTab: (index) {
               ref.read(mainTabIndexProvider.notifier).state = index;
             },

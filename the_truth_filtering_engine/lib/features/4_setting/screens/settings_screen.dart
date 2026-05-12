@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/supabase_config.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
@@ -8,12 +9,12 @@ import '../../../core/providers/liked_reviews_provider.dart';
 import '../../../core/providers/recent_visit_provider.dart';
 import '../../../core/providers/user_profile_provider.dart';
 import '../../1-1_map/models/restaurant_model.dart';
+import '../../1-3_restaurant_detail/utils/blog_review_url.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  final ValueChanged<RestaurantModel>? onViewRestaurant;
   final ValueChanged<int>? onSelectTab;
 
-  const SettingsScreen({super.key, this.onViewRestaurant, this.onSelectTab});
+  const SettingsScreen({super.key, this.onSelectTab});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -110,10 +111,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
           const SizedBox(height: 8),
-          _ReviewButtonsSection(
-            onViewRestaurant: widget.onViewRestaurant,
-            onSelectTab: widget.onSelectTab,
-          ),
+          _ReviewButtonsSection(onSelectTab: widget.onSelectTab),
         ],
       ),
     );
@@ -404,10 +402,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 }
 
 class _ReviewButtonsSection extends StatelessWidget {
-  final ValueChanged<RestaurantModel>? onViewRestaurant;
   final ValueChanged<int>? onSelectTab;
 
-  const _ReviewButtonsSection({this.onViewRestaurant, this.onSelectTab});
+  const _ReviewButtonsSection({this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +421,6 @@ class _ReviewButtonsSection extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => _LikedReviewsSettingsScreen(
-                    onViewRestaurant: onViewRestaurant,
                     onSelectTab: onSelectTab,
                   ),
                 ),
@@ -440,7 +436,6 @@ class _ReviewButtonsSection extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => _RecentReviewsSettingsScreen(
-                    onViewRestaurant: onViewRestaurant,
                     onSelectTab: onSelectTab,
                   ),
                 ),
@@ -481,13 +476,9 @@ class _ReviewNavigationButton extends StatelessWidget {
 }
 
 class _LikedReviewsSettingsScreen extends StatelessWidget {
-  final ValueChanged<RestaurantModel>? onViewRestaurant;
   final ValueChanged<int>? onSelectTab;
 
-  const _LikedReviewsSettingsScreen({
-    this.onViewRestaurant,
-    this.onSelectTab,
-  });
+  const _LikedReviewsSettingsScreen({this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
@@ -496,26 +487,15 @@ class _LikedReviewsSettingsScreen extends StatelessWidget {
       bottomNavigationBar: _SettingsFlowBottomNavigationBar(
         onTap: (index) => _selectMainTab(context, onSelectTab, index),
       ),
-      body: _LikedReviewsSettingsList(
-        onViewRestaurant: onViewRestaurant == null
-            ? null
-            : (restaurant) {
-                Navigator.of(context).pop();
-                onViewRestaurant?.call(restaurant);
-              },
-      ),
+      body: const _LikedReviewsSettingsList(),
     );
   }
 }
 
 class _RecentReviewsSettingsScreen extends StatelessWidget {
-  final ValueChanged<RestaurantModel>? onViewRestaurant;
   final ValueChanged<int>? onSelectTab;
 
-  const _RecentReviewsSettingsScreen({
-    this.onViewRestaurant,
-    this.onSelectTab,
-  });
+  const _RecentReviewsSettingsScreen({this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
@@ -524,14 +504,7 @@ class _RecentReviewsSettingsScreen extends StatelessWidget {
       bottomNavigationBar: _SettingsFlowBottomNavigationBar(
         onTap: (index) => _selectMainTab(context, onSelectTab, index),
       ),
-      body: _RecentReviewsSettingsList(
-        onViewRestaurant: onViewRestaurant == null
-            ? null
-            : (restaurant) {
-                Navigator.of(context).pop();
-                onViewRestaurant?.call(restaurant);
-              },
-      ),
+      body: const _RecentReviewsSettingsList(),
     );
   }
 }
@@ -597,10 +570,72 @@ class _SettingsFlowBottomNavigationBar extends StatelessWidget {
   }
 }
 
-class _LikedReviewsSettingsList extends ConsumerWidget {
-  final ValueChanged<RestaurantModel>? onViewRestaurant;
+Future<void> _openReviewSource(BuildContext context, String rawUrl) async {
+  final uri = mobileBlogReviewUri(rawUrl);
+  if (uri == null) {
+    _showReviewSourceMessage(context, '연결된 리뷰 원문이 없습니다.');
+    return;
+  }
 
-  const _LikedReviewsSettingsList({this.onViewRestaurant});
+  try {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      _showReviewSourceMessage(context, '리뷰 원문을 열지 못했습니다.');
+    }
+  } catch (error) {
+    debugPrint('Could not launch review source $rawUrl: $error');
+    if (!context.mounted) return;
+    _showReviewSourceMessage(context, '리뷰 원문을 열지 못했습니다.');
+  }
+}
+
+Future<void> _openLatestReviewSource(
+  BuildContext context,
+  RestaurantModel restaurant,
+) async {
+  final reviewUrl = await _latestReviewUrlForRestaurant(restaurant);
+  if (!context.mounted) return;
+  await _openReviewSource(context, reviewUrl ?? '');
+}
+
+Future<String?> _latestReviewUrlForRestaurant(
+  RestaurantModel restaurant,
+) async {
+  if (!SupabaseConfig.isConfigured) return null;
+
+  final storeId = restaurant.effectiveStoreId.trim();
+  if (storeId.isEmpty) return null;
+
+  try {
+    final rows = await Supabase.instance.client
+        .from('reviews')
+        .select('review_url')
+        .eq('store_id', storeId)
+        .order('created_at', ascending: false)
+        .limit(10);
+
+    for (final row in rows.whereType<Map>()) {
+      final reviewUrl = row['review_url']?.toString().trim();
+      if (reviewUrl != null && reviewUrl.isNotEmpty) {
+        return reviewUrl;
+      }
+    }
+  } catch (error) {
+    debugPrint('Could not load latest review source: $error');
+  }
+
+  return null;
+}
+
+void _showReviewSourceMessage(BuildContext context, String message) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
+  );
+}
+
+class _LikedReviewsSettingsList extends ConsumerWidget {
+  const _LikedReviewsSettingsList();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -634,9 +669,7 @@ class _LikedReviewsSettingsList extends ConsumerWidget {
 
             return _LikedReviewSettingsTile(
               review: review,
-              onTap: onViewRestaurant == null
-                  ? null
-                  : () => onViewRestaurant?.call(review.restaurant),
+              onTap: () => _openReviewSource(context, review.reviewUrl),
               onRemove: () async {
                 try {
                   await ref.read(likedReviewsProvider.notifier).remove(
@@ -709,9 +742,7 @@ class _LikedReviewSettingsTile extends StatelessWidget {
 }
 
 class _RecentReviewsSettingsList extends ConsumerWidget {
-  final ValueChanged<RestaurantModel>? onViewRestaurant;
-
-  const _RecentReviewsSettingsList({this.onViewRestaurant});
+  const _RecentReviewsSettingsList();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -733,9 +764,7 @@ class _RecentReviewsSettingsList extends ConsumerWidget {
 
         return _RecentReviewSettingsTile(
           restaurant: restaurant,
-          onTap: onViewRestaurant == null
-              ? null
-              : () => onViewRestaurant?.call(restaurant),
+          onTap: () => _openLatestReviewSource(context, restaurant),
           onRemove: () => ref
               .read(recentVisitProvider.notifier)
               .remove(restaurant.effectiveStoreId),
