@@ -150,7 +150,7 @@ class _BlogListScreenState extends State<BlogListScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     // _simulateLoading();
   }
 
@@ -166,11 +166,24 @@ class _BlogListScreenState extends State<BlogListScreen>
     super.dispose();
   }
 
-  List<BlogReview> get _sortedByReal => [...widget.blogs]
+  List<BlogReview> get _sortedByRecommended =>
+      [...widget.blogs]..sort(_compareRecommended);
+
+  List<BlogReview> get _sortedByTrust => [...widget.blogs]
     ..sort((a, b) => a.adProbability.compareTo(b.adProbability));
 
   List<BlogReview> get _sortedByDate =>
       [...widget.blogs]..sort((a, b) => b.date.compareTo(a.date));
+
+  int _compareRecommended(BlogReview a, BlogReview b) {
+    final likeCompare = b.likeCount.compareTo(a.likeCount);
+    if (likeCompare != 0) return likeCompare;
+
+    final trustCompare = a.adProbability.compareTo(b.adProbability);
+    if (trustCompare != 0) return trustCompare;
+
+    return b.date.compareTo(a.date);
+  }
 
   Future<void> _openWebview(BlogReview blog) async {
     final uri = mobileBlogReviewUri(blog.url);
@@ -259,8 +272,9 @@ class _BlogListScreenState extends State<BlogListScreen>
                     unselectedLabelStyle: AppText.caption(),
                     dividerColor: Colors.transparent,
                     tabs: const [
-                      Tab(text: '✅  진성순'),
-                      Tab(text: '🕐  최신순'),
+                      Tab(text: '추천순'),
+                      Tab(text: '신뢰순'),
+                      Tab(text: '최신순'),
                     ],
                   ),
                 ),
@@ -277,7 +291,11 @@ class _BlogListScreenState extends State<BlogListScreen>
                 : TabBarView(
                     controller: _tabController,
                     children: [
-                      _BlogList(blogs: _sortedByReal, onTap: _openWebview),
+                      _BlogList(
+                        blogs: _sortedByRecommended,
+                        onTap: _openWebview,
+                      ),
+                      _BlogList(blogs: _sortedByTrust, onTap: _openWebview),
                       _BlogList(blogs: _sortedByDate, onTap: _openWebview),
                     ],
                   ),

@@ -2,18 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/current_user_provider.dart';
+import '../../../core/providers/liked_reviews_provider.dart';
 import '../../../core/providers/user_profile_provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../data/models/review_like_model.dart';
 import '../providers/review_like_provider.dart';
 import 'report_button.dart';
 
-/// 👍 / 👎 / 🚩 세로 버튼 묶음
-///
-/// 사용:
-/// ```dart
-/// ReviewActionButtons(reviewId: review.id)
-/// ```
 class ReviewActionButtons extends ConsumerWidget {
   final String reviewId;
   final VoidCallback? onReportSubmitted;
@@ -34,9 +28,11 @@ class ReviewActionButtons extends ConsumerWidget {
         : ReviewLikeProviderKey(reviewId: reviewId, userId: userId);
     final state =
         likeKey == null ? null : ref.watch(reviewLikeProvider(likeKey));
-    final ls = state?.likeState ?? const ReviewLikeState();
+    final likeState = state?.likeState;
+    final isLiked = likeState?.isLiked ?? false;
+    final likeCount = likeState?.likeCount ?? 0;
 
-    void onTap(LikeType type) {
+    Future<void> onTapHeart() async {
       if (!isLoggedIn) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -72,35 +68,24 @@ class ReviewActionButtons extends ConsumerWidget {
         return;
       }
 
-      ref.read(reviewLikeProvider(likeKey).notifier).toggle(type);
+      final likeState =
+          await ref.read(reviewLikeProvider(likeKey).notifier).toggleHeart();
+      if (!context.mounted) return;
+      await ref.read(likedReviewsProvider.notifier).syncReviewLikeState(
+            reviewId: likeKey.reviewId,
+            isLiked: likeState.isLiked,
+          );
     }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── 좋아요 ──────────────────────────
-        _ActionButton(
-          icon: Icons.thumb_up_rounded,
-          count: ls.likeCount,
-          isActive: ls.isLiked,
-          activeColor: AppColors.primary500,
-          isLoading: state?.isLoading ?? false,
-          onTap: () => onTap(LikeType.like),
+        _HeartButton(
+          count: likeCount,
+          isActive: isLiked,
+          onTap: onTapHeart,
         ),
-        const SizedBox(height: 6),
-
-        // ── 싫어요 ──────────────────────────
-        _ActionButton(
-          icon: Icons.thumb_down_rounded,
-          count: ls.dislikeCount,
-          isActive: ls.isDisliked,
-          activeColor: AppColors.danger400,
-          isLoading: state?.isLoading ?? false,
-          onTap: () => onTap(LikeType.dislike),
-        ),
-        const SizedBox(height: 6),
-
-        // ── 신고 (아이콘만) ──────────────────
+        const SizedBox(height: 8),
         ReportButton(
           reviewId: reviewId,
           iconOnly: true,
@@ -111,51 +96,55 @@ class ReviewActionButtons extends ConsumerWidget {
   }
 }
 
-// ── 개별 버튼 ─────────────────────────────────
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
+class _HeartButton extends StatelessWidget {
   final int count;
   final bool isActive;
-  final Color activeColor;
-  final bool isLoading;
   final VoidCallback onTap;
 
-  const _ActionButton({
-    required this.icon,
+  const _HeartButton({
     required this.count,
     required this.isActive,
-    required this.activeColor,
-    required this.isLoading,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
-            child: Icon(
-              icon,
-              key: ValueKey(isActive),
-              size: 18,
-              color: isActive ? activeColor : AppColors.textHint,
-            ),
+    final color = isActive ? AppColors.danger400 : AppColors.textHint;
+
+    return Tooltip(
+      message: isActive ? '하트 취소' : '하트',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: Icon(
+                  isActive
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  key: ValueKey(isActive),
+                  size: 20,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$count',
+                style: AppText.caption().copyWith(
+                  color: color,
+                  fontSize: 10,
+                  height: 1.1,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            '$count',
-            style: AppText.caption().copyWith(
-              color: isActive ? activeColor : AppColors.textHint,
-              fontSize: 10,
-              height: 1.1,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

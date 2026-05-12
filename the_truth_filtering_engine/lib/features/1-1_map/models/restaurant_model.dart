@@ -12,11 +12,21 @@ class RestaurantModel {
   final String reviewSummary;
   final String? phone;
   final String? placeUrl;
+  final String? reviewId;
+  final String? reviewUrl;
+  final String? reviewTitle;
+  final String? reviewDescription;
   final String? addressName;
   final String? roadAddressName;
   final String? imageUrl;
   final double latitude;
   final double longitude;
+  final bool isBookmarked;
+  final String? userId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? bookmarkedAt;
+  final DateTime? visitedAt;
 
   const RestaurantModel({
     required this.id,
@@ -29,14 +39,24 @@ class RestaurantModel {
     this.categoryGroupName,
     required this.truthScore,
     this.distance = 0,
+    required this.reviewSummary,
     this.phone,
     this.placeUrl,
+    this.reviewId,
+    this.reviewUrl,
+    this.reviewTitle,
+    this.reviewDescription,
     this.addressName,
     this.roadAddressName,
-    required this.reviewSummary,
     this.imageUrl,
     required this.latitude,
     required this.longitude,
+    this.isBookmarked = false,
+    this.userId,
+    this.createdAt,
+    this.updatedAt,
+    this.bookmarkedAt,
+    this.visitedAt,
   });
 
   String get effectiveStoreId {
@@ -45,6 +65,14 @@ class RestaurantModel {
       return normalizedStoreId;
     }
     return id;
+  }
+
+  String get effectiveReviewId {
+    final normalizedReviewId = reviewId?.trim();
+    if (normalizedReviewId != null && normalizedReviewId.isNotEmpty) {
+      return normalizedReviewId;
+    }
+    return '';
   }
 
   Map<String, dynamic> toJson() {
@@ -62,34 +90,117 @@ class RestaurantModel {
       'reviewSummary': reviewSummary,
       'phone': phone,
       'placeUrl': placeUrl,
+      'reviewId': reviewId,
+      'reviewUrl': reviewUrl,
+      'reviewTitle': reviewTitle,
+      'reviewDescription': reviewDescription,
       'addressName': addressName,
       'roadAddressName': roadAddressName,
       'imageUrl': imageUrl,
       'latitude': latitude,
       'longitude': longitude,
+      'isBookmarked': isBookmarked,
+      'userId': userId,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+      'bookmarkedAt': bookmarkedAt?.toIso8601String(),
+      'visitedAt': visitedAt?.toIso8601String(),
     };
   }
 
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {
     return RestaurantModel(
-      id: json['id']?.toString() ?? '',
-      storeId: json['storeId']?.toString() ?? json['id']?.toString(),
-      name: json['name']?.toString() ?? '',
-      address: json['address']?.toString() ?? '',
-      category: json['category']?.toString() ?? '',
-      categoryName: json['categoryName']?.toString(),
-      categoryGroupCode: json['categoryGroupCode']?.toString(),
-      categoryGroupName: json['categoryGroupName']?.toString(),
-      truthScore: _asInt(json['truthScore'], fallback: 0),
+      id: (json['id'] ?? json['placeId'] ?? '').toString(),
+      storeId:
+          (json['storeId'] ?? json['store_id'] ?? json['placeId'])?.toString(),
+      name: (json['name'] ?? json['placeName'] ?? '').toString(),
+      address: (json['address'] ?? '').toString(),
+      category: (json['category'] ?? '음식점').toString(),
+      categoryName: (json['categoryName'] ?? json['category_name'])?.toString(),
+      categoryGroupCode:
+          (json['categoryGroupCode'] ?? json['category_group_code'])
+              ?.toString(),
+      categoryGroupName:
+          (json['categoryGroupName'] ?? json['category_group_name'])
+              ?.toString(),
+      truthScore:
+          _asInt(json['truthScore'] ?? json['truth_score'], fallback: 0),
       distance: _asInt(json['distance'], fallback: 0),
-      reviewSummary: json['reviewSummary']?.toString() ?? '',
+      reviewSummary:
+          (json['reviewSummary'] ?? json['review_summary'] ?? '').toString(),
       phone: json['phone']?.toString(),
-      placeUrl: json['placeUrl']?.toString(),
-      addressName: json['addressName']?.toString(),
-      roadAddressName: json['roadAddressName']?.toString(),
-      imageUrl: json['imageUrl']?.toString(),
-      latitude: _asDouble(json['latitude'], fallback: 0),
-      longitude: _asDouble(json['longitude'], fallback: 0),
+      placeUrl:
+          (json['placeUrl'] ?? json['link'] ?? json['place_url'])?.toString(),
+      reviewId: (json['reviewId'] ?? json['review_id'])?.toString(),
+      reviewUrl: (json['reviewUrl'] ?? json['review_url'])?.toString(),
+      reviewTitle: (json['reviewTitle'] ?? json['review_title'])?.toString(),
+      reviewDescription:
+          (json['reviewDescription'] ?? json['review_description'])?.toString(),
+      addressName: (json['addressName'] ?? json['address_name'])?.toString(),
+      roadAddressName:
+          (json['roadAddressName'] ?? json['road_address_name'])?.toString(),
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
+      latitude: _asDouble(json['latitude'] ?? json['lat'], fallback: 0),
+      longitude: _asDouble(json['longitude'] ?? json['lng'], fallback: 0),
+      isBookmarked:
+          json['isBookmarked'] == true || json['is_bookmarked'] == true,
+      userId: (json['userId'] ?? json['user_id'])?.toString(),
+      createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
+      updatedAt: _parseDate(json['updatedAt'] ?? json['updated_at']),
+      bookmarkedAt: _parseDate(json['bookmarkedAt'] ?? json['bookmarked_at']),
+      visitedAt: _parseDate(json['visitedAt'] ?? json['visited_at']),
+    );
+  }
+
+  RestaurantModel copyWith({
+    String? storeId,
+    String? categoryName,
+    String? categoryGroupCode,
+    String? categoryGroupName,
+    String? addressName,
+    String? roadAddressName,
+    bool? isBookmarked,
+    String? userId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? bookmarkedAt,
+    DateTime? visitedAt,
+    int? truthScore,
+    String? reviewSummary,
+    String? reviewId,
+    String? reviewUrl,
+    String? reviewTitle,
+    String? reviewDescription,
+  }) {
+    return RestaurantModel(
+      id: id,
+      storeId: storeId ?? this.storeId,
+      name: name,
+      address: address,
+      category: category,
+      categoryName: categoryName ?? this.categoryName,
+      categoryGroupCode: categoryGroupCode ?? this.categoryGroupCode,
+      categoryGroupName: categoryGroupName ?? this.categoryGroupName,
+      truthScore: truthScore ?? this.truthScore,
+      distance: distance,
+      reviewSummary: reviewSummary ?? this.reviewSummary,
+      phone: phone,
+      placeUrl: placeUrl,
+      reviewId: reviewId ?? this.reviewId,
+      reviewUrl: reviewUrl ?? this.reviewUrl,
+      reviewTitle: reviewTitle ?? this.reviewTitle,
+      reviewDescription: reviewDescription ?? this.reviewDescription,
+      addressName: addressName ?? this.addressName,
+      roadAddressName: roadAddressName ?? this.roadAddressName,
+      imageUrl: imageUrl,
+      latitude: latitude,
+      longitude: longitude,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      userId: userId ?? this.userId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      bookmarkedAt: bookmarkedAt ?? this.bookmarkedAt,
+      visitedAt: visitedAt ?? this.visitedAt,
     );
   }
 
@@ -107,24 +218,23 @@ class RestaurantModel {
     return fallback;
   }
 
-  // ── Marker 타입 ──
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
   MarkerType get markerType {
     if (truthScore >= 80) return MarkerType.high;
     if (truthScore >= 70) return MarkerType.mid;
     return MarkerType.low;
   }
 
-  // ── 카테고리 1차 분류 파싱 ──
-  // "음식점 > 한식 > 해장국" → "한식"
-  // "음식점 > 한식"          → "한식"
-  // "한식"                   → "한식"
   String get primaryCategory {
     final parts = category.split(' > ');
     if (parts.length >= 2) return parts[1].trim();
     return category.trim();
   }
 
-  // ── 1차 분류 → 로컬 에셋 경로 ──
   String get categoryImagePath {
     const base = 'assets/images/categories';
     const map = <String, String>{
@@ -146,7 +256,6 @@ class RestaurantModel {
     return map[primaryCategory] ?? '$base/default.png';
   }
 
-  // 썸네일용 (정사각형)
   String get categoryThumbnailPath {
     const base = 'assets/images/thumbnails';
     const map = <String, String>{
@@ -170,44 +279,3 @@ class RestaurantModel {
 }
 
 enum MarkerType { high, mid, low }
-
-class RestaurantDummyData {
-  static const List<RestaurantModel> restaurants = [
-    RestaurantModel(
-      id: '1',
-      name: '더미 가게 1',
-      address: '서울시 강남구 더미거리',
-      category: '음식점 > 한식', // ← 카카오 원본 형태로 수정
-      truthScore: 92,
-      distance: 0,
-      reviewSummary: '안전하고 깔끔한 식당입니다.',
-      imageUrl: null,
-      latitude: 37.5245,
-      longitude: 127.0440,
-    ),
-    RestaurantModel(
-      id: '2',
-      name: '더미 가게 2',
-      address: '서울시 강남구 가로수길',
-      category: '음식점 > 한식', // ← 카카오 원본 형태로 수정
-      truthScore: 98,
-      distance: 0,
-      reviewSummary: '직원 응대가 좋고 맛이 훌륭합니다.',
-      imageUrl: null,
-      latitude: 37.5270,
-      longitude: 127.0290,
-    ),
-    RestaurantModel(
-      id: '3',
-      name: '더미 가게 3',
-      address: '서울시 용산구 이태원로',
-      category: '음식점 > 양식', // ← 카카오 원본 형태로 수정
-      truthScore: 74,
-      distance: 0,
-      reviewSummary: '분위기 좋은 곳이지만 혼잡할 수 있습니다.',
-      imageUrl: null,
-      latitude: 37.5800,
-      longitude: 126.9800,
-    ),
-  ];
-}

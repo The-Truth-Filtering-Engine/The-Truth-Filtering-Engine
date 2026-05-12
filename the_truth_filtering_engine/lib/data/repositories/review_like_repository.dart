@@ -9,35 +9,67 @@ class ReviewLikeRepository {
   Future<ReviewLikeState> fetchState({
     required String reviewId,
     required int userId,
-  }) async {
-    final row = await _source.fetchLikes(reviewId);
-    return ReviewLikeState.fromRow(row, userId);
-  }
-
-  Future<ReviewLikeState> toggle({
-    required String reviewId,
-    required int userId,
-    required LikeType type,
     String? accessToken,
   }) async {
     final row = await _source.fetchLikes(reviewId);
-    var likes = _parseList(row['likes']);
-    var dislikes = _parseList(row['dislikes']);
+    final likes = parseUserIdEntryList(row['likes']);
+    final dislikes = parseUserIdEntryList(row['dislikes']);
+    final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
+    final accountLikedIds = await _fetchAccountLikedIds(accessToken);
+    final isLiked = _isLiked(
+      accountLikedIds: accountLikedIds,
+      reviewId: reviewId,
+      isRowLiked: isRowLiked,
+    );
 
-    if (type == LikeType.like) {
-      if (likes.any((e) => e['user_id'] == userId)) {
-        likes.removeWhere((e) => e['user_id'] == userId);
-      } else {
-        likes.add({'user_id': userId});
-        dislikes.removeWhere((e) => e['user_id'] == userId);
-      }
+    try {
+      await _reconcileSources(
+        reviewId: reviewId,
+        userId: userId,
+        accessToken: accessToken,
+        likes: likes,
+        dislikes: dislikes,
+        accountLikedIds: accountLikedIds,
+        isLiked: isLiked,
+      );
+    } catch (_) {
+      // State reads should not fail just because source reconciliation failed.
+    }
+
+    return ReviewLikeState(
+      likeCount: likes.length,
+      isLiked: isLiked,
+    );
+  }
+
+  Future<ReviewLikeState> toggleHeart({
+    required String reviewId,
+    required int userId,
+    String? accessToken,
+  }) async {
+    final row = await _source.fetchLikes(reviewId);
+    final likes = parseUserIdEntryList(row['likes']);
+    final dislikes = parseUserIdEntryList(row['dislikes']);
+    final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
+    final accountLikedIds = await _fetchAccountLikedIds(accessToken);
+    final isAlreadyLiked = _isLiked(
+      accountLikedIds: accountLikedIds,
+      reviewId: reviewId,
+      isRowLiked: isRowLiked,
+    );
+
+    if (isAlreadyLiked) {
+      likes.removeWhere((entry) => entry['user_id'] == userId);
     } else {
-      if (dislikes.any((e) => e['user_id'] == userId)) {
-        dislikes.removeWhere((e) => e['user_id'] == userId);
-      } else {
-        dislikes.add({'user_id': userId});
-        likes.removeWhere((e) => e['user_id'] == userId);
-      }
+      final now = DateTime.now().toUtc().toIso8601String();
+      likes
+        ..removeWhere((entry) => entry['user_id'] == userId)
+        ..add(<String, dynamic>{
+          'user_id': userId,
+          'likedAt': now,
+          'updatedAt': now,
+        });
+      dislikes.removeWhere((entry) => entry['user_id'] == userId);
     }
 
     await _source.updateLikes(
@@ -48,9 +80,7 @@ class ReviewLikeRepository {
 
     final nextState = ReviewLikeState(
       likeCount: likes.length,
-      dislikeCount: dislikes.length,
-      isLiked: likes.any((e) => e['user_id'] == userId),
-      isDisliked: dislikes.any((e) => e['user_id'] == userId),
+      isLiked: likes.any((entry) => entry['user_id'] == userId),
     );
 
     final token = accessToken?.trim() ?? '';
@@ -59,27 +89,82 @@ class ReviewLikeRepository {
         await _source.syncUserReaction(
           accessToken: token,
           reviewId: reviewId,
-          reaction: nextState.isLiked
-              ? LikeType.like
-              : nextState.isDisliked
-                  ? LikeType.dislike
-                  : null,
+          reaction: nextState.isLiked ? LikeType.like : null,
         );
       } catch (_) {
-        // 리뷰 카운트 반영은 유지하고, 계정 동기화 실패만 삼킨다.
+        // Review count is already updated; account sync can recover later.
       }
     }
 
     return nextState;
   }
 
-  List<Map<String, dynamic>> _parseList(dynamic json) {
-    if (json == null) return [];
-    return List<Map<String, dynamic>>.from(
-      (json as List)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .where((e) => int.tryParse(e['user_id']?.toString() ?? '') != null)
-          .map((e) => {'user_id': int.parse(e['user_id'].toString())}),
-    );
+  Future<Set<String>?> _fetchAccountLikedIds(String? accessToken) async {
+    try {
+      return await _source.fetchUserLikedReviewIds(accessToken);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _isLiked({
+    required Set<String>? accountLikedIds,
+    required String reviewId,
+    required bool isRowLiked,
+  }) {
+    if (accountLikedIds == null) return isRowLiked;
+    if (accountLikedIds.contains(reviewId)) return true;
+    if (accountLikedIds.isEmpty && isRowLiked) return true;
+    return false;
+  }
+
+  Future<void> _reconcileSources({
+    required String reviewId,
+    required int userId,
+    required String? accessToken,
+    required List<Map<String, dynamic>> likes,
+    required List<Map<String, dynamic>> dislikes,
+    required Set<String>? accountLikedIds,
+    required bool isLiked,
+  }) async {
+    if (accountLikedIds == null) return;
+
+    final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
+    final token = accessToken?.trim() ?? '';
+
+    if (isLiked && !isRowLiked) {
+      final now = DateTime.now().toUtc().toIso8601String();
+      likes.add(<String, dynamic>{
+        'user_id': userId,
+        'likedAt': now,
+        'updatedAt': now,
+      });
+      dislikes.removeWhere((entry) => entry['user_id'] == userId);
+      await _source.updateLikes(
+        reviewId: reviewId,
+        likes: likes,
+        dislikes: dislikes,
+      );
+      return;
+    }
+
+    if (isLiked && token.isNotEmpty && !accountLikedIds.contains(reviewId)) {
+      try {
+        await _source.syncUserReaction(
+          accessToken: token,
+          reviewId: reviewId,
+          reaction: LikeType.like,
+        );
+      } catch (_) {}
+    }
+
+    if (!isLiked && isRowLiked) {
+      likes.removeWhere((entry) => entry['user_id'] == userId);
+      await _source.updateLikes(
+        reviewId: reviewId,
+        likes: likes,
+        dislikes: dislikes,
+      );
+    }
   }
 }

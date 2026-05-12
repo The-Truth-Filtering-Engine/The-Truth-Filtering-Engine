@@ -12,7 +12,6 @@ class ReviewLikeRemoteSource {
 
   ReviewLikeRemoteSource(this._client);
 
-  // ── 현재 likes/dislikes 조회 ───────────────
   Future<Map<String, dynamic>> fetchLikes(String reviewId) async {
     final res = await _client
         .from(_table)
@@ -22,7 +21,31 @@ class ReviewLikeRemoteSource {
     return res;
   }
 
-  // ── likes/dislikes 동시 업데이트 ──────────
+  Future<Set<String>?> fetchUserLikedReviewIds(String? accessToken) async {
+    final token = accessToken?.trim() ?? '';
+    if (token.isEmpty) return null;
+
+    final response = await http.get(
+      BackendConfig.apiUri('/user/me/review-reactions'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('review reaction load failed: ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (decoded is! Map) return {};
+
+    final reviewLikes = decoded['review_likes'];
+    if (reviewLikes is! Map) return {};
+
+    return reviewLikes.keys
+        .map((key) => key.toString().trim())
+        .where((key) => key.isNotEmpty)
+        .toSet();
+  }
+
   Future<void> updateLikes({
     required String reviewId,
     required List<Map<String, dynamic>> likes,

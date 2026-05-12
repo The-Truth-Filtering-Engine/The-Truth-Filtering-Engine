@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../core/providers/recent_visit_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import '../../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../1-1_map/models/restaurant_model.dart';
 import '../../1-1_map/providers/map_provider.dart';
+import '../../2_recent_analysis/providers/recent_analysis_provider.dart';
 import '../providers/blog_review.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
 import '../widgets/restaurant_header_widget.dart';
@@ -22,13 +24,7 @@ import '../widgets/review_list_section.dart';
 
 // ── 화면 상태 ─────────────────────────────────────────────────────────────────
 
-enum _ScreenState {
-  initial,
-  checking,
-  noData,
-  analyzing,
-  loaded,
-}
+enum _ScreenState { initial, checking, noData, analyzing, loaded }
 
 const int _reviewBatchSize = 100;
 const int _maxReviewResults = 300;
@@ -37,10 +33,7 @@ class _ReviewFetchResult {
   final List<BlogReview> reviews;
   final bool hasMore;
 
-  const _ReviewFetchResult({
-    required this.reviews,
-    required this.hasMore,
-  });
+  const _ReviewFetchResult({required this.reviews, required this.hasMore});
 }
 
 class _AnalysisRequestException implements Exception {
@@ -73,9 +66,7 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
         uri,
         headers: accessToken == null
             ? null
-            : {
-                'Authorization': 'Bearer $accessToken',
-              },
+            : {'Authorization': 'Bearer $accessToken'},
       )
       .timeout(const Duration(seconds: 15));
   if (res.statusCode == 402) {
@@ -129,9 +120,7 @@ Future<_ReviewFetchResult> _fetchFreshReviews(
         uri,
         headers: accessToken == null
             ? null
-            : {
-                'Authorization': 'Bearer $accessToken',
-              },
+            : {'Authorization': 'Bearer $accessToken'},
       )
       .timeout(const Duration(seconds: 90));
   if (res.statusCode != 200) {
@@ -195,12 +184,10 @@ Map<String, String> _reviewQueryParameters(
   }
 
   addIfNotBlank('storeId', restaurant.effectiveStoreId);
-  addIfNotBlank('categoryName', restaurant.categoryName ?? restaurant.category);
-  addIfNotBlank('categoryGroupCode', restaurant.categoryGroupCode);
-  addIfNotBlank('categoryGroupName', restaurant.categoryGroupName);
+  addIfNotBlank('categoryName', restaurant.category);
   addIfNotBlank('phone', restaurant.phone);
-  addIfNotBlank('addressName', restaurant.addressName);
-  addIfNotBlank('roadAddressName', restaurant.roadAddressName);
+  addIfNotBlank('addressName', restaurant.address);
+  addIfNotBlank('roadAddressName', restaurant.address);
   addIfNotBlank('placeUrl', restaurant.placeUrl);
 
   return params;
@@ -232,28 +219,31 @@ class _RestaurantDetailScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onDetailTap());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _onDetailTap();
+    });
   }
 
   Future<void> _onDetailTap() async {
+    if (!mounted) return;
     setState(() => _state = _ScreenState.checking); // 로딩 스피너만 표시
 
     try {
       final mode = ref.read(analysisModeProvider);
       final cached = await _fetchCachedReviews(_r, mode);
+      if (!mounted) return;
       final shouldLoadFirstBatch =
           cached.reviews.isEmpty || cached.reviews.length < _reviewBatchSize;
 
       if (shouldLoadFirstBatch) {
         // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
         try {
-          final fresh = await _fetchFreshReviews(
-            _r,
-            mode,
-            naverStart: 1,
-          );
+          final fresh = await _fetchFreshReviews(_r, mode, naverStart: 1);
+          if (!mounted) return;
           _applyReviews(fresh);
         } catch (e) {
+          if (!mounted) return;
           if (_isUsageRequiredError(e)) {
             setState(() => _state = _ScreenState.noData);
             _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
@@ -272,12 +262,14 @@ class _RestaurantDetailScreenState
         _applyReviews(cached);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _state = _ScreenState.noData);
       _showError('데이터 조회 중 오류가 발생했어요: $e');
     }
   }
 
   Future<void> _onAnalyzeTap() async {
+    if (!mounted) return;
     setState(() => _state = _ScreenState.analyzing);
 
     try {
@@ -288,8 +280,10 @@ class _RestaurantDetailScreenState
         refresh: true,
         naverStart: 1,
       );
+      if (!mounted) return;
       _applyReviews(fresh);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _state = _ScreenState.noData);
       _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
     }
@@ -308,11 +302,8 @@ class _RestaurantDetailScreenState
     setState(() => _isLoadingReviewBatch = true);
     try {
       final mode = ref.read(analysisModeProvider);
-      final fresh = await _fetchFreshReviews(
-        _r,
-        mode,
-        naverStart: naverStart,
-      );
+      final fresh = await _fetchFreshReviews(_r, mode, naverStart: naverStart);
+      if (!mounted) return;
       final merged = _mergeReviews(_reviews, fresh.reviews);
       _applyReviews(
         _ReviewFetchResult(reviews: merged, hasMore: fresh.hasMore),
@@ -342,6 +333,8 @@ class _RestaurantDetailScreenState
   }
 
   void _applyReviews(_ReviewFetchResult result) {
+    if (!mounted) return;
+
     final reviews = result.reviews;
 
     if (reviews.isEmpty) {
@@ -361,8 +354,9 @@ class _RestaurantDetailScreenState
       category: '${_r.category} · ${_r.address}',
       reviews: reviews,
     );
-    final wordFreqs =
-        WordFreqBuilder.build(reviews.map((r) => r.title).toList());
+    final wordFreqs = WordFreqBuilder.build(
+      reviews.map((r) => r.title).toList(),
+    );
 
     setState(() {
       _reviews = reviews;
@@ -373,6 +367,37 @@ class _RestaurantDetailScreenState
       _isLoadingReviewBatch = false;
       _state = _ScreenState.loaded;
     });
+    _refreshRecentAnalyses();
+  }
+
+  void _refreshRecentAnalyses() {
+    if (!mounted) return;
+    Future.microtask(() => ref.read(recentAnalysesProvider.notifier).load());
+  }
+
+  Future<bool> _recordRecentReviewOpen(BlogReview review) async {
+    final reviewId = review.reviewId?.trim();
+    if (reviewId == null || reviewId.isEmpty) {
+      debugPrint('Recent visit save skipped: reviewId is required');
+      _showSnack('리뷰 id가 없어 최근 기록에 저장하지 못했습니다');
+      return false;
+    }
+
+    try {
+      await ref.read(recentVisitProvider.notifier).addReview(
+            reviewId: reviewId,
+            name: _r.name,
+            reviewUrl: review.url,
+            reviewTitle: review.title,
+            reviewDescription:
+                review.content.isNotEmpty ? review.content : review.preview,
+          );
+      return true;
+    } catch (error) {
+      debugPrint('Recent visit save failed: $error');
+      _showSnack('최근 기록에 저장하지 못했습니다');
+      return false;
+    }
   }
 
   void _showError(String message) {
@@ -411,9 +436,7 @@ class _RestaurantDetailScreenState
       appBar: _buildAppBar(),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Color(0xFFEEEEEE), width: 0.5),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFEEEEEE), width: 0.5)),
         ),
         child: BottomNavigationBar(
           currentIndex: ref.watch(mainTabIndexProvider),
@@ -421,8 +444,10 @@ class _RestaurantDetailScreenState
             ref.read(mainTabIndexProvider.notifier).state = index;
             Navigator.popUntil(context, (route) => route.isFirst);
           },
-          selectedLabelStyle:
-              const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
           items: const [
             BottomNavigationBarItem(
@@ -434,6 +459,11 @@ class _RestaurantDetailScreenState
               icon: Icon(Icons.bookmark_border_rounded),
               activeIcon: Icon(Icons.bookmark_rounded),
               label: '북마크',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              activeIcon: Icon(Icons.history_toggle_off_rounded),
+              label: '최근 분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_outlined),
@@ -485,9 +515,7 @@ class _RestaurantDetailScreenState
     switch (_state) {
       case _ScreenState.initial:
       case _ScreenState.checking:
-        return [
-          const SliverToBoxAdapter(child: _LoadingIndicator()),
-        ];
+        return [const SliverToBoxAdapter(child: _LoadingIndicator())];
 
       case _ScreenState.noData:
         return [
@@ -507,10 +535,7 @@ class _RestaurantDetailScreenState
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: NoDataCard(
-                isAnalyzing: true,
-                onAnalyzeTap: _onAnalyzeTap,
-              ),
+              child: NoDataCard(isAnalyzing: true, onAnalyzeTap: _onAnalyzeTap),
             ),
           ),
         ];
@@ -532,11 +557,7 @@ class _RestaurantDetailScreenState
                   if (isNarrow) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        aiCard,
-                        const SizedBox(height: 12),
-                        wordCloud,
-                      ],
+                      children: [aiCard, const SizedBox(height: 12), wordCloud],
                     );
                   }
 
@@ -569,6 +590,7 @@ class _RestaurantDetailScreenState
                   hasMoreReviews: _hasMoreReviewBatches,
                   isLoadingReviewBatch: _isLoadingReviewBatch,
                   onRequestReviewBatch: _loadReviewBatchForPage,
+                  onReviewTap: _recordRecentReviewOpen,
                 ),
               ),
             ),
@@ -619,10 +641,7 @@ class _RestaurantDetailScreenState
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 1),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
     );
   }
 
@@ -632,23 +651,14 @@ class _RestaurantDetailScreenState
     return AppBar(
       backgroundColor: AppColors.background,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: AppColors.primary),
+        icon: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 18,
+          color: AppColors.primary,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       leadingWidth: 40,
-      title: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.home_outlined,
-                size: 20, color: AppColors.primary),
-            onPressed: () =>
-                Navigator.popUntil(context, (route) => route.isFirst),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
-      ),
       centerTitle: true,
       flexibleSpace: Center(
         child: Text(
@@ -674,9 +684,7 @@ class _LoadingIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 48),
-      child: Center(
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
+      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
   }
 }

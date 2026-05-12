@@ -101,9 +101,13 @@ class ReviewItem extends StatelessWidget {
               right: 0,
               bottom: 0,
               child: Center(
-                child: ReviewActionButtons(
-                  reviewId: blog.id.toString(),
-                  onReportSubmitted: onReportSubmitted,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  child: ReviewActionButtons(
+                    reviewId: blog.effectiveReviewId,
+                    onReportSubmitted: onReportSubmitted,
+                  ),
                 ),
               ),
             ),

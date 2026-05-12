@@ -49,6 +49,7 @@ AdGrade adGradeFromScore(double score) {
 
 class BlogReview {
   final int id;
+  final String? reviewId;
   final String title;
   final String author;
   final String date;
@@ -58,14 +59,24 @@ class BlogReview {
   final ReviewStatus status;
   final int adProbability; // 0~100
   final bool isSponsored;
+  final int likeCount;
 
   /// llm 또는 finetuned 확률값 (0.0~1.0, 없으면 null)
   final double? adScore;
 
   AdGrade? get adGrade => adScore != null ? adGradeFromScore(adScore!) : null;
 
+  String get effectiveReviewId {
+    final normalizedReviewId = reviewId?.trim();
+    if (normalizedReviewId != null && normalizedReviewId.isNotEmpty) {
+      return normalizedReviewId;
+    }
+    return id.toString();
+  }
+
   const BlogReview({
     required this.id,
+    this.reviewId,
     required this.title,
     required this.author,
     required this.date,
@@ -75,6 +86,7 @@ class BlogReview {
     required this.status,
     required this.adProbability,
     required this.isSponsored,
+    this.likeCount = 0,
     this.adScore,
   });
 
@@ -123,8 +135,12 @@ class BlogReview {
 
     final String description = json['review_description'] as String? ?? '';
 
+    final rawId = json['id'];
+    final reviewId = rawId?.toString() ?? '';
+
     return BlogReview(
-      id: json['id'] as int? ?? 0,
+      id: _intIdFromJson(rawId),
+      reviewId: reviewId,
       title: json['review_title'] as String? ?? '(제목 없음)',
       author: json['review_bloggername'] as String? ?? '알 수 없음',
       date: _formatDate(json['review_postdate'] as String? ?? ''),
@@ -136,9 +152,30 @@ class BlogReview {
       status: status,
       adProbability: adProb,
       isSponsored: status == ReviewStatus.ad,
+      likeCount: _likeCountFromJson(
+        json['likes'] ?? json['like_count'] ?? json['likeCount'],
+      ),
       adScore: adScore,
     );
   }
+}
+
+int _intIdFromJson(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty) return 0;
+
+  return int.tryParse(text) ?? text.hashCode;
+}
+
+int _likeCountFromJson(Object? value) {
+  if (value is List) return value.length;
+  if (value is int) return value;
+  if (value is num) return value.round();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
 }
 
 /// YYYYMMDD → YYYY.MM.DD 변환. 그 외 형식은 그대로 반환.

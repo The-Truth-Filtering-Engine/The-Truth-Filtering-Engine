@@ -1,10 +1,7 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js' as js;
-import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
@@ -176,11 +173,11 @@ class KakaoMapViewState extends State<KakaoMapView> {
   static void _loadKakaoMaps() {
     final maps = js.context['kakao']['maps'] as js.JsObject;
     maps.callMethod('load', [
-      (() {
+      js.JsFunction.withThis((_) {
         if (!(_sdkLoader?.isCompleted ?? true)) {
           _sdkLoader?.complete();
         }
-      }).toJS,
+      }),
     ]);
   }
 
@@ -194,7 +191,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
     _maps['event'].callMethod('addListener', [
       _map,
       eventName,
-      callback.toJS,
+      js.JsFunction.withThis((_) => callback()),
     ]);
   }
 
@@ -210,7 +207,8 @@ class KakaoMapViewState extends State<KakaoMapView> {
         'yAnchor': 0.5,
       });
       options['position'] = _latLng(
-        MapPoint(restaurant.latitude, restaurant.longitude),
+        MapPoint(
+            latitude: restaurant.latitude, longitude: restaurant.longitude),
       );
 
       final overlay = js.JsObject(_maps['CustomOverlay'], [options]);
@@ -305,8 +303,8 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
   MapPoint _pointFromLatLng(js.JsObject latLng) {
     return MapPoint(
-      (latLng.callMethod('getLat') as num).toDouble(),
-      (latLng.callMethod('getLng') as num).toDouble(),
+      latitude: (latLng.callMethod('getLat') as num).toDouble(),
+      longitude: (latLng.callMethod('getLng') as num).toDouble(),
     );
   }
 

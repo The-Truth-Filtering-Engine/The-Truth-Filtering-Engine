@@ -15,6 +15,7 @@ void main() {
     bool hasMoreReviews = false,
     bool isLoadingReviewBatch = false,
     ValueChanged<int>? onRequestReviewBatch,
+    ReviewOpenGuard? onReviewTap,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -38,6 +39,7 @@ void main() {
                 hasMoreReviews: hasMoreReviews,
                 isLoadingReviewBatch: isLoadingReviewBatch,
                 onRequestReviewBatch: onRequestReviewBatch,
+                onReviewTap: onReviewTap,
               ),
             ),
           ),
@@ -67,6 +69,69 @@ void main() {
     });
   }
 
+  BlogReview buildReview({
+    required int id,
+    required String title,
+    required int likeCount,
+    required int adProbability,
+    required String date,
+  }) {
+    return BlogReview(
+      id: id,
+      title: title,
+      author: '작성자 $id',
+      date: date,
+      preview: '$title 미리보기',
+      content: '$title 본문',
+      url: 'https://example.com/reviews/$id',
+      status: ReviewStatus.real,
+      adProbability: adProbability,
+      isSponsored: false,
+      likeCount: likeCount,
+      adScore: adProbability / 100,
+    );
+  }
+
+  testWidgets('sorts recommended reviews by heart count first', (tester) async {
+    await pumpReviewList(
+      tester,
+      [
+        buildReview(
+          id: 1,
+          title: '하트 1개 리뷰',
+          likeCount: 1,
+          adProbability: 1,
+          date: '2024.05.03',
+        ),
+        buildReview(
+          id: 2,
+          title: '하트 5개 리뷰',
+          likeCount: 5,
+          adProbability: 80,
+          date: '2024.05.01',
+        ),
+        buildReview(
+          id: 3,
+          title: '하트 3개 리뷰',
+          likeCount: 3,
+          adProbability: 20,
+          date: '2024.05.02',
+        ),
+      ],
+    );
+
+    expect(find.text('추천순'), findsOneWidget);
+    expect(find.text('신뢰순'), findsOneWidget);
+    expect(find.text('최신순'), findsOneWidget);
+
+    final topRecommended = tester.getTopLeft(find.text('하트 5개 리뷰')).dy;
+    final middleRecommended = tester.getTopLeft(find.text('하트 3개 리뷰')).dy;
+    final bottomRecommended = tester.getTopLeft(find.text('하트 1개 리뷰')).dy;
+
+    expect(topRecommended, lessThan(middleRecommended));
+    expect(middleRecommended, lessThan(bottomRecommended));
+  });
+
   testWidgets('shows 10 reviews per page and moves to the next page',
       (tester) async {
     await pumpReviewList(tester, buildReviews(11));
@@ -91,6 +156,24 @@ void main() {
 
     expect(nextButton.onPressed, isNull);
     expect(previousButton.onPressed, isNotNull);
+  });
+
+  testWidgets('calls review tap guard before opening a review', (tester) async {
+    BlogReview? tappedReview;
+
+    await pumpReviewList(
+      tester,
+      buildReviews(1),
+      onReviewTap: (review) async {
+        tappedReview = review;
+        return false;
+      },
+    );
+
+    await tester.tap(find.text('리뷰 01'));
+    await tester.pump();
+
+    expect(tappedReview?.id, 1);
   });
 
   testWidgets('resets to the first page when changing sort tabs',
