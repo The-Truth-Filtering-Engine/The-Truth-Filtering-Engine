@@ -12,6 +12,7 @@ class RestaurantModel {
   final String reviewSummary;
   final String? phone;
   final String? placeUrl;
+  final String? reviewUrl;
   final String? addressName;
   final String? roadAddressName;
   final String? imageUrl;
@@ -38,6 +39,7 @@ class RestaurantModel {
     required this.reviewSummary,
     this.phone,
     this.placeUrl,
+    this.reviewUrl,
     this.addressName,
     this.roadAddressName,
     this.imageUrl,
@@ -74,6 +76,7 @@ class RestaurantModel {
       'reviewSummary': reviewSummary,
       'phone': phone,
       'placeUrl': placeUrl,
+      'reviewUrl': reviewUrl,
       'addressName': addressName,
       'roadAddressName': roadAddressName,
       'imageUrl': imageUrl,
@@ -111,6 +114,7 @@ class RestaurantModel {
       phone: json['phone']?.toString(),
       placeUrl:
           (json['placeUrl'] ?? json['link'] ?? json['place_url'])?.toString(),
+      reviewUrl: (json['reviewUrl'] ?? json['review_url'])?.toString(),
       addressName: (json['addressName'] ?? json['address_name'])?.toString(),
       roadAddressName:
           (json['roadAddressName'] ?? json['road_address_name'])?.toString(),
@@ -142,6 +146,7 @@ class RestaurantModel {
     DateTime? visitedAt,
     int? truthScore,
     String? reviewSummary,
+    String? reviewUrl,
   }) {
     return RestaurantModel(
       id: id,
@@ -157,6 +162,7 @@ class RestaurantModel {
       reviewSummary: reviewSummary ?? this.reviewSummary,
       phone: phone,
       placeUrl: placeUrl,
+      reviewUrl: reviewUrl ?? this.reviewUrl,
       addressName: addressName ?? this.addressName,
       roadAddressName: roadAddressName ?? this.roadAddressName,
       imageUrl: imageUrl,

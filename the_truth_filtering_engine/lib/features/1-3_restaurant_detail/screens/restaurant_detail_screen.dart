@@ -369,7 +369,22 @@ class _RestaurantDetailScreenState
       _isLoadingReviewBatch = false;
       _state = _ScreenState.loaded;
     });
+    _recordRecentVisitReviewUrl(reviews);
     _refreshRecentAnalyses();
+  }
+
+  void _recordRecentVisitReviewUrl(List<BlogReview> reviews) {
+    final reviewUrl = reviews
+        .map((review) => review.url.trim())
+        .firstWhere((url) => url.isNotEmpty, orElse: () => '');
+    if (reviewUrl.isEmpty) return;
+
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.read(recentVisitProvider.notifier).add(
+            _r.copyWith(reviewUrl: reviewUrl),
+          );
+    });
   }
 
   void _refreshRecentAnalyses() {

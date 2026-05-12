@@ -36,16 +36,24 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     final localItems = await _loadLocal();
     state = localItems;
 
+    final localItemsWithReviewUrls = await _withReviewUrls(localItems);
+    if (_hasReviewUrlChanges(localItems, localItemsWithReviewUrls)) {
+      state = localItemsWithReviewUrls;
+      await _saveLocal(localItemsWithReviewUrls);
+    }
+
     if (!enableRemoteSync) return;
 
     final remoteItems = await _loadRemote();
     if (remoteItems == null) return;
 
-    final merged = _mergeRecent(remoteItems, localItems);
+    final merged = await _withReviewUrls(
+      _mergeRecent(remoteItems, localItemsWithReviewUrls),
+    );
     state = merged;
     await _saveLocal(merged);
 
-    for (final restaurant in localItems) {
+    for (final restaurant in localItemsWithReviewUrls) {
       if (remoteItems.any(
         (item) => item.effectiveStoreId == restaurant.effectiveStoreId,
       )) {
@@ -77,9 +85,11 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (storeId.isEmpty) return;
 
     final now = DateTime.now();
-    final visitedRestaurant = restaurant.copyWith(
-      updatedAt: now,
-      visitedAt: now,
+    final visitedRestaurant = await _withReviewUrl(
+      restaurant.copyWith(
+        updatedAt: now,
+        visitedAt: now,
+      ),
     );
 
     // 중복 제거 후 맨 앞에 삽입
@@ -113,6 +123,41 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
       _key,
       items.map((r) => jsonEncode(r.toJson())).toList(),
     );
+  }
+
+  Future<List<RestaurantModel>> _withReviewUrls(
+    List<RestaurantModel> restaurants,
+  ) async {
+    final updated = <RestaurantModel>[];
+    for (final restaurant in restaurants) {
+      updated.add(await _withReviewUrl(restaurant));
+    }
+    return updated;
+  }
+
+  Future<RestaurantModel> _withReviewUrl(RestaurantModel restaurant) async {
+    final currentReviewUrl = restaurant.reviewUrl?.trim();
+    if (currentReviewUrl != null && currentReviewUrl.isNotEmpty) {
+      return restaurant;
+    }
+
+    final reviewUrl = await _latestReviewUrlForStore(
+      restaurant.effectiveStoreId,
+    );
+    if (reviewUrl == null || reviewUrl.isEmpty) return restaurant;
+
+    return restaurant.copyWith(reviewUrl: reviewUrl);
+  }
+
+  bool _hasReviewUrlChanges(
+    List<RestaurantModel> previous,
+    List<RestaurantModel> next,
+  ) {
+    if (previous.length != next.length) return true;
+    for (var index = 0; index < previous.length; index++) {
+      if (previous[index].reviewUrl != next[index].reviewUrl) return true;
+    }
+    return false;
   }
 
   String? get _accessToken {
@@ -209,6 +254,33 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     } catch (error) {
       debugPrint('Recent visits remote clear failed: $error');
     }
+  }
+
+  Future<String?> _latestReviewUrlForStore(String storeId) async {
+    final normalizedStoreId = storeId.trim();
+    if (!SupabaseConfig.isConfigured || normalizedStoreId.isEmpty) {
+      return null;
+    }
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('reviews')
+          .select('review_url')
+          .eq('store_id', normalizedStoreId)
+          .order('created_at', ascending: false)
+          .limit(10);
+
+      for (final row in rows.whereType<Map>()) {
+        final reviewUrl = row['review_url']?.toString().trim();
+        if (reviewUrl != null && reviewUrl.isNotEmpty) {
+          return reviewUrl;
+        }
+      }
+    } catch (error) {
+      debugPrint('Recent visit review_url load failed: $error');
+    }
+
+    return null;
   }
 
   List<RestaurantModel> _mergeRecent(

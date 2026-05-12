@@ -589,44 +589,6 @@ Future<void> _openReviewSource(BuildContext context, String rawUrl) async {
   }
 }
 
-Future<void> _openLatestReviewSource(
-  BuildContext context,
-  RestaurantModel restaurant,
-) async {
-  final reviewUrl = await _latestReviewUrlForRestaurant(restaurant);
-  if (!context.mounted) return;
-  await _openReviewSource(context, reviewUrl ?? '');
-}
-
-Future<String?> _latestReviewUrlForRestaurant(
-  RestaurantModel restaurant,
-) async {
-  if (!SupabaseConfig.isConfigured) return null;
-
-  final storeId = restaurant.effectiveStoreId.trim();
-  if (storeId.isEmpty) return null;
-
-  try {
-    final rows = await Supabase.instance.client
-        .from('reviews')
-        .select('review_url')
-        .eq('store_id', storeId)
-        .order('created_at', ascending: false)
-        .limit(10);
-
-    for (final row in rows.whereType<Map>()) {
-      final reviewUrl = row['review_url']?.toString().trim();
-      if (reviewUrl != null && reviewUrl.isNotEmpty) {
-        return reviewUrl;
-      }
-    }
-  } catch (error) {
-    debugPrint('Could not load latest review source: $error');
-  }
-
-  return null;
-}
-
 void _showReviewSourceMessage(BuildContext context, String message) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
@@ -764,7 +726,7 @@ class _RecentReviewsSettingsList extends ConsumerWidget {
 
         return _RecentReviewSettingsTile(
           restaurant: restaurant,
-          onTap: () => _openLatestReviewSource(context, restaurant),
+          onTap: () => _openReviewSource(context, restaurant.reviewUrl ?? ''),
           onRemove: () => ref
               .read(recentVisitProvider.notifier)
               .remove(restaurant.effectiveStoreId),
