@@ -1,7 +1,5 @@
 import logging
 from pathlib import Path
-from optimum.intel import OVModelForSequenceClassification
-from transformers import PreTrainedTokenizerFast
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +11,14 @@ _model = None
 _model_available = False
 
 def load_model() -> None:
-    global _tokenizer, _model, _model_available
     model_bin = MODEL_DIR / "openvino_model.bin"
+    if not model_bin.exists():
+        logger.warning(f"[electra_service] 모델 파일이 존재하지 않습니다: {model_bin}")
+        _model_available = False
+        return
     try:
+        from optimum.intel import OVModelForSequenceClassification
+        from transformers import PreTrainedTokenizerFast
         _tokenizer = PreTrainedTokenizerFast.from_pretrained(MODEL_DIR)
         _model = OVModelForSequenceClassification.from_pretrained(MODEL_DIR)
         _model_available = True
