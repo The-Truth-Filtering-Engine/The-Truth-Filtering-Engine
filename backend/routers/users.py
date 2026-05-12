@@ -39,8 +39,8 @@ class BookmarkUpdateRequest(BaseModel):
 
 
 class RecentVisitUpdateRequest(BaseModel):
-    storeId: str
-    store: dict = Field(default_factory=dict)
+    reviewId: str = ""
+    review: dict = Field(default_factory=dict)
 
 
 class ReviewReactionUpdateRequest(BaseModel):
@@ -198,16 +198,16 @@ async def add_my_recent_visit(
     payload: RecentVisitUpdateRequest,
     authorization: str | None = Header(default=None),
 ):
-    store_id = payload.storeId.strip()
-    if not store_id:
+    review_id = payload.reviewId.strip()
+    if not review_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="storeId is required",
+            detail="reviewId is required",
         )
 
     email = await _require_email(authorization)
     try:
-        return await add_user_recent_visit(email, store_id, payload.store)
+        return await add_user_recent_visit(email, review_id, payload.review)
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -229,21 +229,21 @@ async def clear_my_recent_visits(
         ) from error
 
 
-@router.delete("/user/me/recent-visits/{store_id}")
+@router.delete("/user/me/recent-visits/{review_id}")
 async def delete_my_recent_visit(
-    store_id: str,
+    review_id: str,
     authorization: str | None = Header(default=None),
 ):
-    normalized_store_id = store_id.strip()
-    if not normalized_store_id:
+    normalized_review_id = review_id.strip()
+    if not normalized_review_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="storeId is required",
+            detail="reviewId is required",
         )
 
     email = await _require_email(authorization)
     try:
-        return await remove_user_recent_visit(email, normalized_store_id)
+        return await remove_user_recent_visit(email, normalized_review_id)
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

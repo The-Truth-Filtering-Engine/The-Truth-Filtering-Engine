@@ -596,15 +596,15 @@ async def remove_user_bookmark(email: str, store_id: str) -> dict:
 
 async def add_user_recent_visit(
     email: str,
-    store_id: str,
-    store: dict | None,
+    review_id: str,
+    review: dict | None,
 ) -> dict:
     normalized_email = _text_or_none(email)
-    normalized_store_id = _text_or_none(store_id)
+    normalized_review_id = _text_or_none(review_id)
     if not normalized_email:
         raise RuntimeError("User email is required")
-    if not normalized_store_id:
-        raise RuntimeError("storeId is required")
+    if not normalized_review_id:
+        raise RuntimeError("reviewId is required")
 
     await ensure_user_profile(normalized_email)
     async with httpx.AsyncClient() as client:
@@ -613,14 +613,14 @@ async def add_user_recent_visit(
             normalized_email,
         ) or {}
         recent_map = _normalize_recent_visit_map(current.get("recent_visits"))
-        recent_store = dict(recent_map.get(normalized_store_id) or {})
-        if isinstance(store, dict):
-            recent_store.update(
-                {key: value for key, value in store.items() if value is not None}
+        recent_review = dict(recent_map.get(normalized_review_id) or {})
+        if isinstance(review, dict):
+            recent_review.update(
+                {key: value for key, value in review.items() if value is not None}
             )
-        recent_map[normalized_store_id] = _normalize_recent_visit_store(
-            normalized_store_id,
-            recent_store,
+        recent_map[normalized_review_id] = _normalize_recent_visit_review(
+            normalized_review_id,
+            recent_review,
             touch=True,
         )
         recent_map = _limit_recent_visit_map(recent_map)
@@ -632,13 +632,13 @@ async def add_user_recent_visit(
     return _normalize_user_recent_visits(updated)
 
 
-async def remove_user_recent_visit(email: str, store_id: str) -> dict:
+async def remove_user_recent_visit(email: str, review_id: str) -> dict:
     normalized_email = _text_or_none(email)
-    normalized_store_id = _text_or_none(store_id)
+    normalized_review_id = _text_or_none(review_id)
     if not normalized_email:
         raise RuntimeError("User email is required")
-    if not normalized_store_id:
-        raise RuntimeError("storeId is required")
+    if not normalized_review_id:
+        raise RuntimeError("reviewId is required")
 
     await ensure_user_profile(normalized_email)
     async with httpx.AsyncClient() as client:
@@ -647,7 +647,7 @@ async def remove_user_recent_visit(email: str, store_id: str) -> dict:
             normalized_email,
         ) or {}
         recent_map = _normalize_recent_visit_map(current.get("recent_visits"))
-        recent_map.pop(normalized_store_id, None)
+        recent_map.pop(normalized_review_id, None)
         updated = await _patch_user_recent_visits(
             client,
             normalized_email,
@@ -876,39 +876,48 @@ def _normalize_recent_visit_map(value) -> dict:
 
     recent_map = {}
     for key, item in value.items():
-        store_id = _text_or_none(key)
-        if not store_id or not isinstance(item, dict):
+        review_id = _text_or_none(key)
+        if not review_id or not isinstance(item, dict):
             continue
-        recent_map[store_id] = _normalize_recent_visit_store(store_id, item)
+        normalized = _normalize_recent_visit_review(review_id, item)
+        if not _text_or_none(normalized.get("review_url")):
+            continue
+        recent_map[review_id] = normalized
 
     return recent_map
 
 
-def _normalize_recent_visit_store(
-    store_id: str,
-    store: dict | None,
+def _normalize_recent_visit_review(
+    _review_id: str,
+    review: dict | None,
     *,
     touch: bool = False,
 ) -> dict:
-    normalized = _normalize_bookmark_store(
-        store_id,
-        store,
-        recorded_at_field=None,
-        touch=touch,
+    source = review if isinstance(review, dict) else {}
+    normalized = {
+        "name": _text_or_none(source.get("name")) or "",
+        "review_url": _text_or_none(source.get("review_url")) or "",
+        "review_title": _text_or_none(source.get("review_title")) or "",
+        "review_description": (
+            _text_or_none(source.get("review_description")) or ""
+        ),
+    }
+    visited_at = (
+        _text_or_none(source.get("visitedAt"))
+        or _text_or_none(source.get("visited_at"))
+        or _text_or_none(source.get("updatedAt"))
+        or _text_or_none(source.get("updated_at"))
     )
-    normalized["storeId"] = store_id
-    if touch or not _text_or_none(normalized.get("visitedAt")):
-        normalized["visitedAt"] = (
-            _text_or_none(normalized.get("updatedAt"))
-            or datetime.now(KST).isoformat()
-        )
+    if touch or not visited_at:
+        visited_at = datetime.now(KST).isoformat()
+    normalized["visitedAt"] = visited_at
     return normalized
 
 
 def _limit_recent_visit_map(recent_map: dict) -> dict:
     items = sorted(
         recent_map.items(),
-        key=lambda pair: _text_or_none(pair[1].get("updatedAt")) or "",
+        key=lambda pair: _recent_visit_date(pair[1]),
         reverse=True,
     )
     return dict(items[:MAX_RECENT_VISITS])
@@ -916,13 +925,23 @@ def _limit_recent_visit_map(recent_map: dict) -> dict:
 
 def _recent_visit_items(recent_map: dict) -> list[dict]:
     return [
-        item
-        for _, item in sorted(
+        {"id": review_id, "reviewId": review_id, **item}
+        for review_id, item in sorted(
             recent_map.items(),
-            key=lambda pair: _text_or_none(pair[1].get("updatedAt")) or "",
+            key=lambda pair: _recent_visit_date(pair[1]),
             reverse=True,
         )
     ]
+
+
+def _recent_visit_date(item: dict) -> str:
+    return (
+        _text_or_none(item.get("visitedAt"))
+        or _text_or_none(item.get("visited_at"))
+        or _text_or_none(item.get("updatedAt"))
+        or _text_or_none(item.get("updated_at"))
+        or ""
+    )
 
 
 def _float_or_none(value) -> float | None:

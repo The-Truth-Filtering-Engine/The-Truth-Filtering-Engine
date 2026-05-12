@@ -115,12 +115,15 @@ class _BlogCardSkeleton extends StatelessWidget {
 
 // ── 리뷰 리스트 섹션 ──────────────────────────────────────────────────────────
 
+typedef ReviewOpenGuard = Future<bool> Function(BlogReview review);
+
 class ReviewListSection extends StatefulWidget {
   final ShopInfo shopInfo;
   final List<BlogReview> blogs;
   final bool hasMoreReviews;
   final bool isLoadingReviewBatch;
   final ValueChanged<int>? onRequestReviewBatch;
+  final ReviewOpenGuard? onReviewTap;
 
   const ReviewListSection({
     super.key,
@@ -129,6 +132,7 @@ class ReviewListSection extends StatefulWidget {
     this.hasMoreReviews = false,
     this.isLoadingReviewBatch = false,
     this.onRequestReviewBatch,
+    this.onReviewTap,
   });
 
   @override
@@ -202,6 +206,9 @@ class _ReviewListSectionState extends State<ReviewListSection>
   }
 
   Future<void> _openUrl(BlogReview blog) async {
+    final canOpen = await widget.onReviewTap?.call(blog) ?? true;
+    if (!canOpen) return;
+
     final uri = mobileBlogReviewUri(blog.url);
     if (uri == null) return;
 

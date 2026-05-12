@@ -12,9 +12,9 @@ import 'current_user_provider.dart';
 import 'user_profile_provider.dart';
 
 const _likedReviewSelectColumns =
-    'id, review_title, review_description, review_url, name, likes, store_id, '
-    'category_name, category_group_code, category_group_name, phone, '
-    'address_name, road_address_name, place_url';
+    'id, review_title, review_description, review_url, name, likes, dislikes, '
+    'store_id, category_name, category_group_code, category_group_name, '
+    'phone, address_name, road_address_name, place_url';
 
 final likedReviewsProvider =
     StateNotifierProvider<LikedReviewsNotifier, AsyncValue<List<LikedReview>>>(
@@ -51,6 +51,10 @@ class LikedReview {
   });
 
   factory LikedReview.fromRow(Map<String, dynamic> row) {
+    final reviewId = row['id']?.toString() ?? '';
+    final title = row['review_title']?.toString() ?? '';
+    final description = row['review_description']?.toString() ?? '';
+    final reviewUrl = row['review_url']?.toString() ?? '';
     final restaurantName = row['name']?.toString() ?? '';
     final storeId = row['store_id']?.toString() ?? '';
     final categoryName = row['category_name']?.toString() ?? '';
@@ -59,14 +63,15 @@ class LikedReview {
     final address = roadAddressName.isNotEmpty ? roadAddressName : addressName;
 
     return LikedReview(
-      id: row['id']?.toString() ?? '',
-      title: row['review_title']?.toString() ?? '',
-      description: row['review_description']?.toString() ?? '',
-      reviewUrl: row['review_url']?.toString() ?? '',
+      id: reviewId,
+      title: title,
+      description: description,
+      reviewUrl: reviewUrl,
       restaurantName: restaurantName,
       restaurant: RestaurantModel(
         id: storeId.isNotEmpty ? storeId : restaurantName,
         storeId: storeId.isEmpty ? null : storeId,
+        reviewId: reviewId,
         name: restaurantName,
         address: address,
         category: categoryName.isEmpty ? '음식점' : categoryName,
@@ -74,7 +79,10 @@ class LikedReview {
         categoryGroupCode: row['category_group_code']?.toString(),
         categoryGroupName: row['category_group_name']?.toString(),
         truthScore: 0,
-        reviewSummary: '',
+        reviewSummary: description,
+        reviewUrl: reviewUrl,
+        reviewTitle: title,
+        reviewDescription: description,
         phone: row['phone']?.toString(),
         placeUrl: row['place_url']?.toString(),
         addressName: addressName.isEmpty ? null : addressName,
@@ -89,6 +97,7 @@ class LikedReview {
 class LikedReviewsNotifier
     extends StateNotifier<AsyncValue<List<LikedReview>>> {
   final int? userId;
+  final _locallyUnlikedReviewIds = <String>{};
 
   LikedReviewsNotifier({required this.userId})
       : super(const AsyncValue.loading()) {
@@ -116,16 +125,25 @@ class LikedReviewsNotifier
       }
 
       final accountLikedIds = await _loadAccountLikedReviewIds();
-      if (accountLikedIds.isNotEmpty) {
-        final loadedIds = liked.map((review) => review.id).toSet();
-        final missingIds = accountLikedIds.difference(loadedIds).toList();
-        liked = [
-          ...liked,
-          ...await _loadReviewsByIds(missingIds, currentUserId),
-        ];
+      if (accountLikedIds != null) {
+        final activeAccountLikedIds = accountLikedIds
+            .where((id) => !_locallyUnlikedReviewIds.contains(id))
+            .toList();
+        if (activeAccountLikedIds.isNotEmpty) {
+          final accountLiked = await _loadReviewsByIds(
+            activeAccountLikedIds,
+            currentUserId,
+            ensureReviewLikes: true,
+          );
+          liked = _mergeLikedReviews(liked, accountLiked);
+        } else if (liked.isNotEmpty) {
+          await _backfillAccountLikes(liked);
+        }
       }
 
-      if (liked.isEmpty && directLoadError != null && accountLikedIds.isEmpty) {
+      if (liked.isEmpty &&
+          directLoadError != null &&
+          (accountLikedIds == null || accountLikedIds.isEmpty)) {
         Error.throwWithStackTrace(
           directLoadError,
           directLoadStackTrace ?? StackTrace.current,
@@ -156,8 +174,9 @@ class LikedReviewsNotifier
 
   Future<List<LikedReview>> _loadReviewsByIds(
     List<String> reviewIds,
-    int currentUserId,
-  ) async {
+    int currentUserId, {
+    bool ensureReviewLikes = false,
+  }) async {
     if (reviewIds.isEmpty) return const [];
 
     final rows = await Supabase.instance.client
@@ -166,40 +185,91 @@ class LikedReviewsNotifier
         .inFilter('id', reviewIds)
         .limit(200);
 
-    return (rows as List<dynamic>)
+    final maps = (rows as List<dynamic>)
         .whereType<Map>()
-        .where((row) => _rowHasUserLike(row, currentUserId))
-        .map((row) => LikedReview.fromRow(Map<String, dynamic>.from(row)))
+        .map((row) => Map<String, dynamic>.from(row))
         .toList();
+
+    if (ensureReviewLikes) {
+      for (final row in maps) {
+        await _ensureReviewLike(row, currentUserId);
+      }
+    }
+
+    return maps.map(LikedReview.fromRow).toList();
+  }
+
+  List<LikedReview> _mergeLikedReviews(
+    List<LikedReview> directReviews,
+    List<LikedReview> accountReviews,
+  ) {
+    final byId = <String, LikedReview>{};
+    for (final review in [...directReviews, ...accountReviews]) {
+      if (review.id.trim().isEmpty) continue;
+      byId[review.id] = review;
+    }
+    return byId.values.toList();
   }
 
   bool _rowHasUserLike(Map row, int currentUserId) {
-    final likes = row['likes'];
-    if (likes is! List) return false;
+    return parseUserIdEntryList(row['likes']).any(
+      (entry) => entry['user_id'] == currentUserId,
+    );
+  }
 
-    return likes.any((entry) {
-      if (entry is Map) {
-        return int.tryParse(entry['user_id']?.toString() ?? '') ==
-            currentUserId;
-      }
-      return int.tryParse(entry.toString()) == currentUserId;
-    });
+  Future<void> _backfillAccountLikes(List<LikedReview> reviews) async {
+    for (final review in reviews) {
+      try {
+        await _syncAccountReaction(review.id, 'like');
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _ensureReviewLike(
+    Map<String, dynamic> row,
+    int currentUserId,
+  ) async {
+    if (_rowHasUserLike(row, currentUserId)) return;
+
+    final reviewId = row['id']?.toString().trim() ?? '';
+    if (reviewId.isEmpty) return;
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final likes = parseUserIdEntryList(row['likes'])
+      ..removeWhere((entry) => entry['user_id'] == currentUserId)
+      ..add(<String, dynamic>{
+        'user_id': currentUserId,
+        'likedAt': now,
+        'updatedAt': now,
+      });
+    final dislikes = parseUserIdEntryList(row['dislikes'])
+      ..removeWhere((entry) => entry['user_id'] == currentUserId);
+
+    try {
+      await Supabase.instance.client.from('reviews').update({
+        'likes': likes,
+        'dislikes': dislikes,
+      }).eq('id', reviewId);
+    } catch (_) {}
   }
 
   Future<void> remove(String reviewId) async {
     final currentUserId = userId;
-    if (currentUserId == null || reviewId.trim().isEmpty) return;
+    final normalizedReviewId = reviewId.trim();
+    if (currentUserId == null || normalizedReviewId.isEmpty) return;
+
+    _locallyUnlikedReviewIds.add(normalizedReviewId);
 
     final previous = state.valueOrNull ?? const <LikedReview>[];
     state = AsyncValue.data(
-      previous.where((review) => review.id != reviewId).toList(),
+      previous.where((review) => review.id != normalizedReviewId).toList(),
     );
 
     try {
       final row = await Supabase.instance.client
           .from('reviews')
           .select('likes')
-          .eq('id', reviewId)
+          .eq('id', normalizedReviewId)
           .single();
 
       final likes = parseUserIdEntryList(row['likes'])
@@ -207,18 +277,40 @@ class LikedReviewsNotifier
 
       await Supabase.instance.client
           .from('reviews')
-          .update({'likes': likes}).eq('id', reviewId);
+          .update({'likes': likes}).eq('id', normalizedReviewId);
 
-      await _syncAccountReaction(reviewId, null);
+      await _syncAccountReaction(normalizedReviewId, null);
     } catch (error, stackTrace) {
       state = AsyncValue.data(previous);
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
-  Future<Set<String>> _loadAccountLikedReviewIds() async {
+  Future<void> syncReviewLikeState({
+    required String reviewId,
+    required bool isLiked,
+  }) async {
+    final normalizedReviewId = reviewId.trim();
+    if (normalizedReviewId.isEmpty) return;
+
+    if (isLiked) {
+      _locallyUnlikedReviewIds.remove(normalizedReviewId);
+      await load();
+      return;
+    }
+
+    _locallyUnlikedReviewIds.add(normalizedReviewId);
+    final previous = state.valueOrNull;
+    if (previous == null) return;
+
+    state = AsyncValue.data(
+      previous.where((review) => review.id != normalizedReviewId).toList(),
+    );
+  }
+
+  Future<Set<String>?> _loadAccountLikedReviewIds() async {
     final token = _accessToken;
-    if (token == null) return {};
+    if (token == null) return null;
 
     try {
       final response = await http.get(
@@ -226,7 +318,7 @@ class LikedReviewsNotifier
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        return {};
+        return null;
       }
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
@@ -240,7 +332,7 @@ class LikedReviewsNotifier
           .where((key) => key.isNotEmpty)
           .toSet();
     } catch (_) {
-      return {};
+      return null;
     }
   }
 

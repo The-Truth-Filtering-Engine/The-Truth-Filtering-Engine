@@ -49,6 +49,7 @@ AdGrade adGradeFromScore(double score) {
 
 class BlogReview {
   final int id;
+  final String? reviewId;
   final String title;
   final String author;
   final String date;
@@ -65,8 +66,17 @@ class BlogReview {
 
   AdGrade? get adGrade => adScore != null ? adGradeFromScore(adScore!) : null;
 
+  String get effectiveReviewId {
+    final normalizedReviewId = reviewId?.trim();
+    if (normalizedReviewId != null && normalizedReviewId.isNotEmpty) {
+      return normalizedReviewId;
+    }
+    return id.toString();
+  }
+
   const BlogReview({
     required this.id,
+    this.reviewId,
     required this.title,
     required this.author,
     required this.date,
@@ -125,8 +135,12 @@ class BlogReview {
 
     final String description = json['review_description'] as String? ?? '';
 
+    final rawId = json['id'];
+    final reviewId = rawId?.toString() ?? '';
+
     return BlogReview(
-      id: json['id'] as int? ?? 0,
+      id: _intIdFromJson(rawId),
+      reviewId: reviewId,
       title: json['review_title'] as String? ?? '(제목 없음)',
       author: json['review_bloggername'] as String? ?? '알 수 없음',
       date: _formatDate(json['review_postdate'] as String? ?? ''),
@@ -144,6 +158,16 @@ class BlogReview {
       adScore: adScore,
     );
   }
+}
+
+int _intIdFromJson(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty) return 0;
+
+  return int.tryParse(text) ?? text.hashCode;
 }
 
 int _likeCountFromJson(Object? value) {

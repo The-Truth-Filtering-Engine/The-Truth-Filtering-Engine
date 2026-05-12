@@ -12,7 +12,10 @@ class RestaurantModel {
   final String reviewSummary;
   final String? phone;
   final String? placeUrl;
+  final String? reviewId;
   final String? reviewUrl;
+  final String? reviewTitle;
+  final String? reviewDescription;
   final String? addressName;
   final String? roadAddressName;
   final String? imageUrl;
@@ -39,7 +42,10 @@ class RestaurantModel {
     required this.reviewSummary,
     this.phone,
     this.placeUrl,
+    this.reviewId,
     this.reviewUrl,
+    this.reviewTitle,
+    this.reviewDescription,
     this.addressName,
     this.roadAddressName,
     this.imageUrl,
@@ -61,6 +67,14 @@ class RestaurantModel {
     return id;
   }
 
+  String get effectiveReviewId {
+    final normalizedReviewId = reviewId?.trim();
+    if (normalizedReviewId != null && normalizedReviewId.isNotEmpty) {
+      return normalizedReviewId;
+    }
+    return '';
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -76,7 +90,10 @@ class RestaurantModel {
       'reviewSummary': reviewSummary,
       'phone': phone,
       'placeUrl': placeUrl,
+      'reviewId': reviewId,
       'reviewUrl': reviewUrl,
+      'reviewTitle': reviewTitle,
+      'reviewDescription': reviewDescription,
       'addressName': addressName,
       'roadAddressName': roadAddressName,
       'imageUrl': imageUrl,
@@ -114,7 +131,11 @@ class RestaurantModel {
       phone: json['phone']?.toString(),
       placeUrl:
           (json['placeUrl'] ?? json['link'] ?? json['place_url'])?.toString(),
+      reviewId: (json['reviewId'] ?? json['review_id'])?.toString(),
       reviewUrl: (json['reviewUrl'] ?? json['review_url'])?.toString(),
+      reviewTitle: (json['reviewTitle'] ?? json['review_title'])?.toString(),
+      reviewDescription:
+          (json['reviewDescription'] ?? json['review_description'])?.toString(),
       addressName: (json['addressName'] ?? json['address_name'])?.toString(),
       roadAddressName:
           (json['roadAddressName'] ?? json['road_address_name'])?.toString(),
@@ -146,7 +167,10 @@ class RestaurantModel {
     DateTime? visitedAt,
     int? truthScore,
     String? reviewSummary,
+    String? reviewId,
     String? reviewUrl,
+    String? reviewTitle,
+    String? reviewDescription,
   }) {
     return RestaurantModel(
       id: id,
@@ -162,7 +186,10 @@ class RestaurantModel {
       reviewSummary: reviewSummary ?? this.reviewSummary,
       phone: phone,
       placeUrl: placeUrl,
+      reviewId: reviewId ?? this.reviewId,
       reviewUrl: reviewUrl ?? this.reviewUrl,
+      reviewTitle: reviewTitle ?? this.reviewTitle,
+      reviewDescription: reviewDescription ?? this.reviewDescription,
       addressName: addressName ?? this.addressName,
       roadAddressName: roadAddressName ?? this.roadAddressName,
       imageUrl: imageUrl,

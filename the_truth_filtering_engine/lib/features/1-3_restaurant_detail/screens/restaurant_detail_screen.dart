@@ -221,8 +221,6 @@ class _RestaurantDetailScreenState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // 최근 본 식당 기록 저장
-      ref.read(recentVisitProvider.notifier).add(widget.restaurant); // ← 추가
       _onDetailTap();
     });
   }
@@ -369,27 +367,37 @@ class _RestaurantDetailScreenState
       _isLoadingReviewBatch = false;
       _state = _ScreenState.loaded;
     });
-    _recordRecentVisitReviewUrl(reviews);
     _refreshRecentAnalyses();
-  }
-
-  void _recordRecentVisitReviewUrl(List<BlogReview> reviews) {
-    final reviewUrl = reviews
-        .map((review) => review.url.trim())
-        .firstWhere((url) => url.isNotEmpty, orElse: () => '');
-    if (reviewUrl.isEmpty) return;
-
-    Future.microtask(() {
-      if (!mounted) return;
-      ref.read(recentVisitProvider.notifier).add(
-            _r.copyWith(reviewUrl: reviewUrl),
-          );
-    });
   }
 
   void _refreshRecentAnalyses() {
     if (!mounted) return;
     Future.microtask(() => ref.read(recentAnalysesProvider.notifier).load());
+  }
+
+  Future<bool> _recordRecentReviewOpen(BlogReview review) async {
+    final reviewId = review.reviewId?.trim();
+    if (reviewId == null || reviewId.isEmpty) {
+      debugPrint('Recent visit save skipped: reviewId is required');
+      _showSnack('리뷰 id가 없어 최근 기록에 저장하지 못했습니다');
+      return false;
+    }
+
+    try {
+      await ref.read(recentVisitProvider.notifier).addReview(
+            reviewId: reviewId,
+            name: _r.name,
+            reviewUrl: review.url,
+            reviewTitle: review.title,
+            reviewDescription:
+                review.content.isNotEmpty ? review.content : review.preview,
+          );
+      return true;
+    } catch (error) {
+      debugPrint('Recent visit save failed: $error');
+      _showSnack('최근 기록에 저장하지 못했습니다');
+      return false;
+    }
   }
 
   void _showError(String message) {
@@ -582,6 +590,7 @@ class _RestaurantDetailScreenState
                   hasMoreReviews: _hasMoreReviewBatches,
                   isLoadingReviewBatch: _isLoadingReviewBatch,
                   onRequestReviewBatch: _loadReviewBatchForPage,
+                  onReviewTap: _recordRecentReviewOpen,
                 ),
               ),
             ),

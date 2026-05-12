@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/current_user_provider.dart';
+import '../../../core/providers/liked_reviews_provider.dart';
 import '../../../core/providers/user_profile_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/review_like_provider.dart';
@@ -31,7 +32,7 @@ class ReviewActionButtons extends ConsumerWidget {
     final isLiked = likeState?.isLiked ?? false;
     final likeCount = likeState?.likeCount ?? 0;
 
-    void onTapHeart() {
+    Future<void> onTapHeart() async {
       if (!isLoggedIn) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -67,7 +68,13 @@ class ReviewActionButtons extends ConsumerWidget {
         return;
       }
 
-      ref.read(reviewLikeProvider(likeKey).notifier).toggleHeart();
+      final likeState =
+          await ref.read(reviewLikeProvider(likeKey).notifier).toggleHeart();
+      if (!context.mounted) return;
+      await ref.read(likedReviewsProvider.notifier).syncReviewLikeState(
+            reviewId: likeKey.reviewId,
+            isLiked: likeState.isLiked,
+          );
     }
 
     return Column(
@@ -76,7 +83,6 @@ class ReviewActionButtons extends ConsumerWidget {
         _HeartButton(
           count: likeCount,
           isActive: isLiked,
-          isLoading: state?.isLoading ?? false,
           onTap: onTapHeart,
         ),
         const SizedBox(height: 8),
@@ -93,13 +99,11 @@ class ReviewActionButtons extends ConsumerWidget {
 class _HeartButton extends StatelessWidget {
   final int count;
   final bool isActive;
-  final bool isLoading;
   final VoidCallback onTap;
 
   const _HeartButton({
     required this.count,
     required this.isActive,
-    required this.isLoading,
     required this.onTap,
   });
 
@@ -110,7 +114,7 @@ class _HeartButton extends StatelessWidget {
     return Tooltip(
       message: isActive ? '하트 취소' : '하트',
       child: GestureDetector(
-        onTap: isLoading ? null : onTap,
+        onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

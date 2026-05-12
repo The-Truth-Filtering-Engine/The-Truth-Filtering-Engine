@@ -9,6 +9,7 @@ import '../../../core/providers/liked_reviews_provider.dart';
 import '../../../core/providers/recent_visit_provider.dart';
 import '../../../core/providers/user_profile_provider.dart';
 import '../../1-1_map/models/restaurant_model.dart';
+import '../../1-3_restaurant_detail/providers/review_like_provider.dart';
 import '../../1-3_restaurant_detail/utils/blog_review_url.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -431,7 +432,7 @@ class _ReviewButtonsSection extends StatelessWidget {
           _ReviewNavigationButton(
             icon: Icons.history,
             title: '최근 기록',
-            subtitle: '최근 확인한 가게 목록',
+            subtitle: '최근 확인한 리뷰 목록',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -589,6 +590,34 @@ Future<void> _openReviewSource(BuildContext context, String rawUrl) async {
   }
 }
 
+Future<void> _recordRecentReviewAndOpen(
+  BuildContext context,
+  WidgetRef ref, {
+  required String reviewId,
+  required String name,
+  required String reviewUrl,
+  required String reviewTitle,
+  required String reviewDescription,
+}) async {
+  try {
+    await ref.read(recentVisitProvider.notifier).addReview(
+          reviewId: reviewId,
+          name: name,
+          reviewUrl: reviewUrl,
+          reviewTitle: reviewTitle,
+          reviewDescription: reviewDescription,
+        );
+  } catch (error) {
+    debugPrint('Recent visit save failed: $error');
+    if (!context.mounted) return;
+    _showReviewSourceMessage(context, '최근 기록에 저장하지 못했습니다.');
+    return;
+  }
+
+  if (!context.mounted) return;
+  await _openReviewSource(context, reviewUrl);
+}
+
 void _showReviewSourceMessage(BuildContext context, String message) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
@@ -631,12 +660,34 @@ class _LikedReviewsSettingsList extends ConsumerWidget {
 
             return _LikedReviewSettingsTile(
               review: review,
-              onTap: () => _openReviewSource(context, review.reviewUrl),
+              onTap: () => _recordRecentReviewAndOpen(
+                context,
+                ref,
+                reviewId: review.id,
+                name: review.restaurantName,
+                reviewUrl: review.reviewUrl,
+                reviewTitle: review.title,
+                reviewDescription: review.description,
+              ),
               onRemove: () async {
+                final userId = ref.read(currentUserIdProvider);
                 try {
                   await ref.read(likedReviewsProvider.notifier).remove(
                         review.id,
                       );
+                  ref.invalidate(reviewLikeProvider);
+                  if (userId != null) {
+                    ref
+                        .read(
+                          reviewLikeProvider(
+                            ReviewLikeProviderKey(
+                              reviewId: review.id,
+                              userId: userId,
+                            ),
+                          ).notifier,
+                        )
+                        .markUnliked();
+                  }
                 } catch (_) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -729,7 +780,7 @@ class _RecentReviewsSettingsList extends ConsumerWidget {
           onTap: () => _openReviewSource(context, restaurant.reviewUrl ?? ''),
           onRemove: () => ref
               .read(recentVisitProvider.notifier)
-              .remove(restaurant.effectiveStoreId),
+              .remove(restaurant.effectiveReviewId),
         );
       },
     );
@@ -754,27 +805,48 @@ class _RecentReviewSettingsTile extends StatelessWidget {
       restaurant.address,
     ].where((value) => value.trim().isNotEmpty).join(' · ');
 
+    final textTheme = Theme.of(context).textTheme;
+    final title = restaurant.reviewTitle?.trim() ?? '';
+    final description = restaurant.reviewDescription?.trim().isNotEmpty == true
+        ? restaurant.reviewDescription!.trim()
+        : restaurant.reviewSummary.trim().isNotEmpty
+            ? restaurant.reviewSummary.trim()
+            : subtitle;
+
     return ListTile(
       leading: IconButton(
         tooltip: '최근 기록 삭제',
         icon: Icon(
-          Icons.history_rounded,
+          Icons.close_rounded,
           color: Theme.of(context).colorScheme.primary,
         ),
         onPressed: onRemove,
       ),
       title: Text(
-        restaurant.name,
+        title.isEmpty ? '제목 없는 리뷰' : title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: subtitle.isEmpty
-          ? null
-          : Text(
-              subtitle,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (restaurant.name.isNotEmpty)
+            Text(
+              restaurant.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
+          if (description.isNotEmpty)
+            Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
       onTap: onTap,
     );
   }

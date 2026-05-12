@@ -11,11 +11,12 @@ import '../config/supabase_config.dart';
 import 'current_user_provider.dart';
 import '../../features/1-1_map/models/restaurant_model.dart';
 
-/// 최근 본 식당 목록 (로컬 SharedPreferences, 최대 30개)
+/// Recently opened review list (local SharedPreferences + users.recent_visits).
 final recentVisitProvider =
     StateNotifierProvider<RecentVisitNotifier, List<RestaurantModel>>(
   (ref) {
     final authState = ref.watch(appAuthProvider);
+
     return RecentVisitNotifier(
       enableRemoteSync: authState.isLoggedIn && !authState.isAdmin,
     );
@@ -23,7 +24,7 @@ final recentVisitProvider =
 );
 
 class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
-  static const _key = 'recent_visited_restaurants';
+  static const _key = 'recent_visited_reviews';
   static const _maxCount = 30;
 
   final bool enableRemoteSync;
@@ -36,27 +37,19 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     final localItems = await _loadLocal();
     state = localItems;
 
-    final localItemsWithReviewUrls = await _withReviewUrls(localItems);
-    if (_hasReviewUrlChanges(localItems, localItemsWithReviewUrls)) {
-      state = localItemsWithReviewUrls;
-      await _saveLocal(localItemsWithReviewUrls);
-    }
-
     if (!enableRemoteSync) return;
 
     final remoteItems = await _loadRemote();
     if (remoteItems == null) return;
 
-    final merged = await _withReviewUrls(
-      _mergeRecent(remoteItems, localItemsWithReviewUrls),
-    );
+    final merged = _mergeRecent(remoteItems, localItems);
     state = merged;
     await _saveLocal(merged);
 
-    for (final restaurant in localItemsWithReviewUrls) {
-      if (remoteItems.any(
-        (item) => item.effectiveStoreId == restaurant.effectiveStoreId,
-      )) {
+    for (final restaurant in localItems) {
+      final reviewId = restaurant.effectiveReviewId;
+      if (reviewId.isEmpty) continue;
+      if (remoteItems.any((item) => item.effectiveReviewId == reviewId)) {
         continue;
       }
       await _syncRemoteAdd(restaurant);
@@ -66,48 +59,94 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   Future<List<RestaurantModel>> _loadLocal() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_key) ?? [];
-    return raw
+    final items = raw
         .map((e) {
           try {
             return RestaurantModel.fromJson(
-                jsonDecode(e) as Map<String, dynamic>);
+              jsonDecode(e) as Map<String, dynamic>,
+            );
           } catch (_) {
             return null;
           }
         })
         .whereType<RestaurantModel>()
+        .where((restaurant) => restaurant.effectiveReviewId.isNotEmpty)
         .toList();
+    return _sortRecent(items);
   }
 
-  /// 식당 상세 진입 시 호출
-  Future<void> add(RestaurantModel restaurant) async {
-    final storeId = restaurant.effectiveStoreId;
-    if (storeId.isEmpty) return;
-
+  Future<void> addReview({
+    required String reviewId,
+    required String name,
+    required String reviewUrl,
+    required String reviewTitle,
+    required String reviewDescription,
+  }) async {
+    final normalizedReviewId = _requireText(reviewId, 'reviewId');
+    final normalizedReviewUrl = _requireText(reviewUrl, 'reviewUrl');
+    final description = reviewDescription.trim();
     final now = DateTime.now();
-    final visitedRestaurant = await _withReviewUrl(
-      restaurant.copyWith(
-        updatedAt: now,
+
+    await add(
+      RestaurantModel(
+        id: normalizedReviewId,
+        reviewId: normalizedReviewId,
+        name: name.trim(),
+        address: '',
+        category: '',
+        truthScore: 0,
+        reviewSummary: description,
+        reviewUrl: normalizedReviewUrl,
+        reviewTitle: reviewTitle.trim(),
+        reviewDescription: description,
+        latitude: 0,
+        longitude: 0,
         visitedAt: now,
       ),
     );
+  }
 
-    // 중복 제거 후 맨 앞에 삽입
+  Future<void> add(RestaurantModel restaurant) async {
+    final reviewId = _requireText(restaurant.effectiveReviewId, 'reviewId');
+    final reviewUrl = _requireText(restaurant.reviewUrl, 'reviewUrl');
+    final now = DateTime.now();
+    final description = _firstText([
+      restaurant.reviewDescription,
+      restaurant.reviewSummary,
+    ]);
+    final visitedReview = RestaurantModel(
+      id: reviewId,
+      reviewId: reviewId,
+      name: restaurant.name.trim(),
+      address: '',
+      category: '',
+      truthScore: 0,
+      reviewSummary: description,
+      reviewUrl: reviewUrl,
+      reviewTitle: restaurant.reviewTitle?.trim() ?? '',
+      reviewDescription: description,
+      latitude: 0,
+      longitude: 0,
+      visitedAt: now,
+    );
+
     final updated = [
-      visitedRestaurant,
-      ...state.where((r) => r.effectiveStoreId != storeId),
+      visitedReview,
+      ...state.where((r) => r.effectiveReviewId != reviewId),
     ].take(_maxCount).toList();
 
     state = updated;
 
     await _saveLocal(updated);
-    await _syncRemoteAdd(visitedRestaurant);
+    await _syncRemoteAdd(visitedReview);
   }
 
-  Future<void> remove(String storeId) async {
-    state = state.where((r) => r.effectiveStoreId != storeId).toList();
+  Future<void> remove(String reviewId) async {
+    final normalizedReviewId = _requireText(reviewId, 'reviewId');
+    state =
+        state.where((r) => r.effectiveReviewId != normalizedReviewId).toList();
     await _saveLocal(state);
-    await _syncRemoteRemove(storeId);
+    await _syncRemoteRemove(normalizedReviewId);
   }
 
   Future<void> clear() async {
@@ -123,41 +162,6 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
       _key,
       items.map((r) => jsonEncode(r.toJson())).toList(),
     );
-  }
-
-  Future<List<RestaurantModel>> _withReviewUrls(
-    List<RestaurantModel> restaurants,
-  ) async {
-    final updated = <RestaurantModel>[];
-    for (final restaurant in restaurants) {
-      updated.add(await _withReviewUrl(restaurant));
-    }
-    return updated;
-  }
-
-  Future<RestaurantModel> _withReviewUrl(RestaurantModel restaurant) async {
-    final currentReviewUrl = restaurant.reviewUrl?.trim();
-    if (currentReviewUrl != null && currentReviewUrl.isNotEmpty) {
-      return restaurant;
-    }
-
-    final reviewUrl = await _latestReviewUrlForStore(
-      restaurant.effectiveStoreId,
-    );
-    if (reviewUrl == null || reviewUrl.isEmpty) return restaurant;
-
-    return restaurant.copyWith(reviewUrl: reviewUrl);
-  }
-
-  bool _hasReviewUrlChanges(
-    List<RestaurantModel> previous,
-    List<RestaurantModel> next,
-  ) {
-    if (previous.length != next.length) return true;
-    for (var index = 0; index < previous.length; index++) {
-      if (previous[index].reviewUrl != next[index].reviewUrl) return true;
-    }
-    return false;
   }
 
   String? get _accessToken {
@@ -181,17 +185,40 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
       }
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      final items = decoded is Map ? decoded['items'] : null;
-      if (items is! List) return const [];
+      if (decoded is! Map) return const [];
 
-      return items
-          .whereType<Map>()
-          .map((item) => RestaurantModel.fromJson(
-                Map<String, dynamic>.from(item),
-              ))
-          .where((restaurant) => restaurant.effectiveStoreId.isNotEmpty)
-          .toList();
-    } catch (_) {
+      final items = decoded['items'];
+      if (items is List) {
+        return _sortRecent(
+          items
+              .whereType<Map>()
+              .map((item) => _restaurantFromRemoteItem(
+                    Map<String, dynamic>.from(item),
+                  ))
+              .whereType<RestaurantModel>()
+              .toList(),
+        );
+      }
+
+      final recentVisits = decoded['recentVisits'];
+      if (recentVisits is! Map) return const [];
+
+      final values = <RestaurantModel>[];
+      for (final entry in recentVisits.entries) {
+        final reviewId = _text(entry.key);
+        final item = entry.value;
+        if (reviewId == null || item is! Map) continue;
+        final restaurant = _restaurantFromRemoteItem({
+          'id': reviewId,
+          'reviewId': reviewId,
+          ...Map<String, dynamic>.from(item),
+        });
+        if (restaurant != null) values.add(restaurant);
+      }
+
+      return _sortRecent(values);
+    } catch (error) {
+      debugPrint('Recent visits load failed: $error');
       return null;
     }
   }
@@ -208,8 +235,16 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'storeId': restaurant.effectiveStoreId,
-          'store': restaurant.toJson(),
+          'reviewId': _requireText(restaurant.effectiveReviewId, 'reviewId'),
+          'review': {
+            'name': restaurant.name.trim(),
+            'review_url': _requireText(restaurant.reviewUrl, 'reviewUrl'),
+            'review_title': restaurant.reviewTitle?.trim() ?? '',
+            'review_description': _firstText([
+              restaurant.reviewDescription,
+              restaurant.reviewSummary,
+            ]),
+          },
         }),
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -220,14 +255,14 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     }
   }
 
-  Future<void> _syncRemoteRemove(String storeId) async {
+  Future<void> _syncRemoteRemove(String reviewId) async {
     final token = _accessToken;
     if (token == null) return;
 
     try {
       final response = await http.delete(
         BackendConfig.apiUri(
-          '/user/me/recent-visits/${Uri.encodeComponent(storeId)}',
+          '/user/me/recent-visits/${Uri.encodeComponent(reviewId)}',
         ),
         headers: {'Authorization': 'Bearer $token'},
       );
@@ -256,47 +291,75 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     }
   }
 
-  Future<String?> _latestReviewUrlForStore(String storeId) async {
-    final normalizedStoreId = storeId.trim();
-    if (!SupabaseConfig.isConfigured || normalizedStoreId.isEmpty) {
-      return null;
-    }
+  RestaurantModel? _restaurantFromRemoteItem(Map<String, dynamic> item) {
+    final reviewId = _text(item['reviewId'] ?? item['review_id'] ?? item['id']);
+    if (reviewId == null) return null;
 
-    try {
-      final rows = await Supabase.instance.client
-          .from('reviews')
-          .select('review_url')
-          .eq('store_id', normalizedStoreId)
-          .order('created_at', ascending: false)
-          .limit(10);
+    final reviewUrl = _text(item['review_url'] ?? item['reviewUrl']);
+    if (reviewUrl == null) return null;
 
-      for (final row in rows.whereType<Map>()) {
-        final reviewUrl = row['review_url']?.toString().trim();
-        if (reviewUrl != null && reviewUrl.isNotEmpty) {
-          return reviewUrl;
-        }
-      }
-    } catch (error) {
-      debugPrint('Recent visit review_url load failed: $error');
-    }
-
-    return null;
+    return RestaurantModel.fromJson({
+      'id': reviewId,
+      'reviewId': reviewId,
+      'name': item['name']?.toString() ?? '',
+      'review_url': reviewUrl,
+      'review_title': item['review_title'] ?? item['reviewTitle'],
+      'review_description':
+          item['review_description'] ?? item['reviewDescription'],
+      'reviewSummary':
+          item['review_description'] ?? item['reviewDescription'] ?? '',
+      'visitedAt': item['visitedAt'] ?? item['visited_at'],
+    });
   }
 
   List<RestaurantModel> _mergeRecent(
     List<RestaurantModel> remoteItems,
     List<RestaurantModel> localItems,
   ) {
-    final seen = <String>{};
-    final merged = <RestaurantModel>[];
+    final byReviewId = <String, RestaurantModel>{};
 
     for (final restaurant in [...remoteItems, ...localItems]) {
-      final storeId = restaurant.effectiveStoreId;
-      if (storeId.isEmpty || !seen.add(storeId)) continue;
-      merged.add(restaurant);
-      if (merged.length >= _maxCount) break;
+      final reviewId = restaurant.effectiveReviewId;
+      if (reviewId.isEmpty) continue;
+      final existing = byReviewId[reviewId];
+      if (existing == null ||
+          _recentDate(restaurant).compareTo(_recentDate(existing)) > 0) {
+        byReviewId[reviewId] = restaurant;
+      }
     }
 
-    return merged;
+    return _sortRecent(byReviewId.values.toList()).take(_maxCount).toList();
+  }
+
+  List<RestaurantModel> _sortRecent(List<RestaurantModel> items) {
+    return [...items]..sort((a, b) => _recentDate(b).compareTo(_recentDate(a)));
+  }
+
+  String _recentDate(RestaurantModel restaurant) {
+    return restaurant.visitedAt?.toIso8601String() ??
+        restaurant.updatedAt?.toIso8601String() ??
+        '';
+  }
+
+  String _firstText(List<String?> values) {
+    for (final value in values) {
+      final text = value?.trim();
+      if (text != null && text.isNotEmpty) return text;
+    }
+    return '';
+  }
+
+  String _requireText(String? value, String field) {
+    final text = value?.trim();
+    if (text == null || text.isEmpty) {
+      throw StateError('$field is required');
+    }
+    return text;
+  }
+
+  String? _text(Object? value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
   }
 }

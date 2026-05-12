@@ -15,6 +15,7 @@ void main() {
     bool hasMoreReviews = false,
     bool isLoadingReviewBatch = false,
     ValueChanged<int>? onRequestReviewBatch,
+    ReviewOpenGuard? onReviewTap,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -38,6 +39,7 @@ void main() {
                 hasMoreReviews: hasMoreReviews,
                 isLoadingReviewBatch: isLoadingReviewBatch,
                 onRequestReviewBatch: onRequestReviewBatch,
+                onReviewTap: onReviewTap,
               ),
             ),
           ),
@@ -154,6 +156,24 @@ void main() {
 
     expect(nextButton.onPressed, isNull);
     expect(previousButton.onPressed, isNotNull);
+  });
+
+  testWidgets('calls review tap guard before opening a review', (tester) async {
+    BlogReview? tappedReview;
+
+    await pumpReviewList(
+      tester,
+      buildReviews(1),
+      onReviewTap: (review) async {
+        tappedReview = review;
+        return false;
+      },
+    );
+
+    await tester.tap(find.text('리뷰 01'));
+    await tester.pump();
+
+    expect(tappedReview?.id, 1);
   });
 
   testWidgets('resets to the first page when changing sort tabs',
