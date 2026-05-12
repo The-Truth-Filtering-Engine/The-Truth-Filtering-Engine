@@ -7,7 +7,7 @@ def preprocess(title: str, description: str, store_name: str) -> str:
 
     # Step 2-③ 가게명 → "식당" 치환 (3글자 미만 제외)
     name = (store_name or "").strip()
-    if len(name) >= 3:
+    if len(name) >= 2:
         text = text.replace(name, "식당")
 
     # Step 2-① HTML 엔티티 디코딩
