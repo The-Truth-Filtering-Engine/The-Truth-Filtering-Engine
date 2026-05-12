@@ -65,16 +65,22 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     final storeId = restaurant.effectiveStoreId;
     if (storeId.isEmpty) return;
 
+    final now = DateTime.now();
+    final visitedRestaurant = restaurant.copyWith(
+      updatedAt: now,
+      visitedAt: now,
+    );
+
     // 중복 제거 후 맨 앞에 삽입
     final updated = [
-      restaurant,
+      visitedRestaurant,
       ...state.where((r) => r.effectiveStoreId != storeId),
     ].take(_maxCount).toList();
 
     state = updated;
 
     await _saveLocal(updated);
-    await _syncRemoteAdd(restaurant);
+    await _syncRemoteAdd(visitedRestaurant);
   }
 
   Future<void> remove(String storeId) async {

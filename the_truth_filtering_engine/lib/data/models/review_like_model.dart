@@ -43,7 +43,25 @@ Set<int> parseUserIdEntries(dynamic json) {
 }
 
 List<Map<String, dynamic>> parseUserIdEntryList(dynamic json) {
-  return parseUserIdEntries(json)
-      .map((userId) => <String, dynamic>{'user_id': userId})
-      .toList();
+  if (json is! List) return [];
+
+  final byUserId = <int, Map<String, dynamic>>{};
+  for (final entry in json) {
+    final userId = _userIdFromEntry(entry);
+    if (userId == null) continue;
+
+    final normalized =
+        entry is Map ? Map<String, dynamic>.from(entry) : <String, dynamic>{};
+    normalized['user_id'] = userId;
+    byUserId[userId] = normalized;
+  }
+
+  return byUserId.values.toList();
+}
+
+int? _userIdFromEntry(Object? entry) {
+  if (entry is Map) {
+    return int.tryParse(entry['user_id']?.toString() ?? '');
+  }
+  return int.tryParse(entry.toString());
 }

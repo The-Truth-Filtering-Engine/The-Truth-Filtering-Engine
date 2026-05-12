@@ -28,6 +28,11 @@ class BookmarkService {
     final storeId = restaurant.effectiveStoreId;
     if (storeId.isEmpty) return loadBookmarks();
 
+    final now = DateTime.now();
+    final bookmarkedRestaurant = restaurant.copyWith(
+      bookmarkedAt: restaurant.bookmarkedAt ?? now,
+      updatedAt: now,
+    );
     final current = await _loadLocal();
     final index = current.indexWhere(
       (item) => item.effectiveStoreId == storeId,
@@ -37,14 +42,14 @@ class BookmarkService {
             ...current.sublist(0, index),
             ...current.sublist(index + 1),
           ]
-        : [...current, restaurant];
+        : [...current, bookmarkedRestaurant];
 
     await _saveLocal(next);
 
     if (index >= 0) {
       await _syncRemoteRemove(storeId);
     } else {
-      await _syncRemoteAdd(restaurant);
+      await _syncRemoteAdd(bookmarkedRestaurant);
     }
 
     return next;

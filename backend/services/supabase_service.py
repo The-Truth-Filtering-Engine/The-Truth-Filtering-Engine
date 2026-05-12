@@ -557,9 +557,14 @@ async def add_user_bookmark(email: str, store_id: str, store: dict | None) -> di
 
     profile = await ensure_user_profile(normalized_email)
     bookmark_map = _normalize_bookmark_map(profile.get("bookmark"))
+    bookmark_store = dict(bookmark_map.get(normalized_store_id) or {})
+    if isinstance(store, dict):
+        bookmark_store.update(
+            {key: value for key, value in store.items() if value is not None}
+        )
     bookmark_map[normalized_store_id] = _normalize_bookmark_store(
         normalized_store_id,
-        store,
+        bookmark_store,
         touch=True,
     )
 
@@ -608,9 +613,14 @@ async def add_user_recent_visit(
             normalized_email,
         ) or {}
         recent_map = _normalize_recent_visit_map(current.get("recent_visits"))
+        recent_store = dict(recent_map.get(normalized_store_id) or {})
+        if isinstance(store, dict):
+            recent_store.update(
+                {key: value for key, value in store.items() if value is not None}
+            )
         recent_map[normalized_store_id] = _normalize_recent_visit_store(
             normalized_store_id,
-            store,
+            recent_store,
             touch=True,
         )
         recent_map = _limit_recent_visit_map(recent_map)
@@ -697,21 +707,27 @@ async def update_user_review_reaction(
         ) or {}
 
         review_likes = _normalize_review_reaction_map(
-            current.get("review_likes")
+            current.get("review_likes"),
+            reaction_type="like",
         )
         review_dislikes = _normalize_review_reaction_map(
-            current.get("review_dislikes")
+            current.get("review_dislikes"),
+            reaction_type="dislike",
         )
 
         if reaction == "like":
             review_likes[normalized_review_id] = _normalize_review_reaction(
                 normalized_review_id,
+                review_likes.get(normalized_review_id),
+                reaction_type="like",
                 touch=True,
             )
             review_dislikes.pop(normalized_review_id, None)
         elif reaction == "dislike":
             review_dislikes[normalized_review_id] = _normalize_review_reaction(
                 normalized_review_id,
+                review_dislikes.get(normalized_review_id),
+                reaction_type="dislike",
                 touch=True,
             )
             review_likes.pop(normalized_review_id, None)
@@ -752,15 +768,17 @@ def _normalize_user_review_reactions(profile: dict | None) -> dict:
     profile = profile or {}
     return {
         "review_likes": _normalize_review_reaction_map(
-            profile.get("review_likes")
+            profile.get("review_likes"),
+            reaction_type="like",
         ),
         "review_dislikes": _normalize_review_reaction_map(
-            profile.get("review_dislikes")
+            profile.get("review_dislikes"),
+            reaction_type="dislike",
         ),
     }
 
 
-def _normalize_review_reaction_map(value) -> dict:
+def _normalize_review_reaction_map(value, *, reaction_type: str | None = None) -> dict:
     if not isinstance(value, dict):
         return {}
 
@@ -769,7 +787,11 @@ def _normalize_review_reaction_map(value) -> dict:
         review_id = _text_or_none(key)
         if not review_id:
             continue
-        reaction_map[review_id] = _normalize_review_reaction(review_id, item)
+        reaction_map[review_id] = _normalize_review_reaction(
+            review_id,
+            item,
+            reaction_type=reaction_type,
+        )
 
     return reaction_map
 
@@ -778,13 +800,22 @@ def _normalize_review_reaction(
     review_id: str,
     reaction: dict | None = None,
     *,
+    reaction_type: str | None = None,
     touch: bool = False,
 ) -> dict:
     normalized = dict(reaction) if isinstance(reaction, dict) else {}
     normalized["reviewId"] = review_id
+    now = datetime.now(KST).isoformat()
 
+    if reaction_type == "like" and not _text_or_none(normalized.get("likedAt")):
+        normalized["likedAt"] = _text_or_none(normalized.get("updatedAt")) or now
+    if (
+        reaction_type == "dislike"
+        and not _text_or_none(normalized.get("dislikedAt"))
+    ):
+        normalized["dislikedAt"] = _text_or_none(normalized.get("updatedAt")) or now
     if touch or not _text_or_none(normalized.get("updatedAt")):
-        normalized["updatedAt"] = datetime.now(KST).isoformat()
+        normalized["updatedAt"] = now
 
     return normalized
 
@@ -807,11 +838,13 @@ def _normalize_bookmark_store(
     store_id: str,
     store: dict | None,
     *,
+    recorded_at_field: str | None = "bookmarkedAt",
     touch: bool = False,
 ) -> dict:
     normalized = dict(store) if isinstance(store, dict) else {}
     normalized["id"] = _text_or_none(normalized.get("id")) or store_id
     normalized["storeId"] = store_id
+    now = datetime.now(KST).isoformat()
 
     latitude = _float_or_none(normalized.get("latitude"))
     if latitude is None:
@@ -827,8 +860,12 @@ def _normalize_bookmark_store(
         normalized["longitude"] = longitude
         normalized["lng"] = longitude
 
+    if recorded_at_field and not _text_or_none(normalized.get(recorded_at_field)):
+        normalized[recorded_at_field] = (
+            _text_or_none(normalized.get("updatedAt")) or now
+        )
     if touch or not _text_or_none(normalized.get("updatedAt")):
-        normalized["updatedAt"] = datetime.now(KST).isoformat()
+        normalized["updatedAt"] = now
 
     return normalized
 
@@ -853,8 +890,18 @@ def _normalize_recent_visit_store(
     *,
     touch: bool = False,
 ) -> dict:
-    normalized = _normalize_bookmark_store(store_id, store, touch=touch)
+    normalized = _normalize_bookmark_store(
+        store_id,
+        store,
+        recorded_at_field=None,
+        touch=touch,
+    )
     normalized["storeId"] = store_id
+    if touch or not _text_or_none(normalized.get("visitedAt")):
+        normalized["visitedAt"] = (
+            _text_or_none(normalized.get("updatedAt"))
+            or datetime.now(KST).isoformat()
+        )
     return normalized
 
 

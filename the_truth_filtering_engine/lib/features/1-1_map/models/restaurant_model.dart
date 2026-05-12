@@ -20,6 +20,9 @@ class RestaurantModel {
   final bool isBookmarked;
   final String? userId;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? bookmarkedAt;
+  final DateTime? visitedAt;
 
   const RestaurantModel({
     required this.id,
@@ -43,6 +46,9 @@ class RestaurantModel {
     this.isBookmarked = false,
     this.userId,
     this.createdAt,
+    this.updatedAt,
+    this.bookmarkedAt,
+    this.visitedAt,
   });
 
   String get effectiveStoreId {
@@ -76,6 +82,9 @@ class RestaurantModel {
       'isBookmarked': isBookmarked,
       'userId': userId,
       'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+      'bookmarkedAt': bookmarkedAt?.toIso8601String(),
+      'visitedAt': visitedAt?.toIso8601String(),
     };
   }
 
@@ -112,6 +121,9 @@ class RestaurantModel {
           json['isBookmarked'] == true || json['is_bookmarked'] == true,
       userId: (json['userId'] ?? json['user_id'])?.toString(),
       createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
+      updatedAt: _parseDate(json['updatedAt'] ?? json['updated_at']),
+      bookmarkedAt: _parseDate(json['bookmarkedAt'] ?? json['bookmarked_at']),
+      visitedAt: _parseDate(json['visitedAt'] ?? json['visited_at']),
     );
   }
 
@@ -125,6 +137,9 @@ class RestaurantModel {
     bool? isBookmarked,
     String? userId,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? bookmarkedAt,
+    DateTime? visitedAt,
     int? truthScore,
     String? reviewSummary,
   }) {
@@ -150,6 +165,9 @@ class RestaurantModel {
       isBookmarked: isBookmarked ?? this.isBookmarked,
       userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      bookmarkedAt: bookmarkedAt ?? this.bookmarkedAt,
+      visitedAt: visitedAt ?? this.visitedAt,
     );
   }
 

@@ -27,7 +27,12 @@ class ReviewLikeRepository {
     if (isAlreadyLiked) {
       likes.removeWhere((entry) => entry['user_id'] == userId);
     } else {
-      likes.add(<String, dynamic>{'user_id': userId});
+      final now = DateTime.now().toUtc().toIso8601String();
+      likes.add(<String, dynamic>{
+        'user_id': userId,
+        'likedAt': now,
+        'updatedAt': now,
+      });
       dislikes.removeWhere((entry) => entry['user_id'] == userId);
     }
 
