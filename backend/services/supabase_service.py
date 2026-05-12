@@ -74,10 +74,7 @@ async def save_reviews(
             "address_name": metadata["address_name"],
             "road_address_name": metadata["road_address_name"],
             "place_url": metadata["place_url"],
-            # 판별 결과는 초기에 null → 이후 update_* 함수로 채움
-            "is_ad_electra_pred": None,
             "is_ad_finetuned_pred": None,
-            "is_ad_llm_pred": None,
         }
         for b in blogs
     ]
@@ -86,6 +83,7 @@ async def save_reviews(
         await client.post(
             f"{SUPABASE_URL}/rest/v1/reviews",
             headers=_h("resolution=ignore-duplicates"),  # 중복 무시
+            params={"on_conflict": "review_url"},
             json=rows,
             timeout=15,
         )
