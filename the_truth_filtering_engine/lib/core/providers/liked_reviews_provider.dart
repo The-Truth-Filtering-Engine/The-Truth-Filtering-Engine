@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -52,19 +54,23 @@ class LikedReviewsNotifier
   }
 
   Future<void> load() async {
-    if (userId == null) {
+    final currentUserId = userId;
+    if (currentUserId == null) {
       state = const AsyncValue.data([]);
       return;
     }
 
     state = const AsyncValue.loading();
     try {
+      final likeFilter = jsonEncode([
+        {'user_id': currentUserId},
+      ]);
+
       final rows = await Supabase.instance.client
           .from('reviews')
           .select('id, review_title, review_description, name, likes')
-          .contains('likes', [
-        {'user_id': userId}
-      ]).limit(200);
+          .contains('likes', likeFilter)
+          .limit(200);
 
       final liked = (rows as List<dynamic>)
           .map((row) => LikedReview.fromRow(row as Map<String, dynamic>))
