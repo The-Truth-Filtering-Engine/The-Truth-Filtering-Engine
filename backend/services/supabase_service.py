@@ -1031,10 +1031,14 @@ async def _patch_review(review_id: str, data: dict) -> None:
 # AI 추천 (ai_recommend.py 에서 호출)
 # ══════════════════════════════════════════════════════════════════════════════
 
+AI_RECOMMEND_REVIEW_ORDER = "is_ad_finetuned_pred.asc,review_postdate.desc,id.desc"
+
+
 async def get_ai_recommendation_reviews(
     threshold: float = 0.1,
     page: int = 1,
     page_size: int = 10,
+    address_terms: list[str] | None = None,
 ) -> dict:
     """
     광고 확률이 threshold 이하인 리뷰 = 진짜 리뷰로 간주하여 반환.
@@ -1055,10 +1059,10 @@ async def get_ai_recommendation_reviews(
                 "Range-Unit": "items",
                 "Prefer": "count=exact",
             },
-            params={
-                "is_ad_finetuned_pred": f"lte.{threshold}",
-                "order": "created_at.desc",
-            },
+            params=_build_ai_recommendation_query_params(
+                threshold=threshold,
+                address_terms=address_terms,
+            ),
             timeout=10,
         )
 
@@ -1071,6 +1075,57 @@ async def get_ai_recommendation_reviews(
     has_next = offset + len(items) < total
 
     return {"items": items, "total": total, "has_next": has_next}
+
+
+def _build_ai_recommendation_query_params(
+    threshold: float,
+    address_terms: list[str] | None = None,
+) -> list[tuple[str, str]]:
+    params = [
+        ("is_ad_finetuned_pred", "not.is.null"),
+        ("is_ad_finetuned_pred", f"lte.{threshold}"),
+        ("store_id", "not.is.null"),
+        ("order", AI_RECOMMEND_REVIEW_ORDER),
+    ]
+
+    filters = [
+        filter_text
+        for term in _dedupe_texts(address_terms or [])
+        if (filter_text := _postgrest_contains_filter("address_name", term))
+    ]
+    if filters:
+        params.append(("address_name", "not.is.null"))
+        params.append(("or", f"({','.join(filters)})"))
+
+    return params
+
+
+def _dedupe_texts(values: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for value in values:
+        text = _text_or_none(value)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        deduped.append(text)
+    return deduped
+
+
+def _postgrest_contains_filter(column: str, value: str) -> str:
+    text = _text_or_none(value)
+    if not text:
+        return ""
+
+    safe_text = (
+        text.replace("*", "")
+        .replace(",", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+    if not safe_text:
+        return ""
+    return f"{column}.ilike.*{safe_text}*"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

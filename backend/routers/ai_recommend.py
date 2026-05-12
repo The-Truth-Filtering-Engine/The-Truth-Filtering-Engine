@@ -13,6 +13,7 @@ KAKAO_KEYWORD_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 KAKAO_COORD_TO_REGION_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json"
 KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
 AI_RECOMMEND_SCAN_PAGE_LIMIT = 8
+AI_RECOMMEND_SCAN_PAGE_SIZE = 50
 
 RegionScope = Literal["dong", "gu", "si"]
 
@@ -28,34 +29,15 @@ async def ai_recommendations(
 ):
     region = await _get_region(lat, lng) if lat is not None and lng is not None else None
 
-    if region:
-        items, has_next = await _load_region_filtered_items(
-            threshold=threshold,
-            page=page,
-            page_size=page_size,
-            region=region,
-            region_scope=region_scope,
-        )
-    else:
-        result = await get_ai_recommendation_reviews(
-            threshold=threshold,
-            page=page,
-            page_size=page_size,
-        )
-        reviews = result.get("items", [])
-        places_by_name = await _find_places_by_names([review.get("name") for review in reviews])
-
-        items = [
-            _build_response_item(
-                review,
-                places_by_name.get((review.get("name") or "").strip()),
-            )
-            for review in reviews
-        ]
-        has_next = result.get("has_next", False)
+    items, has_next = await _load_unique_recommendation_items(
+        threshold=threshold,
+        page=page,
+        page_size=page_size,
+        region=region,
+        region_scope=region_scope,
+    )
 
     region_label = _format_region_label(region, region_scope) if region else ""
-
 
     return {
         "threshold": threshold,
@@ -71,40 +53,60 @@ async def ai_recommendations(
     }
 
 
-async def _load_region_filtered_items(
+async def _load_unique_recommendation_items(
     threshold: float,
     page: int,
     page_size: int,
-    region: dict[str, str],
-    region_scope: RegionScope,
+    region: dict[str, str] | None = None,
+    region_scope: RegionScope = "dong",
 ) -> tuple[list[dict], bool]:
     target_count = page * page_size + 1
-    filtered_items: list[dict] = []
+    unique_items: list[dict] = []
+    seen_store_ids: set[str] = set()
     source_has_next = True
     scan_page = 1
+    address_terms = (
+        _address_search_terms(region, region_scope)
+        if region
+        else None
+    )
+
+    if region and not address_terms:
+        return [], False
 
     while (
         source_has_next
         and scan_page <= AI_RECOMMEND_SCAN_PAGE_LIMIT
-        and len(filtered_items) < target_count
+        and len(unique_items) < target_count
     ):
         result = await get_ai_recommendation_reviews(
             threshold=threshold,
             page=scan_page,
-            page_size=page_size,
+            page_size=max(page_size, AI_RECOMMEND_SCAN_PAGE_SIZE),
+            address_terms=address_terms,
         )
         reviews = result.get("items", [])
         places_by_name = await _find_places_by_names(
-            [review.get("name") for review in reviews],
+            [review.get("name") for review in reviews]
         )
 
         for review in reviews:
-            place = places_by_name.get((review.get("name") or "").strip())
-            if not _review_matches_region(review, place, region, region_scope):
+            store_id = _review_store_id(review)
+            if not store_id or store_id in seen_store_ids:
                 continue
 
-            filtered_items.append(_build_response_item(review, place))
-            if len(filtered_items) >= target_count:
+            place = places_by_name.get((review.get("name") or "").strip())
+            if region and not _review_matches_region(
+                review,
+                place,
+                region,
+                region_scope,
+            ):
+                continue
+
+            seen_store_ids.add(store_id)
+            unique_items.append(_build_response_item(review, place))
+            if len(unique_items) >= target_count:
                 break
 
         source_has_next = result.get("has_next", False)
@@ -113,7 +115,7 @@ async def _load_region_filtered_items(
     start_index = (page - 1) * page_size
     end_index = page * page_size
 
-    return filtered_items[start_index:end_index], len(filtered_items) > end_index
+    return unique_items[start_index:end_index], len(unique_items) > end_index
 
 
 def _build_response_item(review: dict, place: dict | None) -> dict:
@@ -173,6 +175,10 @@ def _build_response_item(review: dict, place: dict | None) -> dict:
         }
     )
     return item
+
+
+def _review_store_id(review: dict) -> str:
+    return str(review.get("store_id") or "").strip()
 
 
 async def _find_places_by_names(names: list) -> dict[str, dict]:
@@ -279,9 +285,10 @@ def _review_matches_region(
             not si_variants or _matches_any(address_text, si_variants)
         )
 
-    return _matches_any(address_text, gu_variants) and _matches_any(
-        address_text,
-        dong_variants,
+    return (
+        _matches_any(address_text, dong_variants)
+        and (not gu_variants or _matches_any(address_text, gu_variants))
+        and (not si_variants or _matches_any(address_text, si_variants))
     )
 
 
@@ -290,13 +297,13 @@ def _format_region_label(region: dict[str, str], region_scope: RegionScope) -> s
     if region_scope in {"gu", "dong"}:
         parts.append(region.get("gu", ""))
     if region_scope == "dong":
-        parts.append(region.get("dong") or region.get("legal_dong", ""))
+        parts.append(_display_dong(region))
 
     return " ".join(part for part in parts if part)
 
 
 def _serialize_region(region: dict[str, str]) -> dict[str, str]:
-    dong = region.get("dong") or region.get("legal_dong", "")
+    dong = _display_dong(region)
     return {
         "si": region.get("si", ""),
         "gu": region.get("gu", ""),
@@ -305,6 +312,43 @@ def _serialize_region(region: dict[str, str]) -> dict[str, str]:
             part for part in [region.get("si", ""), region.get("gu", ""), dong] if part
         ),
     }
+
+
+def _display_dong(region: dict[str, str]) -> str:
+    return region.get("legal_dong") or region.get("dong", "")
+
+
+def _address_search_terms(region: dict[str, str], region_scope: RegionScope) -> list[str]:
+    if region_scope == "si":
+        return _region_search_variants(region.get("si", ""))
+
+    if region_scope == "gu":
+        gu_terms = _region_search_variants(region.get("gu", ""))
+        gu_parts = (region.get("gu") or "").split()
+        if gu_parts:
+            gu_terms.extend(_region_search_variants(gu_parts[-1]))
+        return _dedupe_terms(gu_terms)
+
+    terms = _region_search_variants(region.get("dong", ""))
+    terms.extend(_region_search_variants(region.get("legal_dong", "")))
+    return _dedupe_terms(terms)
+
+
+def _region_search_variants(value: str) -> list[str]:
+    original = value.strip()
+    normalized = _normalize_region_text(value)
+    if not original and not normalized:
+        return []
+
+    variants = [original, normalized]
+    shortened_original = original
+    shortened_normalized = normalized
+    for suffix in ("특별자치시", "특별자치도", "특별시", "광역시", "자치구", "도"):
+        shortened_original = shortened_original.replace(suffix, "")
+        shortened_normalized = shortened_normalized.replace(suffix, "")
+
+    variants.extend([shortened_original, shortened_normalized])
+    return _dedupe_terms(variants)
 
 
 def _region_variants(value: str) -> set[str]:
@@ -321,6 +365,18 @@ def _region_variants(value: str) -> set[str]:
 
 def _matches_any(text: str, variants: set[str]) -> bool:
     return bool(variants) and any(variant in text for variant in variants)
+
+
+def _dedupe_terms(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        text = (value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
 
 
 def _normalize_region_text(value: str) -> str:
