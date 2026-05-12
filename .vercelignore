@@ -1,6 +1,4 @@
 backend
-crawling_naver_api
-crawling_playwright
 the_truth_filtering_engine
 web/node_modules
 web/dist

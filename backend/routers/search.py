@@ -3,8 +3,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, status
 import asyncio
 import time
 from services.preprocess import preprocess
-from services.electra_service import predict_is_ad, score_is_ad, predict_and_score_batch
-from services.llm_service import classify_ad, summarize_reviews
+from services.electra_service import predict_and_score_batch
 from services.naver_service import (
     build_naver_blog_query,
     fetch_blog_previews,
@@ -26,13 +25,10 @@ from services.supabase_service import (
     get_cached_reviews,
     has_analysis_usage,
     save_reviews,
-    # update_electra_pred,
     update_finetuned_pred,
-    update_llm_pred,
 )
 
 router = APIRouter()
-
 
 @router.get("/search/cached")
 async def search_cached(
@@ -184,10 +180,6 @@ async def search(
 
     await _analyze_missing_reviews(saved, mode)
 
-    print("[DEBUG] 리뷰 요약 시작")
-    summary = await summarize_reviews(saved)
-    print("[DEBUG] 리뷰 요약 완료")
-
     loaded_count = len(saved)
     has_more = (
         False
@@ -213,7 +205,6 @@ async def search(
     response = {
         "source": "fresh" if should_fetch else "cache",
         "reviews": saved,
-        "summary": summary,
         "reviewBatchSize": REVIEW_BATCH_SIZE,
         "maxReviewResults": max_review_results,
         "naverStart": normalized_start,
@@ -261,7 +252,6 @@ async def _get_optional_auth_email(authorization: str | None) -> str | None:
 
     return email
 
-
 async def _ensure_analysis_usage_available(
     email: str,
     store_id: str | None = None,
@@ -280,43 +270,6 @@ async def _ensure_analysis_usage_available(
         detail=ANALYSIS_USAGE_REQUIRED_MESSAGE,
     )
 
-
-# async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
-#     for review in reviews:
-#         review_id = review.get("id")
-#         description = review.get("review_description") or ""
-
-#         if mode == "llm":
-#             if review.get("is_ad_llm_pred") is not None:
-#                 continue
-#             print(f"[DEBUG] LLM 판별 중 | id: {review_id}")
-#             is_ad_llm = await classify_ad(review)
-#             if review_id is not None:
-#                 await update_llm_pred(review_id, is_ad_llm)
-#             review["is_ad_llm_pred"] = is_ad_llm
-#             print(f"[DEBUG] LLM 판별 완료 | id: {review_id} | is_ad_llm_pred: {is_ad_llm}")
-#             continue
-
-#         if (
-#             review.get("is_ad_electra_pred") is not None
-#             and review.get("is_ad_finetuned_pred") is not None
-#         ):
-#             continue
-
-#         print(f"[DEBUG] BERT 판별 중 | id: {review_id}")
-#         is_ad_electra = predict_is_ad(description)
-#         score = score_is_ad(description)
-#         if review_id is not None:
-#             await update_electra_pred(review_id, is_ad_electra)
-#             await update_finetuned_pred(review_id, score)
-#         review["is_ad_electra_pred"] = is_ad_electra
-#         review["is_ad_finetuned_pred"] = score
-#         print(
-#             f"[DEBUG] BERT 판별 완료 | id: {review_id} | "
-#             f"is_ad_electra_pred: {is_ad_electra} | is_ad_finetuned_pred: {score}"
-#         )
-
-# 수정 후
 async def _consume_analysis_usage(
     email: str,
     store_id: str | None = None,
@@ -342,18 +295,6 @@ async def _save_to_supabase(targets: list[dict], scores: list[float]) -> None:
         print(f"[DEBUG] 저장 완료 | {idx}/{len(targets)} | id: {review_id} | score: {score:.3f}")
 
 async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
-    if mode == "llm":
-        for review in reviews:
-            review_id = review.get("id")
-            if review.get("is_ad_llm_pred") is not None:
-                continue
-            print(f"[DEBUG] LLM 판별 중 | id: {review_id}")
-            is_ad_llm = await classify_ad(review)
-            if review_id is not None:
-                await update_llm_pred(review_id, is_ad_llm)
-            review["is_ad_llm_pred"] = is_ad_llm
-            print(f"[DEBUG] LLM 판별 완료 | id: {review_id} | is_ad_llm_pred: {is_ad_llm}")
-        return
 
     # 분석이 필요한 리뷰만 필터링
     targets = [
@@ -385,20 +326,8 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
     batch_elapsed = time.time() - batch_start
     print(f"[DEBUG] BERT 배치 판별 완료 | 소요 시간: {batch_elapsed:.2f}s")
 
-    # print(f"[DEBUG] BERT 배치 판별 시작 | count: {len(targets)}")
-    # preds, scores = predict_and_score_batch(descriptions)
-    # print(f"[DEBUG] BERT 배치 판별 완료")
-
-    # for idx, (review, pred, score) in enumerate(zip(targets, all_preds, all_scores), 1):
-    #   review_id = review.get("id")
-    #   if review_id is not None:
-    #       await update_finetuned_pred(review_id, score)
-    #   review["is_ad_finetuned_pred"] = score
-    #   print(f"[DEBUG] 저장 완료 | {idx}/{len(targets)} | id: {review_id} | score: {score:.3f}")
-
-    # 수정 후
     for review, score in zip(targets, all_scores):
-      review["is_ad_finetuned_pred"] = score  # 메모리 먼저 반영
+        review["is_ad_finetuned_pred"] = score  # 메모리 먼저 반영
 
     asyncio.create_task(_save_to_supabase(targets, all_scores))  # Supabase는 백그라운드
 
