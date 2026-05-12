@@ -6,7 +6,6 @@ import {
   Clock,
   Info,
   LoaderCircle,
-  MapPin,
   Navigation,
   Phone,
   RefreshCw,

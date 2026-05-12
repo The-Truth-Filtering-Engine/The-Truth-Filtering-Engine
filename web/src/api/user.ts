@@ -2,7 +2,6 @@ import { BACKEND_BASE_URL } from '../config'
 import { cleanText } from '../lib/format'
 import {
   normalizeRestaurant,
-  dedupeBookmarkRestaurants,
   restaurantToBookmarkStore,
   getRestaurantStoreId,
   type Restaurant,

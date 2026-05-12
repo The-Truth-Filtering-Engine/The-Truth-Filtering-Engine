@@ -1,4 +1,4 @@
-import { Bookmark, BookmarkCheck, X } from 'lucide-react'
+import { BookmarkCheck, X } from 'lucide-react'
 import { RestaurantThumb } from '../RestaurantThumb'
 import { getRestaurantStoreId, type Restaurant } from '../../lib/restaurant'
 
