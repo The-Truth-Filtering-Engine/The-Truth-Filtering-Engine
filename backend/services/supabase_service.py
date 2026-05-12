@@ -75,10 +75,7 @@ async def save_reviews(
             "address_name": metadata["address_name"],
             "road_address_name": metadata["road_address_name"],
             "place_url": metadata["place_url"],
-            # 판별 결과는 초기에 null → 이후 update_* 함수로 채움
-            "is_ad_electra_pred": None,
             "is_ad_finetuned_pred": None,
-            "is_ad_llm_pred": None,
         }
         for b in blogs
     ]
@@ -87,6 +84,7 @@ async def save_reviews(
         await client.post(
             f"{SUPABASE_URL}/rest/v1/reviews",
             headers=_h("resolution=ignore-duplicates"),  # 중복 무시
+            params={"on_conflict": "review_url"},
             json=rows,
             timeout=15,
         )
@@ -1221,6 +1219,12 @@ async def _patch_user_profile_if_current(
 # 캐시 조회
 # ══════════════════════════════════════════════════════════════════════════════
 
+from datetime import datetime, timedelta, timezone
+
+# 캐시 만료 시간 
+CACHE_TTL_DAYS = 30
+PLACE_CACHE_TTL_DAYS = 14
+
 async def get_cached_reviews(
     query: str,
     limit: int = MAX_REVIEW_RESULTS,
@@ -1238,6 +1242,9 @@ async def get_cached_reviews(
         if store_id
         else {"name": f"eq.{query}"}
     )
+    # 캐시 만료
+    ttl_days = PLACE_CACHE_TTL_DAYS if store_id else CACHE_TTL_DAYS
+    expired_at = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -1245,6 +1252,7 @@ async def get_cached_reviews(
             headers={**_h(), "Range": f"0-{end}", "Range-Unit": "items"},
             params={
                 **lookup_params,
+                "created_at": f"gte.{expired_at}", # 캐시 만료 적용
                 "order": "created_at.desc",
                 "limit": str(review_limit),
             },

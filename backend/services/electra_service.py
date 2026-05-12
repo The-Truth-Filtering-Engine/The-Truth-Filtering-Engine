@@ -3,8 +3,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# electra2naver 모델 선정
-MODEL_DIR = Path(__file__).resolve().parents[1] / "models" / "electra2naver"
+MODEL_DIR = Path(__file__).resolve().parents[1] / "models"
 
 _tokenizer = None
 _model = None
@@ -14,45 +13,45 @@ def load_model() -> None:
     global _tokenizer, _model, _model_available
     model_bin = MODEL_DIR / "openvino_model.bin"
     if not model_bin.exists():
-        logger.warning(
-            f"[electra_service] 모델 파일 없음: {model_bin}\n"
-            "Electra 분석 기능은 비활성화됩니다. 나머지 기능은 정상 동작합니다."
-        )
+        logger.warning(f"[electra_service] 모델 파일이 존재하지 않습니다: {model_bin}")
         _model_available = False
         return
     try:
         from optimum.intel import OVModelForSequenceClassification
-        from transformers import PreTrainedTokenizerFast
-        _tokenizer = PreTrainedTokenizerFast.from_pretrained(MODEL_DIR)
-        _model = OVModelForSequenceClassification.from_pretrained(MODEL_DIR)
+        from transformers import AutoTokenizer
+        _tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
+        _model = OVModelForSequenceClassification.from_pretrained(
+            str(MODEL_DIR),
+            ov_config={"PERFORMANCE_HINT": "THROUGHPUT", "NUM_STREAMS": "1"},
+        )
         _model_available = True
-        logger.info("[electra_service] 모델 로드 완료.")
+        logger.info("[MODEL_service] 모델 로드 완료.")
     except Exception as e:
-        logger.warning(f"[electra_service] 모델 로드 실패 (기능 비활성화): {e}")
+        logger.warning(f"[MODEL_service] 모델 로드 실패 (기능 비활성화): {e}")
         _model_available = False
 
-def predict_is_ad(review_description: str) -> int:
-    if not _model_available or _model is None or _tokenizer is None:
-        return 0  # 모델 없을 때 기본값 반환
-    text = (review_description or "").strip()
-    if not text:
-        return 0
-    encoded = _tokenizer(text, truncation=True, padding=True, max_length=512, return_tensors="pt")
-    logits = _model(**encoded).logits
-    pred = logits.argmax(dim=-1).item()
-    return int(pred)
+AD_THRESHOLD_HIGH = 0.739  # 하(광고)
+AD_THRESHOLD_LOW  = 0.343  # 상(진성), 중(의심): 0.343 ~ 0.739
 
 def score_is_ad(review_description: str) -> float:
     if not _model_available or _model is None or _tokenizer is None:
-        return 0.0  # 모델 없을 때 기본값 반환
+        return 0.0
     text = (review_description or "").strip()
     if not text:
         return 0.0
     encoded = _tokenizer(text, truncation=True, padding=True, max_length=512, return_tensors="pt")
     logits = _model(**encoded).logits
     probs = logits.softmax(dim=-1)
-    ad_score = probs[0, 1].item()
-    return float(ad_score)
+    return float(probs[0, 1].item())
+
+def predict_is_ad(review_description: str) -> int:
+    """0=진성, 1=의심, 2=광고"""
+    score = score_is_ad(review_description)
+    if score >= AD_THRESHOLD_HIGH:
+        return 2
+    if score >= AD_THRESHOLD_LOW:
+        return 1
+    return 0
 
 def predict_and_score_batch(texts: list[str]) -> tuple[list[int], list[float]]:
     if not _model_available or _model is None or _tokenizer is None:
@@ -67,7 +66,12 @@ def predict_and_score_batch(texts: list[str]) -> tuple[list[int], list[float]]:
         return_tensors="pt",
     )
     logits = _model(**encoded).logits
-    preds = logits.argmax(dim=-1).tolist()
-    probs = logits.softmax(dim=-1)
+    probs  = logits.softmax(dim=-1)
     scores = [float(probs[i, 1].item()) for i in range(len(cleaned))]
-    return [int(p) for p in preds], scores
+    preds  = [
+        2 if s >= AD_THRESHOLD_HIGH else
+        1 if s >= AD_THRESHOLD_LOW  else
+        0
+        for s in scores
+    ]
+    return preds, scores
