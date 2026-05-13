@@ -1,11 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/config/backend_config.dart';
 import '../../core/config/supabase_config.dart';
+import '../../core/providers/user_activity_history_provider.dart';
 import '../map/models/restaurant_model.dart';
 
 final recentAnalysesProvider =
@@ -31,26 +28,16 @@ class RecentAnalysesNotifier extends StateNotifier<AsyncValue<RecentAnalyses>> {
     state = const AsyncValue.loading();
 
     try {
-      final uri = BackendConfig.apiUri('/user/me/recent-analyses');
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $token'},
+      final decoded = await UserActivityHistoryClient.load(token);
+      final recentAnalyses = decoded?['recentAnalyses'];
+
+      if (recentAnalyses is! Map) {
+        throw Exception('최근 분석 응답 형식이 올바르지 않습니다');
+      }
+
+      state = AsyncValue.data(
+        RecentAnalyses.fromJson(Map<String, dynamic>.from(recentAnalyses)),
       );
-      final text = utf8.decode(response.bodyBytes);
-      final decoded = text.isEmpty ? null : jsonDecode(text);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final message = decoded is Map
-            ? decoded['detail']?.toString() ?? '요청 실패: ${response.statusCode}'
-            : '요청 실패: ${response.statusCode}';
-        throw Exception(message);
-      }
-
-      if (decoded is! Map<String, dynamic>) {
-        throw Exception('최근분석 응답 형식이 올바르지 않습니다');
-      }
-
-      state = AsyncValue.data(RecentAnalyses.fromJson(decoded));
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
     }

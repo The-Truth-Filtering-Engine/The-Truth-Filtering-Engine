@@ -18,6 +18,8 @@ SUPABASE_KEY = (
 USER_PROFILE_SELECT = "id,email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
 MAX_RECENT_VISITS = 30
+ACTIVITY_REVIEW_OPENED = "review_opened"
+ACTIVITY_ANALYSIS_VIEWED = "analysis_viewed"
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
 KST = timezone(timedelta(hours=9))
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
@@ -378,6 +380,29 @@ async def get_user_recent_visits(email: str) -> dict:
     return _normalize_user_recent_visits(recent_visits)
 
 
+async def get_user_activity_history(email: str) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("User email is required")
+
+    await ensure_user_profile(normalized_email)
+    async with httpx.AsyncClient() as client:
+        recent_visits = await _fetch_user_recent_visits_by_email(
+            client,
+            normalized_email,
+        )
+
+    recent_reviews = _normalize_user_recent_visits(recent_visits)
+    recent_analyses = await get_user_recent_analyses(normalized_email)
+
+    return {
+        "recentReviews": recent_reviews,
+        "recentVisits": recent_reviews.get("recentVisits", {}),
+        "recentAnalyses": recent_analyses,
+        "items": _activity_history_items(recent_reviews, recent_analyses),
+    }
+
+
 async def get_user_recent_analyses(email: str) -> dict:
     profile = await ensure_user_profile(email)
     store_date_map = _normalize_store_date_map(profile.get("store"))
@@ -674,6 +699,19 @@ async def add_user_recent_visit(
     return _normalize_user_recent_visits(updated)
 
 
+async def record_user_activity(
+    email: str,
+    activity_type: str,
+    activity_id: str,
+    payload: dict | None = None,
+) -> dict:
+    normalized_type = _text_or_none(activity_type)
+    if normalized_type == ACTIVITY_REVIEW_OPENED:
+        return await add_user_recent_visit(email, activity_id, payload)
+
+    raise ValueError(f"Unsupported activity type: {activity_type}")
+
+
 async def remove_user_recent_visit(email: str, review_id: str) -> dict:
     normalized_email = _text_or_none(email)
     normalized_review_id = _text_or_none(review_id)
@@ -698,6 +736,18 @@ async def remove_user_recent_visit(email: str, review_id: str) -> dict:
     return _normalize_user_recent_visits(updated)
 
 
+async def remove_user_activity(
+    email: str,
+    activity_type: str,
+    activity_id: str,
+) -> dict:
+    normalized_type = _text_or_none(activity_type)
+    if normalized_type == ACTIVITY_REVIEW_OPENED:
+        return await remove_user_recent_visit(email, activity_id)
+
+    raise ValueError(f"Unsupported activity type: {activity_type}")
+
+
 async def clear_user_recent_visits(email: str) -> dict:
     normalized_email = _text_or_none(email)
     if not normalized_email:
@@ -711,6 +761,14 @@ async def clear_user_recent_visits(email: str) -> dict:
             {},
         )
     return _normalize_user_recent_visits(updated)
+
+
+async def clear_user_activity(email: str, activity_type: str | None = None) -> dict:
+    normalized_type = _text_or_none(activity_type) or ACTIVITY_REVIEW_OPENED
+    if normalized_type == ACTIVITY_REVIEW_OPENED:
+        return await clear_user_recent_visits(email)
+
+    raise ValueError(f"Unsupported activity type: {activity_type}")
 
 
 async def get_user_review_reactions(email: str) -> dict:
@@ -804,6 +862,57 @@ def _normalize_user_recent_visits(profile: dict | None) -> dict:
         "recentVisits": recent_map,
         "items": _recent_visit_items(recent_map),
     }
+
+
+def _activity_history_items(recent_reviews: dict, recent_analyses: dict) -> list[dict]:
+    items = []
+
+    for review in recent_reviews.get("items", []):
+        if not isinstance(review, dict):
+            continue
+        review_id = _text_or_none(review.get("reviewId") or review.get("id"))
+        if not review_id:
+            continue
+        occurred_at = _recent_visit_date(review)
+        items.append(
+            {
+                "type": ACTIVITY_REVIEW_OPENED,
+                "id": review_id,
+                "title": _text_or_none(review.get("name")) or "",
+                "subtitle": _text_or_none(review.get("review_title")) or "",
+                "occurredAt": occurred_at,
+                "data": review,
+            }
+        )
+
+    analysis_items = []
+    for key in ("freeItems", "expiredItems"):
+        value = recent_analyses.get(key)
+        if isinstance(value, list):
+            analysis_items.extend(value)
+
+    for analysis in analysis_items:
+        if not isinstance(analysis, dict):
+            continue
+        store_id = _text_or_none(analysis.get("storeId"))
+        if not store_id:
+            continue
+        restaurant = analysis.get("restaurant")
+        restaurant = restaurant if isinstance(restaurant, dict) else {}
+        analyzed_date = _text_or_none(analysis.get("analyzedDate")) or ""
+        items.append(
+            {
+                "type": ACTIVITY_ANALYSIS_VIEWED,
+                "id": store_id,
+                "title": _text_or_none(restaurant.get("name")) or store_id,
+                "subtitle": analyzed_date,
+                "occurredAt": _analysis_activity_date(analyzed_date),
+                "data": analysis,
+            }
+        )
+
+    items.sort(key=lambda item: item.get("occurredAt") or "", reverse=True)
+    return items
 
 
 def _normalize_user_review_reactions(profile: dict | None) -> dict:
@@ -984,6 +1093,17 @@ def _recent_visit_date(item: dict) -> str:
         or _text_or_none(item.get("updated_at"))
         or ""
     )
+
+
+def _analysis_activity_date(value: str) -> str:
+    date_text = _text_or_none(value)
+    if not date_text:
+        return ""
+
+    try:
+        return datetime.strptime(date_text, "%Y%m%d").replace(tzinfo=KST).isoformat()
+    except ValueError:
+        return date_text
 
 
 def _float_or_none(value) -> float | None:

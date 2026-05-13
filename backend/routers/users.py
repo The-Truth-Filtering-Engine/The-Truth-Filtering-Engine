@@ -1,20 +1,24 @@
 from typing import Literal
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from services.supabase_service import (
     add_user_coins,
     add_user_bookmark,
     add_user_recent_visit,
+    clear_user_activity,
     clear_user_recent_visits,
     ensure_user_profile,
     get_auth_email,
+    get_user_activity_history,
     get_user_recent_analyses,
     get_user_bookmarks,
     get_user_recent_visits,
     get_user_review_reactions,
+    record_user_activity,
     remove_user_bookmark,
+    remove_user_activity,
     remove_user_recent_visit,
     set_user_premium,
     update_user_review_reaction,
@@ -41,6 +45,12 @@ class BookmarkUpdateRequest(BaseModel):
 class RecentVisitUpdateRequest(BaseModel):
     reviewId: str = ""
     review: dict = Field(default_factory=dict)
+
+
+class ActivityHistoryUpdateRequest(BaseModel):
+    type: Literal["review_opened"]
+    id: str = ""
+    payload: dict = Field(default_factory=dict)
 
 
 class ReviewReactionUpdateRequest(BaseModel):
@@ -145,6 +155,20 @@ async def get_my_bookmarks(authorization: str | None = Header(default=None)):
         ) from error
 
 
+@router.get("/user/me/activity-history")
+async def get_my_activity_history(
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await get_user_activity_history(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
 @router.get("/user/me/recent-analyses")
 async def get_my_recent_analyses(
     authorization: str | None = Header(default=None),
@@ -164,6 +188,38 @@ async def get_my_recent_visits(authorization: str | None = Header(default=None))
     email = await _require_email(authorization)
     try:
         return await get_user_recent_visits(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/user/me/activity-history")
+async def record_my_activity_history(
+    payload: ActivityHistoryUpdateRequest,
+    authorization: str | None = Header(default=None),
+):
+    activity_id = payload.id.strip()
+    if not activity_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="activity id is required",
+        )
+
+    email = await _require_email(authorization)
+    try:
+        return await record_user_activity(
+            email,
+            payload.type,
+            activity_id,
+            payload.payload,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -215,6 +271,26 @@ async def add_my_recent_visit(
         ) from error
 
 
+@router.delete("/user/me/activity-history")
+async def clear_my_activity_history(
+    activity_type: Literal["review_opened"] | None = Query(None, alias="type"),
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await clear_user_activity(email, activity_type)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
 @router.delete("/user/me/recent-visits")
 async def clear_my_recent_visits(
     authorization: str | None = Header(default=None),
@@ -222,6 +298,38 @@ async def clear_my_recent_visits(
     email = await _require_email(authorization)
     try:
         return await clear_user_recent_visits(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/user/me/activity-history/{activity_type}/{activity_id}")
+async def delete_my_activity_history_item(
+    activity_type: Literal["review_opened"],
+    activity_id: str,
+    authorization: str | None = Header(default=None),
+):
+    normalized_activity_id = activity_id.strip()
+    if not normalized_activity_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="activity id is required",
+        )
+
+    email = await _require_email(authorization)
+    try:
+        return await remove_user_activity(
+            email,
+            activity_type,
+            normalized_activity_id,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

@@ -2,13 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/backend_config.dart';
 import '../config/supabase_config.dart';
 import 'current_user_provider.dart';
+import 'user_activity_history_provider.dart';
 import '../../features/map/models/restaurant_model.dart';
 
 /// Recently opened review list (local SharedPreferences + users.recent_visits).
@@ -175,48 +174,17 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return null;
 
     try {
-      final response = await http.get(
-        BackendConfig.apiUri('/user/me/recent-visits'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        debugPrint('Recent visits load failed: ${response.statusCode}');
-        return null;
-      }
+      final decoded = await UserActivityHistoryClient.load(token);
+      if (decoded == null) return const [];
 
-      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      if (decoded is! Map) return const [];
-
-      final items = decoded['items'];
-      if (items is List) {
-        return _sortRecent(
-          items
-              .whereType<Map>()
-              .map((item) => _restaurantFromRemoteItem(
-                    Map<String, dynamic>.from(item),
-                  ))
-              .whereType<RestaurantModel>()
-              .toList(),
+      final recentReviews = decoded['recentReviews'];
+      if (recentReviews is Map) {
+        return _restaurantsFromRecentReviewPayload(
+          Map<String, dynamic>.from(recentReviews),
         );
       }
 
-      final recentVisits = decoded['recentVisits'];
-      if (recentVisits is! Map) return const [];
-
-      final values = <RestaurantModel>[];
-      for (final entry in recentVisits.entries) {
-        final reviewId = _text(entry.key);
-        final item = entry.value;
-        if (reviewId == null || item is! Map) continue;
-        final restaurant = _restaurantFromRemoteItem({
-          'id': reviewId,
-          'reviewId': reviewId,
-          ...Map<String, dynamic>.from(item),
-        });
-        if (restaurant != null) values.add(restaurant);
-      }
-
-      return _sortRecent(values);
+      return _restaurantsFromRecentReviewPayload(decoded);
     } catch (error) {
       debugPrint('Recent visits load failed: $error');
       return null;
@@ -228,28 +196,19 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return;
 
     try {
-      final response = await http.post(
-        BackendConfig.apiUri('/user/me/recent-visits'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
+      await UserActivityHistoryClient.recordReviewOpened(
+        accessToken: token,
+        reviewId: _requireText(restaurant.effectiveReviewId, 'reviewId'),
+        review: {
+          'name': restaurant.name.trim(),
+          'review_url': _requireText(restaurant.reviewUrl, 'reviewUrl'),
+          'review_title': restaurant.reviewTitle?.trim() ?? '',
+          'review_description': _firstText([
+            restaurant.reviewDescription,
+            restaurant.reviewSummary,
+          ]),
         },
-        body: jsonEncode({
-          'reviewId': _requireText(restaurant.effectiveReviewId, 'reviewId'),
-          'review': {
-            'name': restaurant.name.trim(),
-            'review_url': _requireText(restaurant.reviewUrl, 'reviewUrl'),
-            'review_title': restaurant.reviewTitle?.trim() ?? '',
-            'review_description': _firstText([
-              restaurant.reviewDescription,
-              restaurant.reviewSummary,
-            ]),
-          },
-        }),
       );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('recent visit add failed: ${response.statusCode}');
-      }
     } catch (error) {
       debugPrint('Recent visit remote add failed: $error');
     }
@@ -260,15 +219,10 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return;
 
     try {
-      final response = await http.delete(
-        BackendConfig.apiUri(
-          '/user/me/recent-visits/${Uri.encodeComponent(reviewId)}',
-        ),
-        headers: {'Authorization': 'Bearer $token'},
+      await UserActivityHistoryClient.removeReviewOpened(
+        accessToken: token,
+        reviewId: reviewId,
       );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('recent visit remove failed: ${response.statusCode}');
-      }
     } catch (error) {
       debugPrint('Recent visit remote remove failed: $error');
     }
@@ -279,16 +233,45 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     if (token == null) return;
 
     try {
-      final response = await http.delete(
-        BackendConfig.apiUri('/user/me/recent-visits'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('recent visits clear failed: ${response.statusCode}');
-      }
+      await UserActivityHistoryClient.clearReviewOpened(token);
     } catch (error) {
       debugPrint('Recent visits remote clear failed: $error');
     }
+  }
+
+  List<RestaurantModel> _restaurantsFromRecentReviewPayload(
+    Map<String, dynamic> decoded,
+  ) {
+    final items = decoded['items'];
+    if (items is List) {
+      return _sortRecent(
+        items
+            .whereType<Map>()
+            .map((item) => _restaurantFromRemoteItem(
+                  Map<String, dynamic>.from(item),
+                ))
+            .whereType<RestaurantModel>()
+            .toList(),
+      );
+    }
+
+    final recentVisits = decoded['recentVisits'];
+    if (recentVisits is! Map) return const [];
+
+    final values = <RestaurantModel>[];
+    for (final entry in recentVisits.entries) {
+      final reviewId = _text(entry.key);
+      final item = entry.value;
+      if (reviewId == null || item is! Map) continue;
+      final restaurant = _restaurantFromRemoteItem({
+        'id': reviewId,
+        'reviewId': reviewId,
+        ...Map<String, dynamic>.from(item),
+      });
+      if (restaurant != null) values.add(restaurant);
+    }
+
+    return _sortRecent(values);
   }
 
   RestaurantModel? _restaurantFromRemoteItem(Map<String, dynamic> item) {
