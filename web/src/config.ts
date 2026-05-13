@@ -3,4 +3,5 @@ export const BACKEND_BASE_URL =
 
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() ?? ''
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? ''
+export const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY?.trim() ?? ''
 export const GOOGLE_AUTH_REDIRECT_TO = 'https://truth-filtering-engine-web.vercel.app/'

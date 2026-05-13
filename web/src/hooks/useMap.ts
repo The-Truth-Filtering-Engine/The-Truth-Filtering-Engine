@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  fetchKakaoJsKey,
   loadKakaoMaps,
   getCurrentPosition,
   createCurrentLocationMarker,
@@ -222,8 +221,7 @@ export function useMap(
       }
 
       try {
-        const kakaoJsKey = await fetchKakaoJsKey()
-        const kakaoMaps = await loadKakaoMaps(kakaoJsKey)
+        const kakaoMaps = await loadKakaoMaps()
 
         if (canceled || !mapContainerRef.current) return
 
