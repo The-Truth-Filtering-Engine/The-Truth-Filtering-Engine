@@ -1,12 +1,15 @@
 import {
   Bookmark,
   Clock,
+  Coins,
+  Crown,
   LocateFixed,
   Search,
   Settings,
   Sparkles,
+  Zap,
 } from 'lucide-react'
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import appLogoUrl from '../logo.png'
 import { supabase } from './lib/supabase'
 
@@ -622,6 +625,12 @@ function App() {
         {map.loadState === 'ready' && map.placesErrorMessage && (
           <div className="map-status map-status-error">{map.placesErrorMessage}</div>
         )}
+        {auth.isLoggedIn && !auth.isTemporaryAdmin && (
+          <MapUsageBadge
+            profile={userProfileState.profile}
+            isLoading={userProfileState.isLoading}
+          />
+        )}
         <nav className="map-tool-rail" aria-label="지도 메뉴">
           <div className="map-tool-brand" aria-hidden="true">
             <img src={appLogoUrl} alt="" />
@@ -681,6 +690,54 @@ function App() {
         {toastMessage && <div className="map-toast">{toastMessage}</div>}
       </section>
     </main>
+  )
+}
+
+function MapUsageBadge({
+  profile,
+  isLoading,
+}: {
+  profile: UserProfile | null
+  isLoading: boolean
+}) {
+  const loading = isLoading && !profile
+
+  return (
+    <div className="map-usage-badge" aria-label="분석 잔여 횟수">
+      <MapUsageBadgeItem
+        icon={<Coins aria-hidden="true" size={15} strokeWidth={2.2} />}
+        label="코인"
+        value={loading ? '-' : (profile?.coin ?? 0).toLocaleString()}
+      />
+      <MapUsageBadgeItem
+        icon={<Zap aria-hidden="true" size={15} strokeWidth={2.2} />}
+        label="무료분석"
+        value={loading ? '-' : (profile?.freecount ?? 0).toLocaleString()}
+      />
+      <MapUsageBadgeItem
+        icon={<Crown aria-hidden="true" size={15} strokeWidth={2.2} />}
+        label="추가분석"
+        value={loading ? '-' : (profile?.premiumcount ?? 0).toLocaleString()}
+      />
+    </div>
+  )
+}
+
+function MapUsageBadgeItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <span className="map-usage-item">
+      {icon}
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </span>
   )
 }
 
