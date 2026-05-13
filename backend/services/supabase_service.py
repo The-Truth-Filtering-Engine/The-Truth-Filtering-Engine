@@ -747,8 +747,8 @@ async def update_user_review_reaction(
         raise RuntimeError("?ъ슜???대찓?쇱씠 ?놁뒿?덈떎")
     if not normalized_review_id:
         raise RuntimeError("reviewId媛 ?놁뒿?덈떎")
-    if reaction not in ("like", "dislike", None):
-        raise RuntimeError("reaction??like, dislike, null留?媛?ν빀?덈떎")
+    if reaction not in ("like", None):
+        raise RuntimeError("reaction은 like 또는 null만 가능합니다")
 
     await ensure_user_profile(normalized_email)
     async with httpx.AsyncClient() as client:
@@ -761,10 +761,6 @@ async def update_user_review_reaction(
             current.get("review_likes"),
             reaction_type="like",
         )
-        review_dislikes = _normalize_review_reaction_map(
-            current.get("review_dislikes"),
-            reaction_type="dislike",
-        )
 
         if reaction == "like":
             review_likes[normalized_review_id] = _normalize_review_reaction(
@@ -773,24 +769,13 @@ async def update_user_review_reaction(
                 reaction_type="like",
                 touch=True,
             )
-            review_dislikes.pop(normalized_review_id, None)
-        elif reaction == "dislike":
-            review_dislikes[normalized_review_id] = _normalize_review_reaction(
-                normalized_review_id,
-                review_dislikes.get(normalized_review_id),
-                reaction_type="dislike",
-                touch=True,
-            )
-            review_likes.pop(normalized_review_id, None)
         else:
             review_likes.pop(normalized_review_id, None)
-            review_dislikes.pop(normalized_review_id, None)
 
         updated = await _patch_user_review_reactions(
             client,
             normalized_email,
             review_likes,
-            review_dislikes,
         )
 
     return _normalize_user_review_reactions(updated)
@@ -821,10 +806,6 @@ def _normalize_user_review_reactions(profile: dict | None) -> dict:
         "review_likes": _normalize_review_reaction_map(
             profile.get("review_likes"),
             reaction_type="like",
-        ),
-        "review_dislikes": _normalize_review_reaction_map(
-            profile.get("review_dislikes"),
-            reaction_type="dislike",
         ),
     }
 
@@ -860,11 +841,6 @@ def _normalize_review_reaction(
 
     if reaction_type == "like" and not _text_or_none(normalized.get("likedAt")):
         normalized["likedAt"] = _text_or_none(normalized.get("updatedAt")) or now
-    if (
-        reaction_type == "dislike"
-        and not _text_or_none(normalized.get("dislikedAt"))
-    ):
-        normalized["dislikedAt"] = _text_or_none(normalized.get("updatedAt")) or now
     if touch or not _text_or_none(normalized.get("updatedAt")):
         normalized["updatedAt"] = now
 
@@ -1158,7 +1134,7 @@ async def _fetch_user_review_reactions_by_email(
         headers=_h(),
         params={
             "email": f"eq.{email}",
-            "select": "review_likes,review_dislikes",
+            "select": "review_likes",
             "limit": "1",
         },
         timeout=10,
@@ -1166,7 +1142,7 @@ async def _fetch_user_review_reactions_by_email(
 
     if resp.status_code != 200:
         raise RuntimeError(
-            "review_likes/review_dislikes 而щ읆???꾩슂?⑸땲?? "
+            "review_likes 컬럼이 필요합니다. "
             "supabase/migrations/20260508_add_user_review_reactions.sql瑜? "
             f"?ㅽ뻾??二쇱꽭?? {resp.status_code} {resp.text[:240]}"
         )
@@ -1179,18 +1155,16 @@ async def _patch_user_review_reactions(
     client: httpx.AsyncClient,
     email: str,
     review_likes: dict,
-    review_dislikes: dict,
 ) -> dict:
     resp = await client.patch(
         f"{SUPABASE_URL}/rest/v1/users",
         headers=_h("return=representation"),
         params={
             "email": f"eq.{email}",
-            "select": "review_likes,review_dislikes",
+            "select": "review_likes",
         },
         json={
             "review_likes": review_likes,
-            "review_dislikes": review_dislikes,
         },
         timeout=10,
     )
@@ -1204,7 +1178,6 @@ async def _patch_user_review_reactions(
     rows = resp.json() if resp.text else []
     return rows[0] if rows else {
         "review_likes": review_likes,
-        "review_dislikes": review_dislikes,
     }
 
 

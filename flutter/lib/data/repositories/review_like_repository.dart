@@ -13,7 +13,6 @@ class ReviewLikeRepository {
   }) async {
     final row = await _source.fetchLikes(reviewId);
     final likes = parseUserIdEntryList(row['likes']);
-    final dislikes = parseUserIdEntryList(row['dislikes']);
     final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
     final accountLikedIds = await _fetchAccountLikedIds(accessToken);
     final isLiked = _isLiked(
@@ -28,7 +27,6 @@ class ReviewLikeRepository {
         userId: userId,
         accessToken: accessToken,
         likes: likes,
-        dislikes: dislikes,
         accountLikedIds: accountLikedIds,
         isLiked: isLiked,
       );
@@ -49,7 +47,6 @@ class ReviewLikeRepository {
   }) async {
     final row = await _source.fetchLikes(reviewId);
     final likes = parseUserIdEntryList(row['likes']);
-    final dislikes = parseUserIdEntryList(row['dislikes']);
     final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
     final accountLikedIds = await _fetchAccountLikedIds(accessToken);
     final isAlreadyLiked = _isLiked(
@@ -69,13 +66,11 @@ class ReviewLikeRepository {
           'likedAt': now,
           'updatedAt': now,
         });
-      dislikes.removeWhere((entry) => entry['user_id'] == userId);
     }
 
     await _source.updateLikes(
       reviewId: reviewId,
       likes: likes,
-      dislikes: dislikes,
     );
 
     final nextState = ReviewLikeState(
@@ -123,7 +118,6 @@ class ReviewLikeRepository {
     required int userId,
     required String? accessToken,
     required List<Map<String, dynamic>> likes,
-    required List<Map<String, dynamic>> dislikes,
     required Set<String>? accountLikedIds,
     required bool isLiked,
   }) async {
@@ -139,11 +133,9 @@ class ReviewLikeRepository {
         'likedAt': now,
         'updatedAt': now,
       });
-      dislikes.removeWhere((entry) => entry['user_id'] == userId);
       await _source.updateLikes(
         reviewId: reviewId,
         likes: likes,
-        dislikes: dislikes,
       );
       return;
     }
@@ -163,7 +155,6 @@ class ReviewLikeRepository {
       await _source.updateLikes(
         reviewId: reviewId,
         likes: likes,
-        dislikes: dislikes,
       );
     }
   }

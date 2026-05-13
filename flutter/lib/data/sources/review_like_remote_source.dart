@@ -15,7 +15,7 @@ class ReviewLikeRemoteSource {
   Future<Map<String, dynamic>> fetchLikes(String reviewId) async {
     final res = await _client
         .from(_table)
-        .select('likes, dislikes')
+        .select('likes')
         .eq('id', reviewId)
         .single();
     return res;
@@ -49,11 +49,9 @@ class ReviewLikeRemoteSource {
   Future<void> updateLikes({
     required String reviewId,
     required List<Map<String, dynamic>> likes,
-    required List<Map<String, dynamic>> dislikes,
   }) async {
     await _client.from(_table).update({
       'likes': likes,
-      'dislikes': dislikes,
     }).eq('id', reviewId);
   }
 

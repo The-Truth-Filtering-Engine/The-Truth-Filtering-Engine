@@ -45,7 +45,7 @@ class RecentVisitUpdateRequest(BaseModel):
 
 class ReviewReactionUpdateRequest(BaseModel):
     reviewId: str
-    reaction: Literal["like", "dislike"] | None = None
+    reaction: Literal["like"] | None = None
 
 
 def _extract_bearer_token(authorization: str | None) -> str:

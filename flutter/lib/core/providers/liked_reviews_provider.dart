@@ -12,7 +12,7 @@ import 'current_user_provider.dart';
 import 'user_profile_provider.dart';
 
 const _likedReviewSelectColumns =
-    'id, review_title, review_description, review_url, name, likes, dislikes, '
+    'id, review_title, review_description, review_url, name, likes, '
     'store_id, category_name, category_group_code, category_group_name, '
     'phone, address_name, road_address_name, place_url';
 
@@ -263,13 +263,10 @@ class LikedReviewsNotifier
         'likedAt': now,
         'updatedAt': now,
       });
-    final dislikes = parseUserIdEntryList(row['dislikes'])
-      ..removeWhere((entry) => entry['user_id'] == currentUserId);
 
     try {
       await Supabase.instance.client.from('reviews').update({
         'likes': likes,
-        'dislikes': dislikes,
       }).eq('id', reviewId);
     } catch (_) {}
   }
