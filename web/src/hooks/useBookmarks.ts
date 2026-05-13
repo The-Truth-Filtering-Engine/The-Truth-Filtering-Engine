@@ -1,9 +1,8 @@
 import { type Session } from '@supabase/supabase-js'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   dedupeBookmarkRestaurants,
   getRestaurantStoreId,
-  normalizeRestaurant,
   type Restaurant,
 } from '../lib/restaurant'
 import {
@@ -12,30 +11,6 @@ import {
   fetchUserBookmarks,
   type UserBookmarks,
 } from '../api/user'
-
-const BOOKMARK_STORAGE_KEY = 'bookmarked_restaurants'
-
-export function loadBookmarkedRestaurants(): Restaurant[] {
-  try {
-    const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY)
-    if (!raw) return []
-
-    const decoded = JSON.parse(raw) as unknown
-    if (!Array.isArray(decoded)) return []
-
-    return dedupeBookmarkRestaurants(
-      decoded
-        .map((item) => normalizeRestaurant(item))
-        .filter((restaurant): restaurant is Restaurant => Boolean(restaurant)),
-    )
-  } catch {
-    return []
-  }
-}
-
-function saveBookmarkedRestaurants(bookmarkedRestaurants: Restaurant[]) {
-  window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(bookmarkedRestaurants))
-}
 
 function getBookmarkStoreIds(restaurants: Restaurant[]) {
   const storeIds: string[] = []
@@ -56,7 +31,7 @@ export type UseBookmarksReturn = {
   bookmarkedStoreIds: string[]
   toggleBookmark: (restaurant: Restaurant) => Promise<void>
   applyRemoteBookmarkState: (bookmarks: UserBookmarks) => void
-  applyLocalBookmarkState: (restaurants: Restaurant[], shouldSave?: boolean) => void
+  applyLocalBookmarkState: (restaurants: Restaurant[]) => void
 }
 
 export function useBookmarks(
@@ -64,64 +39,38 @@ export function useBookmarks(
   isTemporaryAdmin: boolean,
   showToast: (message: string) => void,
 ): UseBookmarksReturn {
-  const initialBookmarks = loadBookmarkedRestaurants()
-  const [bookmarkedRestaurants, setBookmarkedRestaurants] = useState<Restaurant[]>(initialBookmarks)
-  const [bookmarkedStoreIds, setBookmarkedStoreIds] = useState<string[]>(
-    getBookmarkStoreIds(initialBookmarks),
-  )
-  const bookmarkSyncSessionRef = useRef<string | null>(null)
+  const [bookmarkedRestaurants, setBookmarkedRestaurants] = useState<Restaurant[]>([])
+  const [bookmarkedStoreIds, setBookmarkedStoreIds] = useState<string[]>([])
 
   function applyRemoteBookmarkState(bookmarks: UserBookmarks) {
     setBookmarkedStoreIds(bookmarks.storeIds)
     setBookmarkedRestaurants(bookmarks.restaurants)
   }
 
-  function applyLocalBookmarkState(restaurants: Restaurant[], shouldSave = false) {
+  function applyLocalBookmarkState(restaurants: Restaurant[]) {
     const nextRestaurants = dedupeBookmarkRestaurants(restaurants)
     setBookmarkedRestaurants(nextRestaurants)
     setBookmarkedStoreIds(getBookmarkStoreIds(nextRestaurants))
-    if (shouldSave) {
-      saveBookmarkedRestaurants(nextRestaurants)
-    }
   }
 
   useEffect(() => {
     const token = authSession?.access_token
     if (!token) {
-      if (isTemporaryAdmin) {
-        applyLocalBookmarkState(loadBookmarkedRestaurants())
+      if (!isTemporaryAdmin) {
+        applyLocalBookmarkState([])
       }
       return
     }
 
     const accessToken = token
     let canceled = false
-    const sessionKey = authSession.user?.id || token
 
     async function syncBookmarks() {
       try {
-        let bookmarks = await fetchUserBookmarks(accessToken)
-        const localBookmarks = loadBookmarkedRestaurants()
-
-        if (localBookmarks.length > 0 && bookmarkSyncSessionRef.current !== sessionKey) {
-          for (const restaurant of localBookmarks) {
-            const storeId = getRestaurantStoreId(restaurant)
-            const hasRemoteStore = bookmarks.restaurants.some(
-              (item) => getRestaurantStoreId(item) === storeId,
-            )
-            if (!storeId || (bookmarks.storeIds.includes(storeId) && hasRemoteStore)) {
-              continue
-            }
-            bookmarks = await addUserBookmark(accessToken, restaurant)
-          }
-          window.localStorage.removeItem(BOOKMARK_STORAGE_KEY)
-        }
-
-        bookmarkSyncSessionRef.current = sessionKey
+        const bookmarks = await fetchUserBookmarks(accessToken)
         if (!canceled) applyRemoteBookmarkState(bookmarks)
       } catch (error) {
         if (canceled) return
-        applyLocalBookmarkState(loadBookmarkedRestaurants())
         showToast(
           error instanceof Error
             ? `북마크 동기화 실패: ${error.message}`
@@ -159,7 +108,6 @@ export function useBookmarks(
 
     const token = authSession?.access_token
     if (!token) {
-      saveBookmarkedRestaurants(nextRestaurants)
       showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
       return
     }
