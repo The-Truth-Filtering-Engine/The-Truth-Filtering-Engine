@@ -41,7 +41,7 @@ export type ReviewStreamChunk = {
 
 export const REVIEW_BATCH_SIZE = 100
 export const REVIEW_PAGE_SIZE = 10
-export const MAX_REVIEW_RESULTS = 300
+export const MAX_REVIEW_RESULTS = 100
 
 export class ApiRequestError extends Error {
   status: number
