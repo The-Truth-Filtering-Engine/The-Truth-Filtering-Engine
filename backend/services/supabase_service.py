@@ -5,6 +5,7 @@ supabase_service.py
 - 캐시 조회, AI 추천 조회 등 모든 DB 접근 통합
 """
 import os
+import asyncio
 import httpx
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -18,6 +19,7 @@ SUPABASE_KEY = (
 USER_PROFILE_SELECT = "id,email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
 MAX_RECENT_VISITS = 30
+RECENT_ANALYSIS_LOOKUP_CONCURRENCY = 5
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
 KST = timezone(timedelta(hours=9))
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
@@ -410,19 +412,26 @@ async def get_user_recent_analyses(email: str) -> dict:
         )
 
     async with httpx.AsyncClient(timeout=6.0) as client:
-        for item in recent_entries:
+        lookup_semaphore = asyncio.Semaphore(RECENT_ANALYSIS_LOOKUP_CONCURRENCY)
+
+        async def hydrate_recent_entry(item: dict) -> None:
             store_id = item["storeId"]
-            review = await _fetch_latest_review_for_store(client, store_id)
-            place = await _find_kakao_place_for_recent_analysis(
-                client,
-                store_id=store_id,
-                review=review,
-            )
-            item["restaurant"] = _recent_analysis_restaurant(
-                store_id=store_id,
-                review=review,
-                place=place,
-            )
+            async with lookup_semaphore:
+                review = await _fetch_latest_review_for_store(client, store_id)
+                place = await _find_kakao_place_for_recent_analysis(
+                    client,
+                    store_id=store_id,
+                    review=review,
+                )
+                item["restaurant"] = _recent_analysis_restaurant(
+                    store_id=store_id,
+                    review=review,
+                    place=place,
+                )
+
+        await asyncio.gather(
+            *(hydrate_recent_entry(item) for item in recent_entries),
+        )
 
     recent_entries.sort(
         key=lambda item: (
