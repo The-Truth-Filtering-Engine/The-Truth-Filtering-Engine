@@ -72,7 +72,7 @@ class _StartAuthScreenState extends ConsumerState<StartAuthScreen> {
         redirectTo: _oauthRedirectTo,
         authScreenLaunchMode: kIsWeb
             ? LaunchMode.platformDefault
-            : LaunchMode.externalApplication,
+            : LaunchMode.inAppBrowserView,
       );
     } on AuthException catch (error) {
       _showSnackBar(error.message);
