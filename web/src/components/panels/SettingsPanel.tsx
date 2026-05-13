@@ -14,7 +14,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { type BlogReview } from '../../api/reviews'
 import { type UserProfile } from '../../api/user'
 import {
@@ -78,18 +78,29 @@ export function SettingsPanel({
   function openLikedReviews() {
     setReviewActionError('')
     setView('liked')
-    if (!likedReviewsState.hasLoaded && !likedReviewsState.isLoading) {
-      onLoadLikedReviews()
-    }
   }
 
   function openRecentReviews() {
     setReviewActionError('')
     setView('recent')
-    if (!recentReviewsState.hasLoaded && !recentReviewsState.isLoading) {
+  }
+
+  useEffect(() => {
+    if (view === 'liked' && !likedReviewsState.hasLoaded && !likedReviewsState.isLoading) {
+      onLoadLikedReviews()
+    }
+    if (view === 'recent' && !recentReviewsState.hasLoaded && !recentReviewsState.isLoading) {
       onLoadRecentReviews()
     }
-  }
+  }, [
+    likedReviewsState.hasLoaded,
+    likedReviewsState.isLoading,
+    onLoadLikedReviews,
+    onLoadRecentReviews,
+    recentReviewsState.hasLoaded,
+    recentReviewsState.isLoading,
+    view,
+  ])
 
   async function runReviewAction(action: () => Promise<void>, fallbackMessage: string) {
     setReviewActionError('')
@@ -413,7 +424,9 @@ function LikedReviewsView({
   onOpen,
   onRemove,
 }: LikedReviewsViewProps) {
-  if (state.isLoading) return <SettingsLoadingMessage message="내 하트 목록을 불러오는 중입니다" />
+  if (state.isLoading || !state.hasLoaded) {
+    return <SettingsLoadingMessage message="내 하트 목록을 불러오는 중입니다" />
+  }
 
   if (state.errorMessage) {
     return (
@@ -476,7 +489,9 @@ function RecentReviewsView({
   onRemove,
   onClear,
 }: RecentReviewsViewProps) {
-  if (state.isLoading) return <SettingsLoadingMessage message="최근 기록을 불러오는 중입니다" />
+  if (state.isLoading || !state.hasLoaded) {
+    return <SettingsLoadingMessage message="최근 기록을 불러오는 중입니다" />
+  }
 
   if (state.errorMessage) {
     return (

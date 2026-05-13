@@ -301,11 +301,12 @@ export function useReviewActivity(
       emptyCollectionState<RecentReviewItem>(),
     )
 
-  const isAvailable = Boolean(supabase && authSession && !isTemporaryAdmin)
+  const authEmail = sessionEmail(authSession)
+  const isAvailable = Boolean(supabase && authEmail && !isTemporaryAdmin)
 
   const ensureCurrentUser = useCallback(async () => {
     const client = requireSupabaseClient()
-    const email = sessionEmail(authSession)
+    const email = authEmail
     if (!email || isTemporaryAdmin) {
       throw new Error('Google 로그인 후 사용할 수 있습니다')
     }
@@ -333,7 +334,7 @@ export function useReviewActivity(
     const user = normalizeUserRow(created as Record<string, unknown>)
     setCurrentUser(user)
     return user
-  }, [authSession, isTemporaryAdmin])
+  }, [authEmail, isTemporaryAdmin])
 
   const updateUserReviewLikes = useCallback(
     async (user: ReviewUserRow, reviewLikes: Record<string, ReviewReaction>) => {
