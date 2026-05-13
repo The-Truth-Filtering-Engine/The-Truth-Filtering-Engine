@@ -19,6 +19,8 @@ export type UserProfile = {
   bookmark: unknown
 }
 
+export type ApiAuthHeaders = Record<string, string>
+
 export type UserBookmarks = {
   storeIds: string[]
   restaurants: Restaurant[]
@@ -28,6 +30,13 @@ export type RecentAnalyses = {
   today: string
   freeItems: RecentAnalysisItem[]
   expiredItems: RecentAnalysisItem[]
+}
+
+function jsonHeaders(authHeaders: ApiAuthHeaders) {
+  return {
+    ...authHeaders,
+    'Content-Type': 'application/json',
+  }
 }
 
 async function readErrorMessage(response: Response) {
@@ -155,9 +164,9 @@ function parseRecentAnalyses(item: Record<string, unknown>): RecentAnalyses {
   }
 }
 
-export async function fetchUserProfile(accessToken: string) {
+export async function fetchUserProfile(authHeaders: ApiAuthHeaders) {
   const response = await fetch(`${BACKEND_BASE_URL}/api/user/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: authHeaders,
   })
 
   if (!response.ok) {
@@ -167,13 +176,10 @@ export async function fetchUserProfile(accessToken: string) {
   return parseUserProfile((await response.json()) as Record<string, unknown>)
 }
 
-export async function updateUserPremium(accessToken: string, premium: boolean) {
+export async function updateUserPremium(authHeaders: ApiAuthHeaders, premium: boolean) {
   const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/premium`, {
     method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: jsonHeaders(authHeaders),
     body: JSON.stringify({ premium }),
   })
 
@@ -184,13 +190,10 @@ export async function updateUserPremium(accessToken: string, premium: boolean) {
   return parseUserProfile((await response.json()) as Record<string, unknown>)
 }
 
-export async function chargeUserCoins(accessToken: string, amount: number) {
+export async function chargeUserCoins(authHeaders: ApiAuthHeaders, amount: number) {
   const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/coins`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: jsonHeaders(authHeaders),
     body: JSON.stringify({ amount }),
   })
 
@@ -201,9 +204,9 @@ export async function chargeUserCoins(accessToken: string, amount: number) {
   return parseUserProfile((await response.json()) as Record<string, unknown>)
 }
 
-export async function fetchUserBookmarks(accessToken: string) {
+export async function fetchUserBookmarks(authHeaders: ApiAuthHeaders) {
   const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/bookmarks`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: authHeaders,
   })
 
   if (!response.ok) {
@@ -213,13 +216,10 @@ export async function fetchUserBookmarks(accessToken: string) {
   return parseUserBookmarks((await response.json()) as Record<string, unknown>)
 }
 
-export async function addUserBookmark(accessToken: string, restaurant: Restaurant) {
+export async function addUserBookmark(authHeaders: ApiAuthHeaders, restaurant: Restaurant) {
   const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/bookmarks`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: jsonHeaders(authHeaders),
     body: JSON.stringify({
       storeId: getRestaurantStoreId(restaurant),
       store: restaurantToBookmarkStore(restaurant),
@@ -233,12 +233,12 @@ export async function addUserBookmark(accessToken: string, restaurant: Restauran
   return parseUserBookmarks((await response.json()) as Record<string, unknown>)
 }
 
-export async function deleteUserBookmark(accessToken: string, storeId: string) {
+export async function deleteUserBookmark(authHeaders: ApiAuthHeaders, storeId: string) {
   const response = await fetch(
     `${BACKEND_BASE_URL}/api/user/me/bookmarks/${encodeURIComponent(storeId)}`,
     {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: authHeaders,
     },
   )
 
@@ -249,9 +249,9 @@ export async function deleteUserBookmark(accessToken: string, storeId: string) {
   return parseUserBookmarks((await response.json()) as Record<string, unknown>)
 }
 
-export async function fetchRecentAnalyses(accessToken: string) {
+export async function fetchRecentAnalyses(authHeaders: ApiAuthHeaders) {
   const response = await fetch(`${BACKEND_BASE_URL}/api/user/me/recent-analyses`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: authHeaders,
   })
 
   if (!response.ok) {

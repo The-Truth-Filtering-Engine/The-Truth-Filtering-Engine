@@ -49,7 +49,7 @@ export function LoginPanel({
           className="login-temp-button"
           onClick={onSignInAsTemporaryAdmin}
         >
-          관리자용 임시 로그인
+          관리자 테스트 로그인
         </button>
       </section>
     </aside>

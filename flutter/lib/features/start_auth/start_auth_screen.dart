@@ -86,9 +86,8 @@ class _StartAuthScreenState extends ConsumerState<StartAuthScreen> {
   }
 
   void _signInAsTemporaryAdmin() {
-    // ▼ 임시 로그인 → appAuthProvider 에 'admin' 저장
     ref.read(appAuthProvider.notifier).setTempAdmin();
-    _showSnackBar('관리자 임시 로그인 상태입니다.');
+    _showSnackBar('test@example.com 계정으로 로그인되었습니다.');
     _goToMainShell();
   }
 
@@ -178,7 +177,7 @@ class _StartAuthScreenState extends ConsumerState<StartAuthScreen> {
 
   Widget _temporaryAdminButton() {
     return DsButton(
-      label: '관리자용 임시 로그인',
+      label: '관리자 테스트 로그인',
       variant: DsButtonVariant.ghost,
       size: DsButtonSize.md,
       onPressed: _signInAsTemporaryAdmin,

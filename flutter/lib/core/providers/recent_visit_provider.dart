@@ -4,10 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
-import '../config/supabase_config.dart';
+import '../config/test_admin_auth_config.dart';
 import 'current_user_provider.dart';
 import '../../features/map/models/restaurant_model.dart';
 
@@ -18,7 +17,8 @@ final recentVisitProvider =
     final authState = ref.watch(appAuthProvider);
 
     return RecentVisitNotifier(
-      enableRemoteSync: authState.isLoggedIn && !authState.isAdmin,
+      enableRemoteSync: authState.isLoggedIn,
+      isAdmin: authState.isAdmin,
     );
   },
 );
@@ -28,8 +28,12 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   static const _maxCount = 30;
 
   final bool enableRemoteSync;
+  final bool isAdmin;
 
-  RecentVisitNotifier({required this.enableRemoteSync}) : super(const []) {
+  RecentVisitNotifier({
+    required this.enableRemoteSync,
+    required this.isAdmin,
+  }) : super(const []) {
     _load();
   }
 
@@ -164,20 +168,20 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
     );
   }
 
-  String? get _accessToken {
+  Map<String, String>? get _authHeaders {
     if (!enableRemoteSync) return null;
-    if (!SupabaseConfig.isConfigured) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
+    final headers = TestAdminAuthConfig.headers(isAdmin: isAdmin);
+    return headers.isEmpty ? null : headers;
   }
 
   Future<List<RestaurantModel>?> _loadRemote() async {
-    final token = _accessToken;
-    if (token == null) return null;
+    final headers = _authHeaders;
+    if (headers == null) return null;
 
     try {
       final response = await http.get(
         BackendConfig.apiUri('/user/me/recent-visits'),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         debugPrint('Recent visits load failed: ${response.statusCode}');
@@ -224,14 +228,14 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   }
 
   Future<void> _syncRemoteAdd(RestaurantModel restaurant) async {
-    final token = _accessToken;
-    if (token == null) return;
+    final headers = _authHeaders;
+    if (headers == null) return;
 
     try {
       final response = await http.post(
         BackendConfig.apiUri('/user/me/recent-visits'),
         headers: {
-          'Authorization': 'Bearer $token',
+          ...headers,
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
@@ -256,15 +260,15 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   }
 
   Future<void> _syncRemoteRemove(String reviewId) async {
-    final token = _accessToken;
-    if (token == null) return;
+    final headers = _authHeaders;
+    if (headers == null) return;
 
     try {
       final response = await http.delete(
         BackendConfig.apiUri(
           '/user/me/recent-visits/${Uri.encodeComponent(reviewId)}',
         ),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('recent visit remove failed: ${response.statusCode}');
@@ -275,13 +279,13 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   }
 
   Future<void> _syncRemoteClear() async {
-    final token = _accessToken;
-    if (token == null) return;
+    final headers = _authHeaders;
+    if (headers == null) return;
 
     try {
       final response = await http.delete(
         BackendConfig.apiUri('/user/me/recent-visits'),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('recent visits clear failed: ${response.statusCode}');

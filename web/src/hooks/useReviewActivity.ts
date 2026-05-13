@@ -1,4 +1,3 @@
-import { type Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   parseBlogReview,
@@ -75,10 +74,6 @@ function requireSupabaseClient() {
     throw new Error('Supabase 설정이 없습니다')
   }
   return supabase
-}
-
-function sessionEmail(authSession: Session | null) {
-  return authSession?.user?.email?.trim() ?? ''
 }
 
 function normalizeDateText(value: unknown) {
@@ -286,8 +281,7 @@ async function fetchDirectlyLikedReviews(
 }
 
 export function useReviewActivity(
-  authSession: Session | null,
-  isTemporaryAdmin: boolean,
+  authEmail: string,
   showToast: (message: string) => void,
 ) {
   const [currentUser, setCurrentUser] = useState<ReviewUserRow | null>(null)
@@ -301,14 +295,13 @@ export function useReviewActivity(
       emptyCollectionState<RecentReviewItem>(),
     )
 
-  const authEmail = sessionEmail(authSession)
-  const isAvailable = Boolean(supabase && authEmail && !isTemporaryAdmin)
+  const isAvailable = Boolean(supabase && authEmail)
 
   const ensureCurrentUser = useCallback(async () => {
     const client = requireSupabaseClient()
     const email = authEmail
-    if (!email || isTemporaryAdmin) {
-      throw new Error('Google 로그인 후 사용할 수 있습니다')
+    if (!email) {
+      throw new Error('로그인 후 사용할 수 있습니다')
     }
 
     const { data, error } = await client
@@ -334,7 +327,7 @@ export function useReviewActivity(
     const user = normalizeUserRow(created as Record<string, unknown>)
     setCurrentUser(user)
     return user
-  }, [authEmail, isTemporaryAdmin])
+  }, [authEmail])
 
   const updateUserReviewLikes = useCallback(
     async (user: ReviewUserRow, reviewLikes: Record<string, ReviewReaction>) => {
@@ -415,7 +408,7 @@ export function useReviewActivity(
   const toggleReviewHeart = useCallback(
     async (review: BlogReview) => {
       if (!isAvailable) {
-        showToast('Google 로그인 후 사용할 수 있습니다')
+        showToast('로그인 후 사용할 수 있습니다')
         return
       }
 
@@ -599,7 +592,7 @@ export function useReviewActivity(
   const recordRecentReview = useCallback(
     async (review: BlogReview) => {
       if (!isAvailable) {
-        throw new Error('Google 로그인 후 사용할 수 있습니다')
+        throw new Error('로그인 후 사용할 수 있습니다')
       }
 
       const client = requireSupabaseClient()
@@ -717,7 +710,7 @@ export function useReviewActivity(
     if (!isAvailable) return
 
     void ensureCurrentUser().catch(() => {})
-  }, [authSession?.access_token, ensureCurrentUser, isAvailable])
+  }, [ensureCurrentUser, isAvailable])
 
   return useMemo(
     () => ({

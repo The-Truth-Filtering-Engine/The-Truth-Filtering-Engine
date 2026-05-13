@@ -1,4 +1,3 @@
-import { type Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 import {
   dedupeBookmarkRestaurants,
@@ -9,6 +8,7 @@ import {
   addUserBookmark,
   deleteUserBookmark,
   fetchUserBookmarks,
+  type ApiAuthHeaders,
   type UserBookmarks,
 } from '../api/user'
 
@@ -35,8 +35,8 @@ export type UseBookmarksReturn = {
 }
 
 export function useBookmarks(
-  authSession: Session | null,
-  isTemporaryAdmin: boolean,
+  authHeaders: ApiAuthHeaders,
+  authKey: string,
   showToast: (message: string) => void,
 ): UseBookmarksReturn {
   const [bookmarkedRestaurants, setBookmarkedRestaurants] = useState<Restaurant[]>([])
@@ -54,20 +54,16 @@ export function useBookmarks(
   }
 
   useEffect(() => {
-    const token = authSession?.access_token
-    if (!token) {
-      if (!isTemporaryAdmin) {
-        applyLocalBookmarkState([])
-      }
+    if (!authKey) {
+      applyLocalBookmarkState([])
       return
     }
 
-    const accessToken = token
     let canceled = false
 
     async function syncBookmarks() {
       try {
-        const bookmarks = await fetchUserBookmarks(accessToken)
+        const bookmarks = await fetchUserBookmarks(authHeaders)
         if (!canceled) applyRemoteBookmarkState(bookmarks)
       } catch (error) {
         if (canceled) return
@@ -81,7 +77,7 @@ export function useBookmarks(
 
     void syncBookmarks()
     return () => { canceled = true }
-  }, [authSession?.access_token, authSession?.user?.id, isTemporaryAdmin])
+  }, [authHeaders, authKey])
 
   async function toggleBookmark(restaurant: Restaurant) {
     const storeId = getRestaurantStoreId(restaurant)
@@ -106,16 +102,15 @@ export function useBookmarks(
     setBookmarkedRestaurants(nextRestaurants)
     setBookmarkedStoreIds(nextStoreIds)
 
-    const token = authSession?.access_token
-    if (!token) {
+    if (!authKey) {
       showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
       return
     }
 
     try {
       const bookmarks = bookmarked
-        ? await deleteUserBookmark(token, storeId)
-        : await addUserBookmark(token, restaurant)
+        ? await deleteUserBookmark(authHeaders, storeId)
+        : await addUserBookmark(authHeaders, restaurant)
       applyRemoteBookmarkState(bookmarks)
       showToast(bookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다')
     } catch (error) {

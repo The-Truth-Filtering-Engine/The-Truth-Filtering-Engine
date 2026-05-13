@@ -1,6 +1,10 @@
 import { type Session } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
-import { GOOGLE_AUTH_REDIRECT_TO } from '../config'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  GOOGLE_AUTH_REDIRECT_TO,
+  TEST_ADMIN_AUTH_HEADER,
+  TEST_ADMIN_EMAIL,
+} from '../config'
 import { supabase } from '../lib/supabase'
 
 const TEMP_ADMIN_AUTH_STORAGE_KEY = 'truth_filtering_temp_admin_auth'
@@ -13,6 +17,10 @@ export type UseAuthReturn = {
   authErrorMessage: string
   isTemporaryAdmin: boolean
   isLoggedIn: boolean
+  authEmail: string
+  authHeaders: Record<string, string>
+  authKey: string
+  hasApiAuth: boolean
   signInWithGoogle: () => Promise<void>
   signInAsTemporaryAdmin: () => void
   signOut: () => Promise<void>
@@ -24,16 +32,28 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
   const [authErrorMessage, setAuthErrorMessage] = useState('')
   const [isTemporaryAdmin, setIsTemporaryAdmin] = useState(false)
 
+  const authEmail = authSession?.user?.email?.trim() || (isTemporaryAdmin ? TEST_ADMIN_EMAIL : '')
+  const authKey = authSession?.access_token || (isTemporaryAdmin ? TEST_ADMIN_EMAIL : '')
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    if (authSession?.access_token) {
+      return { Authorization: `Bearer ${authSession.access_token}` } as Record<string, string>
+    }
+    if (isTemporaryAdmin) {
+      return { [TEST_ADMIN_AUTH_HEADER]: TEST_ADMIN_EMAIL } as Record<string, string>
+    }
+    return {} as Record<string, string>
+  }, [authSession?.access_token, isTemporaryAdmin])
+  const hasApiAuth = authKey !== ''
   const isLoggedIn = authSession !== null || isTemporaryAdmin
 
   useEffect(() => {
-    setIsTemporaryAdmin(
-      window.localStorage.getItem(TEMP_ADMIN_AUTH_STORAGE_KEY) === 'true',
-    )
+    const storedTemporaryAdmin =
+      window.localStorage.getItem(TEMP_ADMIN_AUTH_STORAGE_KEY) === 'true'
+    setIsTemporaryAdmin(storedTemporaryAdmin)
 
     if (!supabase) {
-      setAuthStatus('signedOut')
-      onSignOut()
+      setAuthStatus(storedTemporaryAdmin ? 'signedIn' : 'signedOut')
+      if (!storedTemporaryAdmin) onSignOut()
       return
     }
 
@@ -45,9 +65,10 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
       if (error) {
         setAuthErrorMessage(error.message)
       }
-      setAuthSession(data.session ?? null)
-      setAuthStatus(data.session ? 'signedIn' : 'signedOut')
-      if (!data.session) {
+      const session = data.session ?? null
+      setAuthSession(session)
+      setAuthStatus(session || storedTemporaryAdmin ? 'signedIn' : 'signedOut')
+      if (!session && !storedTemporaryAdmin) {
         onSignOut()
       }
     })
@@ -96,7 +117,7 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
     setIsTemporaryAdmin(true)
     setAuthErrorMessage('')
     setAuthStatus('signedIn')
-    showToast('관리자 임시 로그인 상태입니다')
+    showToast(`${TEST_ADMIN_EMAIL} 계정으로 로그인되었습니다`)
   }
 
   async function signOut() {
@@ -123,6 +144,10 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
     authErrorMessage,
     isTemporaryAdmin,
     isLoggedIn,
+    authEmail,
+    authHeaders,
+    authKey,
+    hasApiAuth,
     signInWithGoogle,
     signInAsTemporaryAdmin,
     signOut,

@@ -35,7 +35,6 @@ type SettingsView = 'main' | 'liked' | 'recent'
 
 type Props = {
   userProfileState: UserProfileState
-  isTemporaryAdmin: boolean
   onClose: () => void
   onTogglePremium: () => void
   onChargeCoins: (amount: number) => void
@@ -55,7 +54,6 @@ type Props = {
 
 export function SettingsPanel({
   userProfileState,
-  isTemporaryAdmin,
   onClose,
   onTogglePremium,
   onChargeCoins,
@@ -180,8 +178,6 @@ export function SettingsPanel({
               )
             }
           />
-        ) : isTemporaryAdmin ? (
-          <TemporaryAdminSettings onSignOut={onSignOut} />
         ) : (
           <MainSettingsView
             userProfileState={userProfileState}
@@ -196,39 +192,6 @@ export function SettingsPanel({
         )}
       </section>
     </aside>
-  )
-}
-
-function TemporaryAdminSettings({ onSignOut }: { onSignOut: () => void }) {
-  return (
-    <div className="settings-card">
-      <div className="settings-card-heading">
-        <UserRound aria-hidden="true" size={19} strokeWidth={2.2} />
-        <div>
-          <strong>임시 관리자 로그인</strong>
-          <span>Google 로그인 사용자가 아니어서 계정 리뷰 기능은 비활성화됩니다.</span>
-        </div>
-      </div>
-      <div className="settings-disabled-actions">
-        <button type="button" disabled>
-          프리미엄 설정
-        </button>
-        <button type="button" disabled>
-          내 하트
-        </button>
-        <button type="button" disabled>
-          최근 기록
-        </button>
-      </div>
-      <button
-        type="button"
-        className="settings-logout-button"
-        onClick={onSignOut}
-      >
-        <LogOut aria-hidden="true" size={16} strokeWidth={2.2} />
-        로그아웃
-      </button>
-    </div>
   )
 }
 
@@ -393,7 +356,7 @@ function MainSettingsView({
         !userProfileState.profile &&
         !userProfileState.errorMessage && (
           <div className="bookmark-empty">
-            Google 로그인 정보를 확인할 수 없습니다
+            계정 정보를 확인할 수 없습니다
           </div>
         )}
 

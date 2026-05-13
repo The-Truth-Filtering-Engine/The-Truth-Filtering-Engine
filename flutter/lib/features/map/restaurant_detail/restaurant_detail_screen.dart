@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/backend_config.dart';
-import '../../../core/config/supabase_config.dart';
+import '../../../core/config/test_admin_auth_config.dart';
+import '../../../core/providers/current_user_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -51,6 +51,7 @@ class _AnalysisRequestException implements Exception {
 Future<_ReviewFetchResult> _fetchCachedReviews(
   RestaurantModel restaurant,
   AnalysisMode mode,
+  Map<String, String> authHeaders,
 ) async {
   final uri = BackendConfig.apiUri(
     '/search/cached',
@@ -59,14 +60,11 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
       limit: '$_maxReviewResults',
     ),
   );
-  final accessToken = _currentAccessToken();
 
   final res = await http
       .get(
         uri,
-        headers: accessToken == null
-            ? null
-            : {'Authorization': 'Bearer $accessToken'},
+        headers: authHeaders.isEmpty ? null : authHeaders,
       )
       .timeout(const Duration(seconds: 15));
   if (res.statusCode == 402) {
@@ -98,6 +96,7 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
 Future<_ReviewFetchResult> _fetchFreshReviews(
   RestaurantModel restaurant,
   AnalysisMode mode, {
+  required Map<String, String> authHeaders,
   bool refresh = false,
   int naverStart = 1,
 }) async {
@@ -113,14 +112,11 @@ Future<_ReviewFetchResult> _fetchFreshReviews(
   if (refresh) queryParameters['refresh'] = 'true';
 
   final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
-  final accessToken = _currentAccessToken();
 
   final res = await http
       .get(
         uri,
-        headers: accessToken == null
-            ? null
-            : {'Authorization': 'Bearer $accessToken'},
+        headers: authHeaders.isEmpty ? null : authHeaders,
       )
       .timeout(const Duration(seconds: 90));
   if (res.statusCode != 200) {
@@ -139,18 +135,6 @@ Future<_ReviewFetchResult> _fetchFreshReviews(
         .toList(),
     hasMore: body['hasMore'] as bool? ?? false,
   );
-}
-
-String? _currentAccessToken() {
-  if (!SupabaseConfig.isConfigured) return null;
-
-  try {
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    if (token == null || token.isEmpty) return null;
-    return token;
-  } catch (_) {
-    return null;
-  }
 }
 
 String? _readApiError(http.Response response) {
@@ -231,7 +215,8 @@ class _RestaurantDetailScreenState
 
     try {
       final mode = ref.read(analysisModeProvider);
-      final cached = await _fetchCachedReviews(_r, mode);
+      final authHeaders = _currentAuthHeaders();
+      final cached = await _fetchCachedReviews(_r, mode, authHeaders);
       if (!mounted) return;
       final shouldLoadFirstBatch =
           cached.reviews.isEmpty || cached.reviews.length < _reviewBatchSize;
@@ -239,7 +224,12 @@ class _RestaurantDetailScreenState
       if (shouldLoadFirstBatch) {
         // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
         try {
-          final fresh = await _fetchFreshReviews(_r, mode, naverStart: 1);
+          final fresh = await _fetchFreshReviews(
+            _r,
+            mode,
+            authHeaders: authHeaders,
+            naverStart: 1,
+          );
           if (!mounted) return;
           _applyReviews(fresh);
         } catch (e) {
@@ -274,9 +264,11 @@ class _RestaurantDetailScreenState
 
     try {
       final mode = ref.read(analysisModeProvider);
+      final authHeaders = _currentAuthHeaders();
       final fresh = await _fetchFreshReviews(
         _r,
         mode,
+        authHeaders: authHeaders,
         refresh: true,
         naverStart: 1,
       );
@@ -302,7 +294,13 @@ class _RestaurantDetailScreenState
     setState(() => _isLoadingReviewBatch = true);
     try {
       final mode = ref.read(analysisModeProvider);
-      final fresh = await _fetchFreshReviews(_r, mode, naverStart: naverStart);
+      final authHeaders = _currentAuthHeaders();
+      final fresh = await _fetchFreshReviews(
+        _r,
+        mode,
+        authHeaders: authHeaders,
+        naverStart: naverStart,
+      );
       if (!mounted) return;
       final merged = _mergeReviews(_reviews, fresh.reviews);
       _applyReviews(
@@ -373,6 +371,11 @@ class _RestaurantDetailScreenState
   void _refreshRecentAnalyses() {
     if (!mounted) return;
     Future.microtask(() => ref.read(recentAnalysesProvider.notifier).load());
+  }
+
+  Map<String, String> _currentAuthHeaders() {
+    final authState = ref.read(appAuthProvider);
+    return TestAdminAuthConfig.headers(isAdmin: authState.isAdmin);
   }
 
   Future<bool> _recordRecentReviewOpen(BlogReview review) async {

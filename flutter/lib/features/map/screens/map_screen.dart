@@ -191,7 +191,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
-          if (authState.isLoggedIn && !authState.isAdmin)
+          if (authState.isLoggedIn)
             Positioned(
               left: 16,
               top: 74,
@@ -286,7 +286,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     AppAuthState authState,
     AsyncValue<UserProfile?> profileState,
   ) {
-    if (!authState.isLoggedIn || authState.isAdmin) {
+    if (!authState.isLoggedIn) {
       _requestedProfileForMapBadge = false;
       return;
     }

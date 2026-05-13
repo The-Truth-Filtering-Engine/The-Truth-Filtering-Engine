@@ -1,13 +1,15 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/backend_config.dart';
-import '../../core/config/supabase_config.dart';
+import '../../core/config/test_admin_auth_config.dart';
 import '../map/models/restaurant_model.dart';
 
 class BookmarkService {
+  BookmarkService({required this.isAdmin});
+
+  final bool isAdmin;
   List<RestaurantModel> _items = const [];
 
   Future<List<RestaurantModel>> loadBookmarks() async {
@@ -67,19 +69,19 @@ class BookmarkService {
     return _items;
   }
 
-  String? get _accessToken {
-    if (!SupabaseConfig.isConfigured) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
+  Map<String, String>? get _authHeaders {
+    final headers = TestAdminAuthConfig.headers(isAdmin: isAdmin);
+    return headers.isEmpty ? null : headers;
   }
 
   Future<List<RestaurantModel>?> _loadRemote() async {
-    final token = _accessToken;
-    if (token == null) return null;
+    final headers = _authHeaders;
+    if (headers == null) return null;
 
     try {
       final response = await http.get(
         BackendConfig.apiUri('/user/me/bookmarks'),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return null;
@@ -111,14 +113,14 @@ class BookmarkService {
   }
 
   Future<void> _syncRemoteAdd(RestaurantModel restaurant) async {
-    final token = _accessToken;
-    if (token == null) return;
+    final headers = _authHeaders;
+    if (headers == null) return;
 
     try {
       await http.post(
         BackendConfig.apiUri('/user/me/bookmarks'),
         headers: {
-          'Authorization': 'Bearer $token',
+          ...headers,
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
@@ -130,15 +132,15 @@ class BookmarkService {
   }
 
   Future<void> _syncRemoteRemove(String storeId) async {
-    final token = _accessToken;
-    if (token == null) return;
+    final headers = _authHeaders;
+    if (headers == null) return;
 
     try {
       await http.delete(
         BackendConfig.apiUri(
           '/user/me/bookmarks/${Uri.encodeComponent(storeId)}',
         ),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
     } catch (_) {}
   }

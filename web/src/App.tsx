@@ -124,10 +124,9 @@ function App() {
 
   const auth = useAuth(handleSignOut, showToast)
 
-  const bookmarks = useBookmarks(auth.authSession, auth.isTemporaryAdmin, showToast)
+  const bookmarks = useBookmarks(auth.authHeaders, auth.authKey, showToast)
   const reviewActivity = useReviewActivity(
-    auth.authSession,
-    auth.isTemporaryAdmin,
+    auth.authEmail,
     showToast,
   )
 
@@ -143,7 +142,7 @@ function App() {
     setRecentAnalysesState((prev) => ({ ...prev, hasLoaded: false }))
   }
 
-  const detail = useDetail(auth.authSession, showToast, handleProfileRefresh)
+  const detail = useDetail(auth.authHeaders, showToast, handleProfileRefresh)
 
   function handleMapSelectRestaurant(restaurant: Restaurant | null) {
     if (!restaurant) {
@@ -159,7 +158,7 @@ function App() {
 
   useEffect(() => {
     if (
-      !auth.authSession?.access_token ||
+      !auth.hasApiAuth ||
       userProfileState.hasLoaded ||
       userProfileState.isLoading ||
       userProfileState.errorMessage
@@ -168,15 +167,15 @@ function App() {
     }
     void loadUserProfile()
   }, [
-    auth.authSession?.access_token,
+    auth.authKey,
+    auth.hasApiAuth,
     userProfileState.errorMessage,
     userProfileState.hasLoaded,
     userProfileState.isLoading,
   ])
 
   async function loadUserProfile() {
-    const token = auth.authSession?.access_token
-    if (!token) {
+    if (!auth.hasApiAuth) {
       resetUserProfileState()
       return
     }
@@ -184,7 +183,7 @@ function App() {
     setUserProfileState((prev) => ({ ...prev, isLoading: true, errorMessage: '' }))
 
     try {
-      const profile = await fetchUserProfile(token)
+      const profile = await fetchUserProfile(auth.authHeaders)
       setUserProfileState({ profile, isLoading: false, isSaving: false, errorMessage: '', hasLoaded: true })
     } catch (error) {
       setUserProfileState((prev) => ({
@@ -198,14 +197,13 @@ function App() {
   }
 
   async function toggleUserPremium() {
-    const token = auth.authSession?.access_token
     const profile = userProfileState.profile
-    if (!token || !profile) return
+    if (!auth.hasApiAuth || !profile) return
 
     setUserProfileState((prev) => ({ ...prev, isSaving: true, errorMessage: '' }))
 
     try {
-      const updated = await updateUserPremium(token, profile.premium !== 1)
+      const updated = await updateUserPremium(auth.authHeaders, profile.premium !== 1)
       setUserProfileState({ profile: updated, isLoading: false, isSaving: false, errorMessage: '', hasLoaded: true })
       showToast(updated.premium === 1 ? '프리미엄이 설정되었습니다' : '프리미엄이 해제되었습니다')
     } catch (error) {
@@ -218,13 +216,12 @@ function App() {
   }
 
   async function chargeCoins(amount: number) {
-    const token = auth.authSession?.access_token
-    if (!token) return
+    if (!auth.hasApiAuth) return
 
     setUserProfileState((prev) => ({ ...prev, isSaving: true, errorMessage: '' }))
 
     try {
-      const updated = await chargeUserCoins(token, amount)
+      const updated = await chargeUserCoins(auth.authHeaders, amount)
       setUserProfileState({ profile: updated, isLoading: false, isSaving: false, errorMessage: '', hasLoaded: true })
       showToast(`${amount.toLocaleString()} 코인이 충전되었습니다`)
     } catch (error) {
@@ -281,7 +278,7 @@ function App() {
       showToast('분석을 위해 코인을 충전해주세요')
       setSelectedRestaurant(null)
       setActiveSidePanel('settings')
-      if (auth.authSession && !userProfileState.hasLoaded && !userProfileState.isLoading) {
+      if (auth.hasApiAuth && !userProfileState.hasLoaded && !userProfileState.isLoading) {
         void loadUserProfile()
       }
       return
@@ -354,8 +351,7 @@ function App() {
   }
 
   async function loadRecentAnalyses() {
-    const token = auth.authSession?.access_token
-    if (!token || auth.isTemporaryAdmin) {
+    if (!auth.hasApiAuth) {
       setRecentAnalysesState({ data: { today: '', freeItems: [], expiredItems: [] }, isLoading: false, errorMessage: '', hasLoaded: true })
       return
     }
@@ -363,7 +359,7 @@ function App() {
     setRecentAnalysesState((prev) => ({ ...prev, isLoading: true, errorMessage: '' }))
 
     try {
-      const data = await fetchRecentAnalyses(token)
+      const data = await fetchRecentAnalyses(auth.authHeaders)
       setRecentAnalysesState({ data, isLoading: false, errorMessage: '', hasLoaded: true })
     } catch (error) {
       setRecentAnalysesState((prev) => ({
@@ -388,7 +384,7 @@ function App() {
     const shouldOpen = activeSidePanel !== 'settings'
     setSelectedRestaurant(null)
     setActiveSidePanel(shouldOpen ? 'settings' : 'search')
-    if (shouldOpen && auth.authSession && !userProfileState.hasLoaded && !userProfileState.isLoading) {
+    if (shouldOpen && auth.hasApiAuth && !userProfileState.hasLoaded && !userProfileState.isLoading) {
       void loadUserProfile()
     }
   }
@@ -571,8 +567,7 @@ function App() {
             {activeSidePanel === 'recent' && (
               <RecentPanel
                 recentAnalysesState={recentAnalysesState}
-                isTemporaryAdmin={auth.isTemporaryAdmin}
-                authSessionExists={Boolean(auth.authSession)}
+                hasApiAuth={auth.hasApiAuth}
                 onClose={() => setActiveSidePanel('search')}
                 onFocusItem={focusRecentAnalysis}
                 onRetry={loadRecentAnalyses}
@@ -592,7 +587,6 @@ function App() {
             {activeSidePanel === 'settings' && (
               <SettingsPanel
                 userProfileState={userProfileState}
-                isTemporaryAdmin={auth.isTemporaryAdmin}
                 onClose={() => setActiveSidePanel('search')}
                 onTogglePremium={toggleUserPremium}
                 onChargeCoins={chargeCoins}
@@ -625,7 +619,7 @@ function App() {
         {map.loadState === 'ready' && map.placesErrorMessage && (
           <div className="map-status map-status-error">{map.placesErrorMessage}</div>
         )}
-        {auth.isLoggedIn && !auth.isTemporaryAdmin && (
+        {auth.isLoggedIn && (
           <MapUsageBadge
             profile={userProfileState.profile}
             isLoading={userProfileState.isLoading}

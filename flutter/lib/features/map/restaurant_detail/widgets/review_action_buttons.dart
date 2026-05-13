@@ -55,7 +55,7 @@ class ReviewActionButtons extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '사용자 정보를 불러오는 중입니다.',
+              '계정 정보를 준비하고 있습니다.',
               style: AppText.body().copyWith(color: Colors.white),
             ),
             backgroundColor: AppColors.warning400,

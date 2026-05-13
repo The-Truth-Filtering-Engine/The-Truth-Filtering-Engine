@@ -2,40 +2,43 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
-import '../config/supabase_config.dart';
+import '../config/test_admin_auth_config.dart';
 import 'current_user_provider.dart';
 
 final userProfileProvider =
     StateNotifierProvider<UserProfileNotifier, AsyncValue<UserProfile?>>(
-  (ref) => UserProfileNotifier(),
+  (ref) {
+    final authState = ref.watch(appAuthProvider);
+    return UserProfileNotifier(isAdmin: authState.isAdmin);
+  },
 );
 
 final currentUserIdProvider = Provider<int?>((ref) {
   final email = ref.watch(currentUserEmailProvider);
   if (email == null || email.isEmpty) return null;
-  if (email == 'admin') return 1;
+  if (email == TestAdminAuthConfig.email) return TestAdminAuthConfig.userId;
 
   final id = ref.watch(userProfileProvider).asData?.value?.id;
-  if (id == null || id <= 0) return null;
+  if (id == null || id < 0) return null;
   return id;
 });
 
 class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
-  UserProfileNotifier() : super(const AsyncValue.data(null));
+  UserProfileNotifier({required this.isAdmin})
+      : super(const AsyncValue.data(null));
 
-  String? get accessToken {
-    if (!SupabaseConfig.isConfigured) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
-  }
+  final bool isAdmin;
 
-  bool get hasGoogleSession => accessToken != null;
+  Map<String, String> get authHeaders =>
+      TestAdminAuthConfig.headers(isAdmin: isAdmin);
+
+  bool get hasApiAuth => authHeaders.isNotEmpty;
 
   Future<UserProfile?> loadIfPossible({bool force = false}) async {
-    final token = accessToken;
-    if (token == null) {
+    final headers = authHeaders;
+    if (headers.isEmpty) {
       state = const AsyncValue.data(null);
       return null;
     }
@@ -46,7 +49,7 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     state = const AsyncValue.loading();
 
     try {
-      final profile = await _requestProfile(token);
+      final profile = await _requestProfile(headers);
       state = AsyncValue.data(profile);
       return profile;
     } catch (error, stackTrace) {
@@ -76,13 +79,13 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     required String path,
     Map<String, Object?>? body,
   }) async {
-    final token = accessToken;
-    if (token == null) {
-      throw Exception('Google 로그인 정보가 없습니다');
+    final headers = authHeaders;
+    if (headers.isEmpty) {
+      throw Exception('인증 헤더를 만들 수 없습니다');
     }
 
     final profile = await _requestProfile(
-      token,
+      headers,
       method: method,
       path: path,
       body: body,
@@ -92,14 +95,14 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   }
 
   Future<UserProfile> _requestProfile(
-    String token, {
+    Map<String, String> authHeaders, {
     String method = 'GET',
     String path = '/user/me',
     Map<String, Object?>? body,
   }) async {
     final uri = BackendConfig.apiUri(path);
     final headers = {
-      'Authorization': 'Bearer $token',
+      ...authHeaders,
       'Content-Type': 'application/json',
     };
 

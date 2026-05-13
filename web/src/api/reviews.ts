@@ -193,11 +193,11 @@ async function readErrorMessage(response: Response) {
 export async function* streamReviews(
   path: string,
   signal: AbortSignal,
-  accessToken?: string,
+  authHeaders?: Record<string, string>,
 ): AsyncGenerator<ReviewStreamChunk> {
   const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
     signal,
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    headers: authHeaders && Object.keys(authHeaders).length > 0 ? authHeaders : undefined,
   })
   if (!response.ok) {
     throw new ApiRequestError(await readErrorMessage(response), response.status)
@@ -232,11 +232,11 @@ export async function* streamReviews(
 export async function fetchDetailJson(
   path: string,
   signal: AbortSignal,
-  accessToken?: string,
+  authHeaders?: Record<string, string>,
 ): Promise<DetailJson> {
   const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
     signal,
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    headers: authHeaders && Object.keys(authHeaders).length > 0 ? authHeaders : undefined,
   })
   if (!response.ok) {
     throw new ApiRequestError(await readErrorMessage(response), response.status)
