@@ -110,18 +110,10 @@ export function parseReviewLikeEntries(value: unknown): ReviewLikeEntry[] {
 }
 
 export function parseBlogReview(item: Record<string, unknown>): BlogReview {
-  const electraPred =
-    typeof item.is_ad_electra_pred === 'number' ? item.is_ad_electra_pred : null
   const scoreSource =
     typeof item.is_ad_finetuned_pred === 'number'
       ? item.is_ad_finetuned_pred
-      : typeof item.is_ad_llm_pred === 'number'
-        ? item.is_ad_llm_pred
-        : electraPred === 1
-          ? 0.9
-          : electraPred === 0
-            ? 0.1
-            : null
+      : null
   const adScore = scoreSource === null ? null : Math.max(0, Math.min(1, scoreSource))
   const description = cleanText(item.review_description)
   const preview = description

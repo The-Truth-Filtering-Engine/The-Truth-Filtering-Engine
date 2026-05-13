@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase'
 
 const USER_SELECT_COLUMNS = 'id,email,review_likes,recent_visits'
 const REVIEW_SELECT_COLUMNS =
-  'id,name,review_title,review_description,review_bloggername,review_url,review_postdate,is_ad_electra_pred,is_ad_finetuned_pred,is_ad_llm_pred,likes,store_id,category_name,category_group_code,category_group_name,phone,address_name,road_address_name,place_url'
+  'id,name,review_title,review_description,review_bloggername,review_url,review_postdate,is_ad_finetuned_pred,likes,store_id,category_name,category_group_code,category_group_name,phone,address_name,road_address_name,place_url'
 const MAX_RECENT_REVIEWS = 30
 
 type ReviewReaction = {
