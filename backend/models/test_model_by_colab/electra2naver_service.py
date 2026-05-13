@@ -7,7 +7,7 @@ import torch
 from supabase import Client, create_client
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-load_dotenv(Path(__file__).resolve().parents[2] / "the_truth_filtering_engine" / ".env")
+load_dotenv(Path(__file__).resolve().parents[2] / "flutter" / ".env")
 
 MODEL_DIR = Path(__file__).resolve().parents[2] / "classifier" / "bert2naver"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
