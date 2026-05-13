@@ -267,8 +267,22 @@ async function fetchDirectlyLikedReviews(
     .contains('likes', [{ user_id: userId }])
     .limit(200)
 
-  if (error) return []
-  return ((data ?? []) as Record<string, unknown>[]).map(parseBlogReview)
+  if (!error) {
+    const directlyMatched = ((data ?? []) as Record<string, unknown>[]).map(parseBlogReview)
+    if (directlyMatched.length > 0) return directlyMatched
+  }
+
+  const { data: fallbackData, error: fallbackError } = await client
+    .from('reviews')
+    .select(REVIEW_SELECT_COLUMNS)
+    .neq('likes', [])
+    .limit(1000)
+
+  if (fallbackError) return []
+  return ((fallbackData ?? []) as Record<string, unknown>[])
+    .map(parseBlogReview)
+    .filter((review) => hasUserLike(review.likes, userId))
+    .slice(0, 200)
 }
 
 export function useReviewActivity(
@@ -384,7 +398,10 @@ export function useReviewActivity(
       const override = reviewStates[reviewActivityKey(review)]
       if (override) return override
 
-      const isLiked = currentUser ? hasUserLike(review.likes, currentUser.id) : false
+      const isLiked = currentUser
+        ? Boolean(currentUser.reviewLikes[review.reviewId]) ||
+          hasUserLike(review.likes, currentUser.id)
+        : false
       return {
         isLiked,
         likeCount: review.likeCount,
@@ -417,7 +434,8 @@ export function useReviewActivity(
         }
 
         const currentLikes = parseReviewLikeEntries(resolved.likes)
-        const nextIsLiked = !hasUserLike(currentLikes, user.id)
+        const nextIsLiked =
+          !(Boolean(user.reviewLikes[resolved.reviewId]) || hasUserLike(currentLikes, user.id))
         const likes = nextLikedEntries(currentLikes, user.id, nextIsLiked)
         const { data, error } = await client
           .from('reviews')
