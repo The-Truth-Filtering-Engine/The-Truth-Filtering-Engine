@@ -275,7 +275,7 @@ async function fetchDirectlyLikedReviews(
   const { data: fallbackData, error: fallbackError } = await client
     .from('reviews')
     .select(REVIEW_SELECT_COLUMNS)
-    .neq('likes', [])
+    .not('likes', 'eq', '[]')
     .limit(1000)
 
   if (fallbackError) return []
