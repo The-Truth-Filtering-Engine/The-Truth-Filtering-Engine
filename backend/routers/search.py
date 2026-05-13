@@ -449,6 +449,8 @@ async def search_stream(
             place_detail_request and cached_count == 0
         )
 
+        print(f"[DEBUG] 스트림 검색 요청 | query: {query} | mode: {mode} | cached: {cached_count} | should_fetch: {should_fetch}", flush=True)
+
         already_scored = [r for r in cached if r.get("is_ad_finetuned_pred") is not None]
 
         if already_scored:
@@ -462,6 +464,8 @@ async def search_stream(
 
             # Supabase 필드명("review_url")으로 중복 URL 집합 구성
             seen_urls = {r.get("review_url") for r in already_scored}
+
+            print(f"[DEBUG] → Naver API 호출 | naverQuery: {naver_query}", flush=True)
 
             async for page_blogs in iter_store_blog_pages(
                 naver_query,
@@ -477,6 +481,9 @@ async def search_stream(
 
                 reviews = _blogs_to_reviews(query, new_blogs, normalized_start, place_metadata)
                 page_scores: list[float] = []
+
+                print(f"[DEBUG] 모델 배치 판별 시작 | count: {len(reviews)}", flush=True)
+                batch_start = time.time()
 
                 for i in range(0, len(reviews), STREAM_BATCH_SIZE):
                     chunk = reviews[i:i + STREAM_BATCH_SIZE]
@@ -497,13 +504,18 @@ async def search_stream(
                     for review, score in zip(chunk, scores):
                         review["is_ad_finetuned_pred"] = score
                     page_scores.extend(scores)
-                    yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
 
+                    print(f"[DEBUG] 모델 판별 진행 | {len(page_scores)}/{len(reviews)}", flush=True)
+                    yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
+                    await asyncio.sleep(0)
+
+                print(f"[DEBUG] 모델 배치 판별 완료 | 소요 시간: {time.time() - batch_start:.2f}s", flush=True)
                 asyncio.create_task(
                     save_reviews_with_scores(query, new_blogs, page_scores, place_metadata)
                 )
         else:
             targets = [r for r in cached if r.get("is_ad_finetuned_pred") is None]
+            print(f"[DEBUG] → Supabase 캐시 hit | cached: {cached_count} | unscored: {len(targets)}", flush=True)
             for i in range(0, len(targets), STREAM_BATCH_SIZE):
                 chunk = targets[i:i + STREAM_BATCH_SIZE]
                 descriptions = [
@@ -525,6 +537,7 @@ async def search_stream(
                 yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
 
         yield f"data: {json.dumps({'reviews': [], 'done': True, 'naverQuery': naver_query})}\n\n"
+        print(f"[DEBUG] 스트림 완료 | query: {query}", flush=True)
 
     return StreamingResponse(
         event_generator(),
