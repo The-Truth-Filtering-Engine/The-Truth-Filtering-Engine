@@ -11,10 +11,12 @@ from services.naver_service import (
     fetch_blog_previews,
     fetch_store_blog_previews,
     filter_blogs_by_store_name,
+    iter_store_blog_pages,
 )
 from services.review_limits import (
     MAX_REVIEW_RESULTS,
     REVIEW_BATCH_SIZE,
+    STREAM_BATCH_SIZE,
     clamp_max_results,
     clamp_review_limit,
     normalize_naver_start,
@@ -27,6 +29,7 @@ from services.supabase_service import (
     get_cached_reviews,
     has_analysis_usage,
     save_reviews,
+    save_reviews_with_scores,
     update_finetuned_pred,
 )
 
@@ -40,7 +43,7 @@ async def search_cached(
     authorization: str | None = Header(default=None),
 ):
     review_limit = clamp_max_results(limit)
-    cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id)
+    cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id, scored_only=True)
     place_detail_request = _is_place_detail_request(store_id)
     if place_detail_request:
         cached = filter_blogs_by_store_name(cached, query)
@@ -298,21 +301,16 @@ async def _save_to_supabase(targets: list[dict], scores: list[float]) -> None:
 
 async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
 
-    # 분석이 필요한 리뷰만 필터링
-    targets = [
-        r for r in reviews
-        if r.get("is_ad_finetuned_pred") is None
-    ]
+    targets = [r for r in reviews if r.get("is_ad_finetuned_pred") is None]
     if not targets:
         return
-    
-    INFER_BATCH = 32
-    all_preds, all_scores = [], []
+
+    all_scores: list[float] = []
 
     print(f"[DEBUG] 모델 배치 판별 시작 | count: {len(targets)}")
     batch_start = time.time()
-    for i in range(0, len(targets), INFER_BATCH):
-        chunk = targets[i:i + INFER_BATCH]
+    for i in range(0, len(targets), STREAM_BATCH_SIZE):
+        chunk = targets[i:i + STREAM_BATCH_SIZE]
         descriptions = [
             preprocess(
                 title=r.get("review_title") or "",
@@ -321,17 +319,20 @@ async def _analyze_missing_reviews(reviews: list[dict], mode: str) -> None:
             )
             for r in chunk
         ]
-        preds, scores = predict_and_score_batch(descriptions)
-        all_preds.extend(preds)
+        try:
+            _, scores = predict_and_score_batch(descriptions)
+        except Exception as e:
+            print(f"[WARNING] 배치 추론 실패, score=0.0 대체 | {e}")
+            scores = [0.0] * len(chunk)
         all_scores.extend(scores)
-        print(f"[DEBUG] 모델 판별 진행 | {len(all_preds)}/{len(targets)}")
+        print(f"[DEBUG] 모델 판별 진행 | {len(all_scores)}/{len(targets)}")
     batch_elapsed = time.time() - batch_start
     print(f"[DEBUG] 모델 배치 판별 완료 | 소요 시간: {batch_elapsed:.2f}s")
 
     for review, score in zip(targets, all_scores):
-        review["is_ad_finetuned_pred"] = score  # 메모리 먼저 반영
+        review["is_ad_finetuned_pred"] = score
 
-    asyncio.create_task(_save_to_supabase(targets, all_scores))  # Supabase는 백그라운드
+    asyncio.create_task(_save_to_supabase(targets, all_scores))
 
 def _is_place_detail_request(store_id: str | None) -> bool:
     return bool(str(store_id or "").strip())
@@ -448,55 +449,80 @@ async def search_stream(
             place_detail_request and cached_count == 0
         )
 
-        if should_fetch:
-            if auth_email:
-                await _ensure_analysis_usage_available(auth_email, store_id)
-
-            if place_detail_request:
-                fetch_result = await fetch_store_blog_previews(
-                    naver_query, query,
-                    start=normalized_start,
-                    display=REVIEW_BATCH_SIZE,
-                    max_results=max_review_results,
-                )
-                blogs = fetch_result.items
-            else:
-                blogs = await fetch_blog_previews(
-                    naver_query, start=normalized_start, display=review_limit,
-                )
-
-            await save_reviews(query, blogs, place_metadata=place_metadata)
-            saved = await get_cached_reviews(query, limit=max_review_results, store_id=store_id)
-            if place_detail_request:
-                saved = _filter_reviews_for_place(saved, place_metadata)
-            if not saved and blogs:
-                saved = _blogs_to_reviews(query, blogs, normalized_start, place_metadata=place_metadata)
-        else:
-            saved = cached
-
-        STREAM_BATCH = 32
-        already_scored = [r for r in saved if r.get("is_ad_finetuned_pred") is not None]
-        targets = [r for r in saved if r.get("is_ad_finetuned_pred") is None]
+        already_scored = [r for r in cached if r.get("is_ad_finetuned_pred") is not None]
 
         if already_scored:
             yield f"data: {json.dumps({'reviews': already_scored, 'done': False})}\n\n"
 
         loop = asyncio.get_running_loop()
-        for i in range(0, len(targets), STREAM_BATCH):
-            chunk = targets[i:i + STREAM_BATCH]
-            descriptions = [
-                preprocess(
-                    title=r.get("review_title") or "",
-                    description=r.get("review_description") or "",
-                    store_name=r.get("name") or "",
+
+        if should_fetch:
+            if auth_email:
+                await _ensure_analysis_usage_available(auth_email, store_id)
+
+            # Supabase 필드명("review_url")으로 중복 URL 집합 구성
+            seen_urls = {r.get("review_url") for r in already_scored}
+
+            async for page_blogs in iter_store_blog_pages(
+                naver_query,
+                query,
+                start=normalized_start,
+                max_results=max_review_results,
+            ):
+                # NAVER 필드명("link")으로 이미 스트림한 URL 제외
+                new_blogs = [b for b in page_blogs if b.get("link") not in seen_urls]
+                if not new_blogs:
+                    continue
+                seen_urls.update(b.get("link") for b in new_blogs)
+
+                reviews = _blogs_to_reviews(query, new_blogs, normalized_start, place_metadata)
+                page_scores: list[float] = []
+
+                for i in range(0, len(reviews), STREAM_BATCH_SIZE):
+                    chunk = reviews[i:i + STREAM_BATCH_SIZE]
+                    chunk_blogs = new_blogs[i:i + STREAM_BATCH_SIZE]
+                    descriptions = [
+                        preprocess(
+                            title=r.get("review_title") or "",
+                            description=r.get("review_description") or "",
+                            store_name=r.get("name") or "",
+                        )
+                        for r in chunk
+                    ]
+                    try:
+                        _, scores = await loop.run_in_executor(None, predict_and_score_batch, descriptions)
+                    except Exception as e:
+                        print(f"[WARNING] 스트림 배치 추론 실패, score=0.0 대체 | {e}")
+                        scores = [0.0] * len(chunk)
+                    for review, score in zip(chunk, scores):
+                        review["is_ad_finetuned_pred"] = score
+                    page_scores.extend(scores)
+                    yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
+
+                asyncio.create_task(
+                    save_reviews_with_scores(query, new_blogs, page_scores, place_metadata)
                 )
-                for r in chunk
-            ]
-            preds, scores = await loop.run_in_executor(None, predict_and_score_batch, descriptions)
-            for review, score in zip(chunk, scores):
-                review["is_ad_finetuned_pred"] = score
-            asyncio.create_task(_save_to_supabase(chunk, scores))
-            yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
+        else:
+            targets = [r for r in cached if r.get("is_ad_finetuned_pred") is None]
+            for i in range(0, len(targets), STREAM_BATCH_SIZE):
+                chunk = targets[i:i + STREAM_BATCH_SIZE]
+                descriptions = [
+                    preprocess(
+                        title=r.get("review_title") or "",
+                        description=r.get("review_description") or "",
+                        store_name=r.get("name") or "",
+                    )
+                    for r in chunk
+                ]
+                try:
+                    _, scores = await loop.run_in_executor(None, predict_and_score_batch, descriptions)
+                except Exception as e:
+                    print(f"[WARNING] 스트림 배치 추론 실패, score=0.0 대체 | {e}")
+                    scores = [0.0] * len(chunk)
+                for review, score in zip(chunk, scores):
+                    review["is_ad_finetuned_pred"] = score
+                asyncio.create_task(_save_to_supabase(chunk, scores))
+                yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
 
         yield f"data: {json.dumps({'reviews': [], 'done': True, 'naverQuery': naver_query})}\n\n"
 

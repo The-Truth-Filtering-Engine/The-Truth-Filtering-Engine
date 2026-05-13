@@ -1,6 +1,7 @@
 REVIEW_BATCH_SIZE = 100
 MAX_REVIEW_RESULTS = 300
 NAVER_MAX_START = 1000
+STREAM_BATCH_SIZE = 32
 
 def clamp_review_limit(value: int, default: int = REVIEW_BATCH_SIZE) -> int:
     if value <= 0:
