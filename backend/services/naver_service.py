@@ -1,4 +1,5 @@
 import httpx, os, re, unicodedata
+from collections.abc import AsyncGenerator
 from typing import NamedTuple
 from html import unescape
 from services.review_limits import (
@@ -209,6 +210,32 @@ def _category_hint(*categories: object) -> str | None:
         if needle in category_text:
             return hint
     return None
+
+async def iter_store_blog_pages(
+    query: str,
+    store_name: str,
+    *,
+    start: int = 1,
+    max_results: int = MAX_REVIEW_RESULTS,
+) -> AsyncGenerator[list[dict], None]:
+    """NAVER 블로그를 한 페이지(최대 100개, 상호명 필터 적용)씩 yield.
+    페이지 결과가 display 미만이면 마지막 페이지로 간주하고 조기 종료."""
+    async with httpx.AsyncClient() as client:
+        first_start = normalize_naver_start(start)
+        max_start = min(max(max_results, 1), MAX_REVIEW_RESULTS)
+
+        for page_start in range(first_start, max_start + 1, NAVER_BLOG_MAX_DISPLAY):
+            page = await _fetch_blog_previews_page(
+                client,
+                query,
+                start=page_start,
+                display=NAVER_BLOG_MAX_DISPLAY,
+            )
+            yield filter_blogs_by_store_name(page, store_name)
+
+            if len(page) < NAVER_BLOG_MAX_DISPLAY:
+                break
+
 
 async def fetch_blog_previews(
     query: str,

@@ -63,6 +63,7 @@ export function useDetail(
   const [isReviewBatchLoading, setIsReviewBatchLoading] = useState(false)
   const detailRequestIdRef = useRef(0)
   const reviewBatchRequestIdRef = useRef(0)
+  const streamControllerRef = useRef<AbortController | null>(null)
 
   function applyUsageProfile(usage?: AnalysisUsage) {
     const profile = usage?.profile
@@ -71,8 +72,10 @@ export function useDetail(
   }
 
   async function loadRestaurantDetail(restaurant: Restaurant, forceFresh = false) {
-    const requestId = ++detailRequestIdRef.current
+    streamControllerRef.current?.abort()
     const controller = new AbortController()
+    streamControllerRef.current = controller
+    const requestId = ++detailRequestIdRef.current
     const query = restaurant.name
     const accessToken = authSession?.access_token
 

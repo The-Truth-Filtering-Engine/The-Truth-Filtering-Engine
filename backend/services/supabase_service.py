@@ -90,6 +90,50 @@ async def save_reviews(
         )
 
 
+async def save_reviews_with_scores(
+    query: str,
+    blogs: list[dict],
+    scores: list[float],
+    place_metadata: dict | None = None,
+) -> None:
+    """NAVER 블로그 수집 결과와 추론 점수를 한 번에 upsert.
+    기존 레코드가 있으면 is_ad_finetuned_pred 를 갱신한다 (merge-duplicates)."""
+    if not SUPABASE_URL or not blogs:
+        return
+
+    metadata = _normalize_place_metadata(query, place_metadata)
+
+    rows = [
+        {
+            "name": metadata["name"],
+            "review_title": b.get("title", ""),
+            "review_description": b.get("description", ""),
+            "review_bloggername": b.get("bloggername", ""),
+            "review_url": b.get("link", ""),
+            "review_postdate": b.get("postdate"),
+            "store_id": metadata["store_id"],
+            "category_name": metadata["category_name"],
+            "category_group_code": metadata["category_group_code"],
+            "category_group_name": metadata["category_group_name"],
+            "phone": metadata["phone"],
+            "address_name": metadata["address_name"],
+            "road_address_name": metadata["road_address_name"],
+            "place_url": metadata["place_url"],
+            "is_ad_finetuned_pred": round(score, 4),
+        }
+        for b, score in zip(blogs, scores)
+    ]
+
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers=_h("resolution=merge-duplicates"),
+            params={"on_conflict": "review_url"},
+            json=rows,
+            timeout=15,
+        )
+
+
 def _normalize_place_metadata(query: str, place_metadata: dict | None) -> dict:
     metadata = place_metadata or {}
     return {
@@ -1229,8 +1273,10 @@ async def get_cached_reviews(
     query: str,
     limit: int = MAX_REVIEW_RESULTS,
     store_id: str | None = None,
+    scored_only: bool = False,
 ) -> list[dict]:
-    """store_id가 있으면 장소 ID 기준으로, 없으면 기존 query 기준으로 캐시 조회."""
+    """store_id가 있으면 장소 ID 기준으로, 없으면 기존 query 기준으로 캐시 조회.
+    scored_only=True면 is_ad_finetuned_pred 가 채워진 리뷰만 반환한다."""
     if not SUPABASE_URL:
         return []
 
@@ -1246,16 +1292,20 @@ async def get_cached_reviews(
     ttl_days = PLACE_CACHE_TTL_DAYS if store_id else CACHE_TTL_DAYS
     expired_at = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
 
+    params = {
+        **lookup_params,
+        "created_at": f"gte.{expired_at}",
+        "order": "created_at.desc",
+        "limit": str(review_limit),
+    }
+    if scored_only:
+        params["is_ad_finetuned_pred"] = "not.is.null"
+
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{SUPABASE_URL}/rest/v1/reviews",
             headers={**_h(), "Range": f"0-{end}", "Range-Unit": "items"},
-            params={
-                **lookup_params,
-                "created_at": f"gte.{expired_at}", # 캐시 만료 적용
-                "order": "created_at.desc",
-                "limit": str(review_limit),
-            },
+            params=params,
             timeout=10,
         )
 
