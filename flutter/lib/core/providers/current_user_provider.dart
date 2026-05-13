@@ -13,11 +13,16 @@ import '../config/test_account_auth_config.dart';
 
 class AppAuthState {
   final String? email;
-  final bool isTestAccountLogin;
+  final bool _isTestAccountLogin;
 
-  const AppAuthState({this.email, this.isTestAccountLogin = false});
+  const AppAuthState({this.email, bool isTestAccountLogin = false})
+      : _isTestAccountLogin = isTestAccountLogin;
 
   bool get isLoggedIn => email != null;
+
+  bool get isTestAccountLogin =>
+      _isTestAccountLogin ||
+      email?.trim().toLowerCase() == TestAccountAuthConfig.email;
 }
 
 class AppAuthNotifier extends StateNotifier<AppAuthState> {

@@ -7,13 +7,15 @@ class TestAccountAuthConfig {
   static const headerName = 'X-Test-Account-Email';
 
   static Map<String, String> headers({required bool isTestAccountLogin}) {
+    if (isTestAccountLogin) {
+      return {headerName: email};
+    }
+
     final token = _currentAccessToken();
     if (token != null) {
       return {'Authorization': 'Bearer $token'};
     }
-    if (isTestAccountLogin) {
-      return {headerName: email};
-    }
+
     return const {};
   }
 
