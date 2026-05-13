@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/backend_config.dart';
-import '../../../core/config/test_admin_auth_config.dart';
+import '../../../core/config/test_account_auth_config.dart';
 import '../../../core/providers/current_user_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
@@ -375,7 +375,9 @@ class _RestaurantDetailScreenState
 
   Map<String, String> _currentAuthHeaders() {
     final authState = ref.read(appAuthProvider);
-    return TestAdminAuthConfig.headers(isAdmin: authState.isAdmin);
+    return TestAccountAuthConfig.headers(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   }
 
   Future<bool> _recordRecentReviewOpen(BlogReview review) async {

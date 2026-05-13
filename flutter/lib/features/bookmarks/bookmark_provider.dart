@@ -9,7 +9,9 @@ final bookmarkRestaurantsProvider =
   (ref) {
     final authState = ref.watch(appAuthProvider);
     return BookmarkRestaurantsNotifier(
-      bookmarkService: BookmarkService(isAdmin: authState.isAdmin),
+      bookmarkService: BookmarkService(
+        isTestAccountLogin: authState.isTestAccountLogin,
+      ),
     );
   },
 );

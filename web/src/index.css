@@ -182,7 +182,7 @@ body {
 }
 
 .login-oauth-button,
-.login-temp-button {
+.login-test-account-button {
   display: flex;
   width: 100%;
   min-height: 46px;
@@ -235,7 +235,7 @@ body {
   background: var(--color-border-subtle);
 }
 
-.login-temp-button {
+.login-test-account-button {
   color: var(--color-text-subtle);
 }
 
@@ -263,7 +263,7 @@ body {
 .detail-button:focus-visible,
 .detail-secondary-button:focus-visible,
 .login-oauth-button:focus-visible,
-.login-temp-button:focus-visible,
+.login-test-account-button:focus-visible,
 .ai-region-tabs button:focus-visible,
 .map-search-field:focus-within,
 .map-search-submit:focus-visible,

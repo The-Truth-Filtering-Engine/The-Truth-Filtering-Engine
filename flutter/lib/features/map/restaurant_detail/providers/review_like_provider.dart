@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/test_admin_auth_config.dart';
+import '../../../../core/config/test_account_auth_config.dart';
 import '../../../../core/providers/current_user_provider.dart';
 import '../../../../data/models/review_like_model.dart';
 import '../../../../data/repositories/review_like_repository.dart';
@@ -150,7 +150,9 @@ final reviewLikeProvider = StateNotifierProviderFamily<ReviewLikeNotifier,
       repo: ref.read(reviewLikeRepositoryProvider),
       reviewId: key.reviewId,
       userId: key.userId,
-      authHeaders: TestAdminAuthConfig.headers(isAdmin: authState.isAdmin),
+      authHeaders: TestAccountAuthConfig.headers(
+        isTestAccountLogin: authState.isTestAccountLogin,
+      ),
     );
   },
 );

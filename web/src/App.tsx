@@ -494,7 +494,7 @@ function App() {
             authErrorMessage={auth.authErrorMessage}
             supabaseAvailable={Boolean(supabase)}
             onSignInWithGoogle={auth.signInWithGoogle}
-            onSignInAsTemporaryAdmin={auth.signInAsTemporaryAdmin}
+            onSignInWithTestAccount={auth.signInWithTestAccount}
           />
         ) : (
           <>

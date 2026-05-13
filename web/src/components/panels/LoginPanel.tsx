@@ -5,7 +5,7 @@ type Props = {
   authErrorMessage: string
   supabaseAvailable: boolean
   onSignInWithGoogle: () => void
-  onSignInAsTemporaryAdmin: () => void
+  onSignInWithTestAccount: () => void
 }
 
 export function LoginPanel({
@@ -13,7 +13,7 @@ export function LoginPanel({
   authErrorMessage,
   supabaseAvailable,
   onSignInWithGoogle,
-  onSignInAsTemporaryAdmin,
+  onSignInWithTestAccount,
 }: Props) {
   return (
     <aside className="restaurant-panel login-panel" aria-label="로그인">
@@ -46,10 +46,10 @@ export function LoginPanel({
 
         <button
           type="button"
-          className="login-temp-button"
-          onClick={onSignInAsTemporaryAdmin}
+          className="login-test-account-button"
+          onClick={onSignInWithTestAccount}
         >
-          관리자 테스트 로그인
+          테스트 계정으로 계속하기
         </button>
       </section>
     </aside>

@@ -2,17 +2,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_config.dart';
 
-class TestAdminAuthConfig {
+class TestAccountAuthConfig {
   static const email = 'test@example.com';
-  static const userId = 0;
-  static const headerName = 'X-Temporary-Admin-Email';
+  static const headerName = 'X-Test-Account-Email';
 
-  static Map<String, String> headers({required bool isAdmin}) {
+  static Map<String, String> headers({required bool isTestAccountLogin}) {
     final token = _currentAccessToken();
     if (token != null) {
       return {'Authorization': 'Bearer $token'};
     }
-    if (isAdmin) {
+    if (isTestAccountLogin) {
       return {headerName: email};
     }
     return const {};

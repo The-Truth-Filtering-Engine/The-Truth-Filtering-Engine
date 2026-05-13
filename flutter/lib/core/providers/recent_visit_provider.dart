@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/backend_config.dart';
-import '../config/test_admin_auth_config.dart';
+import '../config/test_account_auth_config.dart';
 import 'current_user_provider.dart';
 import '../../features/map/models/restaurant_model.dart';
 
@@ -18,7 +18,7 @@ final recentVisitProvider =
 
     return RecentVisitNotifier(
       enableRemoteSync: authState.isLoggedIn,
-      isAdmin: authState.isAdmin,
+      isTestAccountLogin: authState.isTestAccountLogin,
     );
   },
 );
@@ -28,11 +28,11 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
   static const _maxCount = 30;
 
   final bool enableRemoteSync;
-  final bool isAdmin;
+  final bool isTestAccountLogin;
 
   RecentVisitNotifier({
     required this.enableRemoteSync,
-    required this.isAdmin,
+    required this.isTestAccountLogin,
   }) : super(const []) {
     _load();
   }
@@ -170,7 +170,9 @@ class RecentVisitNotifier extends StateNotifier<List<RestaurantModel>> {
 
   Map<String, String>? get _authHeaders {
     if (!enableRemoteSync) return null;
-    final headers = TestAdminAuthConfig.headers(isAdmin: isAdmin);
+    final headers = TestAccountAuthConfig.headers(
+      isTestAccountLogin: isTestAccountLogin,
+    );
     return headers.isEmpty ? null : headers;
   }
 

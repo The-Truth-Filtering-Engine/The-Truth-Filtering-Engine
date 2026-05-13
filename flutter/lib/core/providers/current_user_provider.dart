@@ -1,21 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/test_admin_auth_config.dart';
+import '../config/test_account_auth_config.dart';
 
 // ─────────────────────────────────────────────────────────────
-// AppAuthState — Google OAuth + 관리자 테스트 로그인 통합 관리
+// AppAuthState — Google OAuth + 테스트 계정 간편 로그인 통합 관리
 //
 //  Google 로그인    → email = 실제 구글 이메일
-//  관리자 테스트 로그인 → email = 'test@example.com', isAdmin = true
+//  테스트 계정 로그인 → email = 'test@example.com'
 //  미로그인         → email = null
 // ─────────────────────────────────────────────────────────────
 
 class AppAuthState {
   final String? email;
-  final bool isAdmin;
+  final bool isTestAccountLogin;
 
-  const AppAuthState({this.email, this.isAdmin = false});
+  const AppAuthState({this.email, this.isTestAccountLogin = false});
 
   bool get isLoggedIn => email != null;
 }
@@ -34,11 +34,11 @@ class AppAuthNotifier extends StateNotifier<AppAuthState> {
     state = AppAuthState(email: email);
   }
 
-  /// 관리자 테스트 로그인 → start_auth_screen.dart 의 _signInAsTemporaryAdmin 에서 호출
-  void setTempAdmin() {
+  /// 테스트 계정 간편 로그인 → start_auth_screen.dart 에서 호출
+  void setTestAccountUser() {
     state = const AppAuthState(
-      email: TestAdminAuthConfig.email,
-      isAdmin: true,
+      email: TestAccountAuthConfig.email,
+      isTestAccountLogin: true,
     );
   }
 

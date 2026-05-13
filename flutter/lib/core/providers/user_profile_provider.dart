@@ -4,21 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/backend_config.dart';
-import '../config/test_admin_auth_config.dart';
+import '../config/test_account_auth_config.dart';
 import 'current_user_provider.dart';
 
 final userProfileProvider =
     StateNotifierProvider<UserProfileNotifier, AsyncValue<UserProfile?>>(
   (ref) {
     final authState = ref.watch(appAuthProvider);
-    return UserProfileNotifier(isAdmin: authState.isAdmin);
+    return UserProfileNotifier(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   },
 );
 
 final currentUserIdProvider = Provider<int?>((ref) {
   final email = ref.watch(currentUserEmailProvider);
   if (email == null || email.isEmpty) return null;
-  if (email == TestAdminAuthConfig.email) return TestAdminAuthConfig.userId;
 
   final id = ref.watch(userProfileProvider).asData?.value?.id;
   if (id == null || id < 0) return null;
@@ -26,13 +27,13 @@ final currentUserIdProvider = Provider<int?>((ref) {
 });
 
 class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
-  UserProfileNotifier({required this.isAdmin})
+  UserProfileNotifier({required this.isTestAccountLogin})
       : super(const AsyncValue.data(null));
 
-  final bool isAdmin;
+  final bool isTestAccountLogin;
 
   Map<String, String> get authHeaders =>
-      TestAdminAuthConfig.headers(isAdmin: isAdmin);
+      TestAccountAuthConfig.headers(isTestAccountLogin: isTestAccountLogin);
 
   bool get hasApiAuth => authHeaders.isNotEmpty;
 

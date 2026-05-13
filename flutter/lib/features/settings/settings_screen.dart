@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/supabase_config.dart';
-import '../../core/config/test_admin_auth_config.dart';
+import '../../core/config/test_account_auth_config.dart';
 import '../../core/providers/current_user_provider.dart';
 import '../../core/providers/liked_reviews_provider.dart';
 import '../../core/providers/recent_visit_provider.dart';
@@ -34,7 +34,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Map<String, String> get _authHeaders {
     final authState = ref.read(appAuthProvider);
-    return TestAdminAuthConfig.headers(isAdmin: authState.isAdmin);
+    return TestAccountAuthConfig.headers(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   }
 
   bool get _hasApiAuth => _authHeaders.isNotEmpty;

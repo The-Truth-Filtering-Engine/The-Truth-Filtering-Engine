@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
-import '../config/test_admin_auth_config.dart';
+import '../config/test_account_auth_config.dart';
 import '../../data/models/review_like_model.dart';
 import '../../features/map/models/restaurant_model.dart';
 import 'current_user_provider.dart';
@@ -31,7 +31,7 @@ final likedReviewsProvider =
 
     return LikedReviewsNotifier(
       userId: userId,
-      isAdmin: authState.isAdmin,
+      isTestAccountLogin: authState.isTestAccountLogin,
     );
   },
 );
@@ -100,12 +100,12 @@ class LikedReview {
 class LikedReviewsNotifier
     extends StateNotifier<AsyncValue<List<LikedReview>>> {
   final int? userId;
-  final bool isAdmin;
+  final bool isTestAccountLogin;
   final _locallyUnlikedReviewIds = <String>{};
 
   LikedReviewsNotifier({
     required this.userId,
-    required this.isAdmin,
+    required this.isTestAccountLogin,
   })
       : super(const AsyncValue.loading()) {
     load();
@@ -405,7 +405,9 @@ class LikedReviewsNotifier
   }
 
   Map<String, String>? get _authHeaders {
-    final headers = TestAdminAuthConfig.headers(isAdmin: isAdmin);
+    final headers = TestAccountAuthConfig.headers(
+      isTestAccountLogin: isTestAccountLogin,
+    );
     return headers.isEmpty ? null : headers;
   }
 }

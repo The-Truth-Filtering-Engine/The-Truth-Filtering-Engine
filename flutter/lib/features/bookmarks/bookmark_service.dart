@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/backend_config.dart';
-import '../../core/config/test_admin_auth_config.dart';
+import '../../core/config/test_account_auth_config.dart';
 import '../map/models/restaurant_model.dart';
 
 class BookmarkService {
-  BookmarkService({required this.isAdmin});
+  BookmarkService({required this.isTestAccountLogin});
 
-  final bool isAdmin;
+  final bool isTestAccountLogin;
   List<RestaurantModel> _items = const [];
 
   Future<List<RestaurantModel>> loadBookmarks() async {
@@ -70,7 +70,9 @@ class BookmarkService {
   }
 
   Map<String, String>? get _authHeaders {
-    final headers = TestAdminAuthConfig.headers(isAdmin: isAdmin);
+    final headers = TestAccountAuthConfig.headers(
+      isTestAccountLogin: isTestAccountLogin,
+    );
     return headers.isEmpty ? null : headers;
   }
 

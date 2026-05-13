@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/backend_config.dart';
-import '../../core/config/test_admin_auth_config.dart';
+import '../../core/config/test_account_auth_config.dart';
 import '../../core/providers/current_user_provider.dart';
 import '../map/models/restaurant_model.dart';
 
@@ -12,18 +12,20 @@ final recentAnalysesProvider =
     StateNotifierProvider<RecentAnalysesNotifier, AsyncValue<RecentAnalyses>>(
   (ref) {
     final authState = ref.watch(appAuthProvider);
-    return RecentAnalysesNotifier(isAdmin: authState.isAdmin);
+    return RecentAnalysesNotifier(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   },
 );
 
 class RecentAnalysesNotifier extends StateNotifier<AsyncValue<RecentAnalyses>> {
-  RecentAnalysesNotifier({required this.isAdmin})
+  RecentAnalysesNotifier({required this.isTestAccountLogin})
       : super(const AsyncValue.data(RecentAnalyses.empty));
 
-  final bool isAdmin;
+  final bool isTestAccountLogin;
 
   Map<String, String> get _authHeaders =>
-      TestAdminAuthConfig.headers(isAdmin: isAdmin);
+      TestAccountAuthConfig.headers(isTestAccountLogin: isTestAccountLogin);
 
   Future<void> load() async {
     final headers = _authHeaders;

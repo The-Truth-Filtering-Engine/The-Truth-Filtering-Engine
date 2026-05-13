@@ -85,8 +85,8 @@ class _StartAuthScreenState extends ConsumerState<StartAuthScreen> {
     }
   }
 
-  void _signInAsTemporaryAdmin() {
-    ref.read(appAuthProvider.notifier).setTempAdmin();
+  void _signInWithTestAccount() {
+    ref.read(appAuthProvider.notifier).setTestAccountUser();
     _showSnackBar('test@example.com 계정으로 로그인되었습니다.');
     _goToMainShell();
   }
@@ -127,7 +127,7 @@ class _StartAuthScreenState extends ConsumerState<StartAuthScreen> {
                       const SizedBox(height: AppSpacing.x7),
                       _googleButton(),
                       const SizedBox(height: AppSpacing.x3),
-                      _temporaryAdminButton(),
+                      _testAccountButton(),
                     ],
                   ),
                 ),
@@ -175,13 +175,13 @@ class _StartAuthScreenState extends ConsumerState<StartAuthScreen> {
     );
   }
 
-  Widget _temporaryAdminButton() {
+  Widget _testAccountButton() {
     return DsButton(
-      label: '관리자 테스트 로그인',
+      label: '테스트 계정으로 계속하기',
       variant: DsButtonVariant.ghost,
       size: DsButtonSize.md,
-      onPressed: _signInAsTemporaryAdmin,
-      leftIcon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
+      onPressed: _signInWithTestAccount,
+      leftIcon: const Icon(Icons.person_outline, size: 20),
     );
   }
 }

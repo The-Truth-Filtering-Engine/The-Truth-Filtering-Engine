@@ -23,8 +23,8 @@ from services.supabase_service import (
 router = APIRouter()
 
 ALLOWED_COIN_AMOUNTS = {1000, 2000, 3000}
-TEST_ADMIN_EMAIL = "test@example.com"
-TEST_ADMIN_HEADER = "X-Temporary-Admin-Email"
+TEST_ACCOUNT_EMAIL = "test@example.com"
+TEST_ACCOUNT_HEADER = "X-Test-Account-Email"
 
 
 class PremiumUpdateRequest(BaseModel):
@@ -67,25 +67,25 @@ def _extract_bearer_token(authorization: str | None) -> str:
     return token.strip()
 
 
-def _extract_temporary_admin_email(temporary_admin_email: str | None) -> str | None:
-    email = (temporary_admin_email or "").strip().lower()
+def _extract_test_account_email(test_account_email: str | None) -> str | None:
+    email = (test_account_email or "").strip().lower()
     if not email:
         return None
-    if email != TEST_ADMIN_EMAIL:
+    if email != TEST_ACCOUNT_EMAIL:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="테스트 관리자 이메일이 올바르지 않습니다",
+            detail="테스트 계정 이메일이 올바르지 않습니다",
         )
-    return TEST_ADMIN_EMAIL
+    return TEST_ACCOUNT_EMAIL
 
 
 async def _require_email(
     authorization: str | None,
-    temporary_admin_email: str | None,
+    test_account_email: str | None,
 ) -> str:
-    admin_email = _extract_temporary_admin_email(temporary_admin_email)
-    if admin_email:
-        return admin_email
+    account_email = _extract_test_account_email(test_account_email)
+    if account_email:
+        return account_email
 
     token = _extract_bearer_token(authorization)
 
@@ -108,9 +108,9 @@ async def _require_email(
 
 async def _require_email_from_headers(
     authorization: str | None = Header(default=None),
-    temporary_admin_email: str | None = Header(default=None, alias=TEST_ADMIN_HEADER),
+    test_account_email: str | None = Header(default=None, alias=TEST_ACCOUNT_HEADER),
 ) -> str:
-    return await _require_email(authorization, temporary_admin_email)
+    return await _require_email(authorization, test_account_email)
 
 
 @router.get("/user/me")
