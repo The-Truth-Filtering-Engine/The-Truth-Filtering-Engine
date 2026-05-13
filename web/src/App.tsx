@@ -25,6 +25,7 @@ import { useAuth } from './hooks/useAuth'
 import { useBookmarks } from './hooks/useBookmarks'
 import { useDetail } from './hooks/useDetail'
 import { useMap } from './hooks/useMap'
+import { useReviewActivity } from './hooks/useReviewActivity'
 import { LoginPanel } from './components/panels/LoginPanel'
 import { SearchPanel } from './components/panels/SearchPanel'
 import { RestaurantPanel, getDetailUsageInfo } from './components/panels/RestaurantPanel'
@@ -121,6 +122,11 @@ function App() {
   const auth = useAuth(handleSignOut, showToast)
 
   const bookmarks = useBookmarks(auth.authSession, auth.isTemporaryAdmin, showToast)
+  const reviewActivity = useReviewActivity(
+    auth.authSession,
+    auth.isTemporaryAdmin,
+    showToast,
+  )
 
   function handleProfileRefresh(profile: UserProfile) {
     setUserProfileState((prev) => ({
@@ -545,6 +551,10 @@ function App() {
                 onRefresh={(restaurant) => openDetailPanel(restaurant, true)}
                 onChangeReviewSort={detail.changeReviewSort}
                 onChangeReviewPage={(page) => detail.changeReviewPage(page, selectedRestaurant)}
+                reviewActivityAvailable={reviewActivity.isAvailable}
+                getReviewLikeState={reviewActivity.getReviewLikeState}
+                onToggleReviewHeart={reviewActivity.toggleReviewHeart}
+                onOpenReviewSource={reviewActivity.openReviewSource}
               />
             )}
             {activeSidePanel === 'bookmarks' && (
@@ -585,6 +595,16 @@ function App() {
                 onChargeCoins={chargeCoins}
                 onSignOut={auth.signOut}
                 onRetryLoadProfile={loadUserProfile}
+                reviewActivityAvailable={reviewActivity.isAvailable}
+                likedReviewsState={reviewActivity.likedReviewsState}
+                recentReviewsState={reviewActivity.recentReviewsState}
+                onLoadLikedReviews={reviewActivity.loadLikedReviews}
+                onLoadRecentReviews={reviewActivity.loadRecentReviews}
+                onOpenLikedReview={reviewActivity.openReviewSource}
+                onOpenRecentReview={reviewActivity.openRecentReviewSource}
+                onRemoveLikedReview={reviewActivity.removeLikedReview}
+                onRemoveRecentReview={reviewActivity.removeRecentReview}
+                onClearRecentReviews={reviewActivity.clearRecentReviews}
               />
             )}
           </>

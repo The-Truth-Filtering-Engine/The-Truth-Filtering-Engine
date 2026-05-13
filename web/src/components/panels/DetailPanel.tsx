@@ -4,6 +4,8 @@ import {
   Bookmark,
   BookmarkCheck,
   Clock,
+  ExternalLink,
+  Heart,
   Info,
   LoaderCircle,
   Navigation,
@@ -17,6 +19,7 @@ import { formatDistance } from '../../lib/format'
 import { getRestaurantStoreId, type Restaurant } from '../../lib/restaurant'
 import { gradeLabel, type BlogReview, type DetailData, REVIEW_PAGE_SIZE } from '../../api/reviews'
 import { type DetailState } from '../../hooks/useDetail'
+import { type ReviewLikeViewState } from '../../hooks/useReviewActivity'
 
 type Props = {
   restaurant: Restaurant
@@ -39,6 +42,10 @@ type Props = {
   onRefresh: (restaurant: Restaurant) => void
   onChangeReviewSort: (sort: 'real' | 'latest') => void
   onChangeReviewPage: (page: number) => void
+  reviewActivityAvailable: boolean
+  getReviewLikeState: (review: BlogReview) => ReviewLikeViewState
+  onToggleReviewHeart: (review: BlogReview) => void
+  onOpenReviewSource: (review: BlogReview) => void
 }
 
 export function DetailPanel({
@@ -62,6 +69,10 @@ export function DetailPanel({
   onRefresh,
   onChangeReviewSort,
   onChangeReviewPage,
+  reviewActivityAvailable,
+  getReviewLikeState,
+  onToggleReviewHeart,
+  onOpenReviewSource,
 }: Props) {
   const isBookmarked = bookmarkedStoreIds.includes(getRestaurantStoreId(restaurant))
 
@@ -229,37 +240,13 @@ export function DetailPanel({
                     ))
                   : visibleDetailReviews.map((review) => (
                       <li key={`${review.id}-${review.url || review.title}`}>
-                        {review.url ? (
-                          <a
-                            className="review-card"
-                            href={review.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`${review.title} 원문 열기`}
-                          >
-                            <span className={`review-grade ${review.grade}`}>
-                              {gradeLabel(review.grade)}
-                            </span>
-                            <strong>{review.title}</strong>
-                            <p>{review.preview}</p>
-                            <small>
-                              {review.author}
-                              {review.date ? ` · ${review.date}` : ''}
-                            </small>
-                          </a>
-                        ) : (
-                          <article className="review-card">
-                            <span className={`review-grade ${review.grade}`}>
-                              {gradeLabel(review.grade)}
-                            </span>
-                            <strong>{review.title}</strong>
-                            <p>{review.preview}</p>
-                            <small>
-                              {review.author}
-                              {review.date ? ` · ${review.date}` : ''}
-                            </small>
-                          </article>
-                        )}
+                        <ReviewCard
+                          review={review}
+                          reviewActivityAvailable={reviewActivityAvailable}
+                          likeState={getReviewLikeState(review)}
+                          onToggleReviewHeart={onToggleReviewHeart}
+                          onOpenReviewSource={onOpenReviewSource}
+                        />
                       </li>
                     ))}
               </ul>
@@ -289,5 +276,62 @@ export function DetailPanel({
         )}
       </section>
     </aside>
+  )
+}
+
+type ReviewCardProps = {
+  review: BlogReview
+  reviewActivityAvailable: boolean
+  likeState: ReviewLikeViewState
+  onToggleReviewHeart: (review: BlogReview) => void
+  onOpenReviewSource: (review: BlogReview) => void
+}
+
+function ReviewCard({
+  review,
+  reviewActivityAvailable,
+  likeState,
+  onToggleReviewHeart,
+  onOpenReviewSource,
+}: ReviewCardProps) {
+  return (
+    <article className="review-card">
+      <div className="review-card-topline">
+        <span className={`review-grade ${review.grade}`}>
+          {gradeLabel(review.grade)}
+        </span>
+        <button
+          type="button"
+          className={`review-heart-button ${likeState.isLiked ? 'active' : ''}`}
+          disabled={!reviewActivityAvailable || likeState.isSaving}
+          aria-label={likeState.isLiked ? '내 하트 해제' : '내 하트 추가'}
+          onClick={() => onToggleReviewHeart(review)}
+        >
+          <Heart
+            aria-hidden="true"
+            size={15}
+            strokeWidth={2.3}
+            fill={likeState.isLiked ? 'currentColor' : 'none'}
+          />
+          <span>{likeState.likeCount}</span>
+        </button>
+      </div>
+      <strong>{review.title}</strong>
+      <p>{review.preview}</p>
+      <small>
+        {review.author}
+        {review.date ? ` · ${review.date}` : ''}
+      </small>
+      {review.url && (
+        <button
+          type="button"
+          className="review-open-button"
+          onClick={() => onOpenReviewSource(review)}
+        >
+          <ExternalLink aria-hidden="true" size={14} strokeWidth={2.2} />
+          원문 보기
+        </button>
+      )}
+    </article>
   )
 }

@@ -4,13 +4,24 @@ import { type Restaurant } from '../lib/restaurant'
 
 export type ReviewGrade = 'real' | 'suspicious' | 'ad'
 
+export type ReviewLikeEntry = {
+  user_id: number
+  likedAt?: string
+  updatedAt?: string
+}
+
 export type BlogReview = {
   id: number
+  reviewId: string
   title: string
   author: string
   date: string
+  description: string
   preview: string
   url: string
+  restaurantName: string
+  likes: ReviewLikeEntry[]
+  likeCount: number
   adScore: number | null
   adProbability: number
   grade: ReviewGrade
@@ -70,6 +81,34 @@ export function gradeLabel(grade: ReviewGrade) {
   return '의심'
 }
 
+export function parseReviewLikeEntries(value: unknown): ReviewLikeEntry[] {
+  if (!Array.isArray(value)) return []
+
+  const byUserId = new Map<number, ReviewLikeEntry>()
+
+  for (const entry of value) {
+    const source =
+      entry && typeof entry === 'object' && !Array.isArray(entry)
+        ? (entry as Record<string, unknown>)
+        : {}
+    const userId = Number(
+      source.user_id ??
+        source.userId ??
+        (typeof entry === 'number' || typeof entry === 'string' ? entry : NaN),
+    )
+
+    if (!Number.isFinite(userId)) continue
+
+    byUserId.set(userId, {
+      user_id: userId,
+      likedAt: cleanText(source.likedAt),
+      updatedAt: cleanText(source.updatedAt),
+    })
+  }
+
+  return [...byUserId.values()]
+}
+
 export function parseBlogReview(item: Record<string, unknown>): BlogReview {
   const electraPred =
     typeof item.is_ad_electra_pred === 'number' ? item.is_ad_electra_pred : null
@@ -90,14 +129,21 @@ export function parseBlogReview(item: Record<string, unknown>): BlogReview {
       ? `${description.slice(0, 96)}...`
       : description
     : '요약 없음'
+  const likes = parseReviewLikeEntries(item.likes)
+  const fallbackLikeCount = Number(item.like_count ?? item.likeCount ?? 0)
 
   return {
     id: Number(item.id ?? 0),
+    reviewId: cleanText(item.id),
     title: cleanText(item.review_title) || '(제목 없음)',
     author: cleanText(item.review_bloggername) || '알 수 없음',
     date: formatReviewDate(item.review_postdate),
+    description,
     preview,
     url: cleanExternalUrl(item.review_url ?? item.reviewUrl ?? item.link),
+    restaurantName: cleanText(item.name),
+    likes,
+    likeCount: likes.length || (Number.isFinite(fallbackLikeCount) ? fallbackLikeCount : 0),
     adScore,
     adProbability: adScore === null ? 50 : Math.round(adScore * 100),
     grade: gradeFromScore(adScore),
