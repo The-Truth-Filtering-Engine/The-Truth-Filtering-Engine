@@ -27,7 +27,7 @@ import 'widgets/review_list_section.dart';
 enum _ScreenState { initial, checking, noData, analyzing, loaded }
 
 const int _reviewBatchSize = 100;
-const int _maxReviewResults = 300;
+const int _maxReviewResults = 100;
 
 class _ReviewFetchResult {
   final List<BlogReview> reviews;
