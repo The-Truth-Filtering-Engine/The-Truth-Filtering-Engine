@@ -1,4 +1,5 @@
 import logging
+import torch
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -9,26 +10,48 @@ _tokenizer = None
 _model = None
 _model_available = False
 
+GPU_MODEL_DIR = Path(__file__).resolve().parents[1] / "models" / "GPU"
+
 def load_model() -> None:
     global _tokenizer, _model, _model_available
-    model_bin = MODEL_DIR / "openvino_model.bin"
-    if not model_bin.exists():
-        logger.warning(f"[electra_service] 모델 파일이 존재하지 않습니다: {model_bin}")
+    model_file = GPU_MODEL_DIR / "model.safetensors"
+    if not model_file.exists():
+        logger.warning(f"[electra_service] 모델 파일이 존재하지 않습니다: {model_file}")
         _model_available = False
         return
     try:
-        from optimum.intel import OVModelForSequenceClassification
-        from transformers import AutoTokenizer
-        _tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
-        _model = OVModelForSequenceClassification.from_pretrained(
-            str(MODEL_DIR),
-            ov_config={"PERFORMANCE_HINT": "THROUGHPUT", "NUM_STREAMS": "1"},
-        )
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        _tokenizer = AutoTokenizer.from_pretrained(str(GPU_MODEL_DIR))
+        _model = AutoModelForSequenceClassification.from_pretrained(str(GPU_MODEL_DIR))
+        _model.to("cuda")
+        _model.eval()
         _model_available = True
-        logger.info("[MODEL_service] 모델 로드 완료.")
+        logger.info("[MODEL_service] 모델 로드 완료 (CUDA)")
     except Exception as e:
-        logger.warning(f"[MODEL_service] 모델 로드 실패 (기능 비활성화): {e}")
+        logger.warning(f"[MODEL_service] 모델 로드 실패: {e}")
         _model_available = False
+
+# Intel CPU
+# def load_model() -> None:
+#     global _tokenizer, _model, _model_available
+#     model_bin = MODEL_DIR / "openvino_model.bin"
+#     if not model_bin.exists():
+#         logger.warning(f"[electra_service] 모델 파일이 존재하지 않습니다: {model_bin}")
+#         _model_available = False
+#         return
+#     try:
+#         from optimum.intel import OVModelForSequenceClassification
+#         from transformers import AutoTokenizer
+#         _tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
+#         _model = OVModelForSequenceClassification.from_pretrained(
+#             str(MODEL_DIR),
+#             ov_config={"PERFORMANCE_HINT": "THROUGHPUT", "NUM_STREAMS": "1"},
+#         )
+#           _model_available = True
+#           logger.info("[MODEL_service] 모델 로드 완료.")
+#       except Exception as e:
+#           logger.warning(f"[MODEL_service] 모델 로드 실패 (기능 비활성화): {e}")
+#           _model_available = False
 
 AD_THRESHOLD_HIGH = 0.739  # 하(광고)
 AD_THRESHOLD_LOW  = 0.343  # 상(진성), 중(의심): 0.343 ~ 0.739
@@ -39,9 +62,17 @@ def score_is_ad(review_description: str) -> float:
     text = (review_description or "").strip()
     if not text:
         return 0.0
+    
     encoded = _tokenizer(text, truncation=True, padding=True, max_length=512, return_tensors="pt")
-    logits = _model(**encoded).logits
-    probs = logits.softmax(dim=-1)
+    encoded = {k: v.to("cuda") for k, v in encoded.items()}
+    with torch.no_grad():
+        logits = _model(**encoded).logits
+    probs = logits.softmax(dim=-1).cpu()
+
+    # Intel CPU
+    # encoded = _tokenizer(text, truncation=True, padding=True, max_length=512, return_tensors="pt")
+    # logits = _model(**encoded).logits
+    # probs = logits.softmax(dim=-1)
     return float(probs[0, 1].item())
 
 def predict_is_ad(review_description: str) -> int:
@@ -65,13 +96,39 @@ def predict_and_score_batch(texts: list[str]) -> tuple[list[int], list[float]]:
         max_length=256,
         return_tensors="pt",
     )
-    logits = _model(**encoded).logits
-    probs  = logits.softmax(dim=-1)
+    encoded = {k: v.to("cuda") for k, v in encoded.items()}    # ← GPU로 이동
+    with torch.no_grad():                                      # ← 추론 시 메모리 절약
+        logits = _model(**encoded).logits
+    probs = logits.softmax(dim=-1).cpu()                       # ← 결과는 CPU로
     scores = [float(probs[i, 1].item()) for i in range(len(cleaned))]
-    preds  = [
+    preds = [
         2 if s >= AD_THRESHOLD_HIGH else
-        1 if s >= AD_THRESHOLD_LOW  else
+        1 if s >= AD_THRESHOLD_LOW else
         0
         for s in scores
     ]
     return preds, scores
+
+# Intel CPU
+# def predict_and_score_batch(texts: list[str]) -> tuple[list[int], list[float]]:
+#     if not _model_available or _model is None or _tokenizer is None:
+#         return [0] * len(texts), [0.0] * len(texts)
+
+#     cleaned = [(t or "").strip() for t in texts]
+#     encoded = _tokenizer(
+#         cleaned,
+#         truncation=True,
+#         padding=True,
+#         max_length=256,
+#         return_tensors="pt",
+#     )
+#     logits = _model(**encoded).logits
+#     probs  = logits.softmax(dim=-1)
+#     scores = [float(probs[i, 1].item()) for i in range(len(cleaned))]
+#     preds  = [
+#         2 if s >= AD_THRESHOLD_HIGH else
+#         1 if s >= AD_THRESHOLD_LOW  else
+#         0
+#         for s in scores
+#     ]
+#     return preds, scores
