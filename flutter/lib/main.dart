@@ -83,6 +83,9 @@ class _MainShellState extends ConsumerState<MainShell> {
         index: ref.watch(mainTabIndexProvider),
         children: [
           MapScreen(
+            onSelectTab: (index) {
+              ref.read(mainTabIndexProvider.notifier).state = index;
+            },
             onOpenSettings: () {
               ref.read(mainTabIndexProvider.notifier).state = 4;
             },

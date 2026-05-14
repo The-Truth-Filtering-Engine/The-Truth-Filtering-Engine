@@ -27,8 +27,9 @@ import '../../search/search_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenSettings;
+  final ValueChanged<int>? onSelectTab;
 
-  const MapScreen({super.key, this.onOpenSettings});
+  const MapScreen({super.key, this.onOpenSettings, this.onSelectTab});
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -252,6 +253,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       builder: (_) => SearchScreen(
                         initialLatitude: currentLocation?.latitude,
                         initialLongitude: currentLocation?.longitude,
+                        onSelectTab: widget.onSelectTab,
                         onViewPlace: _showRestaurantFromSearchResult,
                       ),
                     ),

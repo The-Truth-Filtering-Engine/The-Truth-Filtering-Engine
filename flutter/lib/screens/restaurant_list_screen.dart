@@ -3,18 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config/backend_config.dart';
 import '../core/theme/app_theme.dart';
 import '../features/map/models/restaurant_model.dart';
 
-const _kakaoApiKey = 'f93a0dfc8ddbcbd58a4c74a1b8434cdb';
-
 class RestaurantListScreen extends StatefulWidget {
-  final String query;
-  final double? initialLatitude;
-  final double? initialLongitude;
-  final ValueChanged<RestaurantModel> onViewPlace;
-
   const RestaurantListScreen({
     super.key,
     required this.query,
@@ -23,6 +18,11 @@ class RestaurantListScreen extends StatefulWidget {
     required this.onViewPlace,
   });
 
+  final String query;
+  final double? initialLatitude;
+  final double? initialLongitude;
+  final ValueChanged<RestaurantModel> onViewPlace;
+
   @override
   State<RestaurantListScreen> createState() => _RestaurantListScreenState();
 }
@@ -30,11 +30,11 @@ class RestaurantListScreen extends StatefulWidget {
 class _RestaurantListScreenState extends State<RestaurantListScreen> {
   late final TextEditingController _queryController;
   late String _query;
+
   bool _isLoading = true;
   String? _errorMessage;
   List<RestaurantModel> _results = [];
-  String _sortBy = 'trust_score';
-  final List<String> _sortOptions = ['distance', 'trust_score'];
+  String _sortBy = 'truth_score';
 
   @override
   void initState() {
@@ -42,9 +42,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
     _query = widget.query.trim();
     _queryController = TextEditingController(text: _query);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _search(_query);
-      }
+      if (mounted) _search(_query);
     });
   }
 
@@ -56,10 +54,9 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
 
   Future<void> _search(String query) async {
     final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      if (!mounted) return;
+    if (trimmed.length < 2) {
       setState(() {
-        _errorMessage = 'Please enter a search keyword.';
+        _errorMessage = '검색어를 2글자 이상 입력해주세요';
         _isLoading = false;
       });
       return;
@@ -74,273 +71,120 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
     }
 
     FocusScope.of(context).unfocus();
-
-    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      double? lat;
-      double? lng;
-
-      try {
-        lat = widget.initialLatitude;
-        lng = widget.initialLongitude;
-
-        if (lat == null || lng == null) {
-          final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-          if (serviceEnabled) {
-            LocationPermission permission = await Geolocator.checkPermission();
-            if (permission == LocationPermission.denied) {
-              permission = await Geolocator.requestPermission();
-            }
-
-            if (permission == LocationPermission.whileInUse ||
-                permission == LocationPermission.always) {
-              final position = await Geolocator.getCurrentPosition(
-                locationSettings: const LocationSettings(
-                  accuracy: LocationAccuracy.high,
-                ),
-              );
-              lat = position.latitude;
-              lng = position.longitude;
-            }
-          }
-        }
-      } catch (_) {
-        // 위치 권한/획득 실패 시 일반 검색으로 대비(fallback)
-      }
-      const categoryCodes = ['FD6', 'CE7'];
-      final mergedDocuments = <Map<String, dynamic>>[];
-
-      for (final categoryCode in categoryCodes) {
-        String url = 'https://dapi.kakao.com/v2/local/search/keyword.json'
-            '?query=${Uri.encodeComponent(trimmed)}'
-            '&category_group_code=$categoryCode'
-            '&size=15';
-
-        if (lat != null && lng != null) {
-          url += '&sort=distance';
-          url += '&x=$lng&y=$lat&radius=5000';
-        }
-
-        final response = await http.get(
-          Uri.parse(url),
-          headers: {'Authorization': 'KakaoAK $_kakaoApiKey'},
-        );
-
-        if (response.statusCode != 200) {
-          final errorInfo = _extractKakaoError(response);
-          if (!mounted) return;
-          setState(() {
-            _errorMessage = '검색 API 에러 (${response.statusCode})'
-                '${errorInfo.isNotEmpty ? '\n$errorInfo' : ''}';
-            _isLoading = false;
-          });
-          return;
-        }
-
-        final data = jsonDecode(response.body);
-        final documents = (data['documents'] as List?) ?? [];
-        for (final item in documents) {
-          if (item is Map) {
-            mergedDocuments.add(item.cast<String, dynamic>());
-          }
-        }
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (token == null || token.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = '로그인이 필요합니다';
+          _isLoading = false;
+        });
+        return;
       }
 
-      final uniqueById = <String, Map<String, dynamic>>{};
-      for (final doc in mergedDocuments) {
-        final id = doc['id']?.toString() ?? '';
-        if (id.isEmpty || uniqueById.containsKey(id)) continue;
-        uniqueById[id] = doc.cast<String, dynamic>();
+      final (lat, lng) = await _resolveLocation();
+      final params = <String, String>{'query': trimmed};
+      if (lat != null) params['lat'] = lat.toString();
+      if (lng != null) params['lng'] = lng.toString();
+
+      final response = await http.get(
+        BackendConfig.apiUri('/search/results', queryParameters: params),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      final decoded = _decodeBody(response);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final detail = decoded is Map ? decoded['detail']?.toString() : null;
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = detail ?? '검색 API 오류 (${response.statusCode})';
+          _isLoading = false;
+        });
+        return;
       }
+
+      final rows = decoded is Map ? decoded['results'] : null;
+      final restaurants = rows is List
+          ? rows
+              .whereType<Map>()
+              .map((item) => _restaurantFromResult(item))
+              .toList()
+          : <RestaurantModel>[];
 
       if (!mounted) return;
       setState(() {
-        _results = uniqueById.values.map((map) {
-          return RestaurantModel(
-            id: map['id']?.toString() ?? '',
-            storeId: map['id']?.toString() ?? '',
-            name: map['place_name']?.toString() ?? '',
-            category: _parseCategory(map['category_name']?.toString() ?? ''),
-            categoryName: map['category_name']?.toString(),
-            categoryGroupCode: map['category_group_code']?.toString(),
-            categoryGroupName: map['category_group_name']?.toString(),
-            address: (map['road_address_name']?.toString().isNotEmpty == true
-                        ? map['road_address_name']
-                        : map['address_name'])
-                    ?.toString() ??
-                '',
-            latitude: double.tryParse(map['y']?.toString() ?? '0') ?? 0,
-            longitude: double.tryParse(map['x']?.toString() ?? '0') ?? 0,
-            truthScore: _mockTruthScore(map['id']?.toString() ?? ''),
-            distance: int.tryParse(map['distance']?.toString() ?? '0') ?? 0,
-            phone: map['phone']?.toString(),
-            placeUrl: map['place_url']?.toString(),
-            addressName: map['address_name']?.toString(),
-            roadAddressName: map['road_address_name']?.toString(),
-            reviewSummary: map['place_name']?.toString() ?? '검색 결과',
-          );
-        }).toList();
+        _results = restaurants;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = '네트워크 에러가 발생했습니다';
+        _errorMessage = '검색 결과를 불러오지 못했습니다';
         _isLoading = false;
       });
     }
   }
 
-  String _extractKakaoError(http.Response response) {
+  Object? _decodeBody(http.Response response) {
+    final text = utf8.decode(response.bodyBytes);
+    if (text.trim().isEmpty) return null;
+    return jsonDecode(text);
+  }
+
+  RestaurantModel _restaurantFromResult(Map item) {
+    final restaurant = RestaurantModel.fromJson(
+      Map<String, dynamic>.from(item),
+    );
+    return restaurant.copyWith(
+      truthScore: _mockTruthScore(restaurant.effectiveStoreId),
+      reviewSummary: restaurant.reviewSummary.isNotEmpty
+          ? restaurant.reviewSummary
+          : restaurant.name,
+    );
+  }
+
+  Future<(double?, double?)> _resolveLocation() async {
+    var lat = widget.initialLatitude;
+    var lng = widget.initialLongitude;
+    if (lat != null && lng != null) return (lat, lng);
+
     try {
-      final body = jsonDecode(response.body);
-      if (body is Map<String, dynamic>) {
-        final code = body['code'];
-        final msg = body['msg'];
-        final message = body['message'];
-        final errorType = body['errorType'];
-        final errorDescription = body['error_description'];
-        final docHint = _kakaoCodeHint(code);
-        final validationHint = _extractKakaoValidationHint(body['details']);
-        final serviceDisabledHint = _kakaoServiceHint(
-          statusCode: response.statusCode,
-          code: code,
-          message: msg?.toString(),
-          messageAlt: message?.toString(),
-          errorType: errorType?.toString(),
-          errorDescription: errorDescription?.toString(),
-        );
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return (lat, lng);
 
-        final serviceSuffix =
-            serviceDisabledHint != null ? ' / $serviceDisabledHint' : '';
-        final detailSuffix = validationHint != null ? ' / $validationHint' : '';
-
-        if (code != null && msg != null) {
-          final docSuffix = docHint != null ? ' / $docHint' : '';
-          return 'code=$code msg=$msg$docSuffix$serviceSuffix$detailSuffix';
-        }
-        if (message != null) {
-          final docSuffix = docHint != null ? ' / $docHint' : '';
-          return '${message.toString()}$docSuffix$serviceSuffix$detailSuffix';
-        }
-        if (serviceDisabledHint != null) {
-          return serviceDisabledHint;
-        }
-        if (body['errorType'] != null) {
-          final typeText =
-              '${body['errorType']} ${body['error_description'] ?? ''}';
-          return '$typeText$serviceSuffix$detailSuffix';
-        }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        return (lat, lng);
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      lat = position.latitude;
+      lng = position.longitude;
     } catch (_) {}
-    return response.reasonPhrase?.isNotEmpty == true
-        ? '${response.reasonPhrase}${response.reasonPhrase?.toLowerCase().contains('forbidden') == true ? ' (FORBIDDEN)' : ''}'
-        : '';
-  }
 
-  String? _extractKakaoValidationHint(dynamic details) {
-    if (details == null) return null;
-    final List<dynamic> list = details is List<dynamic> ? details : [details];
-
-    for (final item in list) {
-      if (item is! Map<String, dynamic>) continue;
-
-      final parts = <String>[];
-
-      final field = item['field'];
-      final error = item['error'];
-      final reason = item['reason'];
-      final value = item['value'];
-
-      if (field != null && field.toString().isNotEmpty) {
-        parts.add('field=${field.toString()}');
-      }
-      if (error != null && error.toString().isNotEmpty) {
-        parts.add('error=${error.toString()}');
-      }
-      if (reason != null && reason.toString().isNotEmpty) {
-        parts.add('reason=${reason.toString()}');
-      }
-      if (value != null && value.toString().isNotEmpty) {
-        parts.add('value=${value.toString()}');
-      }
-
-      if (parts.isNotEmpty) return parts.join(', ');
-    }
-
-    return null;
-  }
-
-  String? _kakaoCodeHint(dynamic code) {
-    if (code == -3 || code == '-3') {
-      return 'Local API 미승인 또는 사용 권한 확인 필요 / OPEN_MAP_AND_LOCAL service 비활성화 가능성';
-    }
-    if (code == -5 || code == '-5') {
-      return '요청한 API 사용 권한이 없습니다';
-    }
-    if (code == -401 || code == '-401') {
-      return 'Authentication error: check Kakao API key and permissions.';
-    }
-    return null;
-  }
-
-  String? _kakaoServiceHint({
-    required int statusCode,
-    required dynamic code,
-    String? message,
-    String? messageAlt,
-    String? errorType,
-    String? errorDescription,
-  }) {
-    if (statusCode != 403) return null;
-
-    final lowerCode = code?.toString();
-    final fields = <String>[
-      if (errorType != null) errorType,
-      if (message != null) message,
-      if (messageAlt != null) messageAlt,
-      if (errorDescription != null) errorDescription,
-    ];
-
-    final lowerText = fields.join(' ').toLowerCase();
-    if (lowerCode == '-3' || lowerCode == '-5') {
-      return 'OPEN_MAP_AND_LOCAL service가 앱에서 비활성화되어 있습니다. '
-          '카카오 디벨로퍼스 앱 설정에서 카카오맵(Local) API 사용을 확인하세요.';
-    }
-
-    if (lowerText.contains('open_map_and_local') ||
-        lowerText.contains('open map and local') ||
-        lowerText.contains('disabled') ||
-        lowerText.contains('not authorized') ||
-        lowerText.contains('notauthorizederror')) {
-      return 'OPEN_MAP_AND_LOCAL service가 앱에서 비활성화되어 있습니다. '
-          '카카오 디벨로퍼스 앱 설정에서 카카오맵(Local) API 사용을 확인하세요.';
-    }
-
-    return null;
+    return (lat, lng);
   }
 
   void _submitSearch(String value) {
     final query = value.trim();
-    if (query.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Please enter a search keyword.';
-      });
+    if (query.length < 2) {
+      setState(() => _errorMessage = '검색어를 2글자 이상 입력해주세요');
       return;
     }
     _search(query);
-  }
-
-  String _parseCategory(String category) {
-    final parts = category.split(' > ');
-    if (parts.length >= 2) return parts[1];
-    return parts.first;
   }
 
   int _mockTruthScore(String id) {
@@ -354,7 +198,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
       case 'distance':
         list.sort((a, b) => a.distance.compareTo(b.distance));
         break;
-      case 'trust_score':
+      case 'truth_score':
       default:
         list.sort((a, b) => b.truthScore.compareTo(a.truthScore));
         break;
@@ -371,51 +215,17 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 18, color: AppColors.textSecondary),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 18,
+            color: AppColors.textSecondary,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.bg,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.border, width: 0.5),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.search_rounded,
-                  size: 16, color: AppColors.textHint),
-              const SizedBox(width: 6),
-              Expanded(
-                child: TextField(
-                  controller: _queryController,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: _submitSearch,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    hintText: 'Search restaurants or cafes',
-                    hintStyle: TextStyle(color: AppColors.textHint),
-                  ),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.search_rounded,
-                    size: 16, color: AppColors.primary500),
-                onPressed: () => _submitSearch(_queryController.text),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Search',
-              ),
-            ],
-          ),
+        title: _SearchField(
+          controller: _queryController,
+          onSubmitted: _submitSearch,
+          onSearchTap: () => _submitSearch(_queryController.text),
         ),
         actions: [
           if (_isLoading)
@@ -451,26 +261,32 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
 
   Widget _buildError() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.wifi_off_rounded,
-              size: 52, color: AppColors.textHint),
-          const SizedBox(height: 14),
-          Text(
-            _errorMessage!,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              size: 52,
+              color: AppColors.textHint,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => _search(_query),
-            child: const Text('다시 시도'),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _search(_query),
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -483,27 +299,15 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '"$_query" ',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary500,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '${results.length} results',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+              Expanded(
+                child: Text(
+                  '"$_query" ${results.length}개',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
               DropdownButtonHideUnderline(
@@ -514,16 +318,17 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                      size: 16, color: AppColors.textHint),
-                  items: _sortOptions
-                      .map((o) => DropdownMenuItem<String>(
-                            value: o,
-                            child: Text(o),
-                          ))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _sortBy = val);
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: AppColors.textHint,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'distance', child: Text('거리순')),
+                    DropdownMenuItem(value: 'truth_score', child: Text('정확도순')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _sortBy = value);
                   },
                 ),
               ),
@@ -537,13 +342,16 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   itemCount: results.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _RestaurantCard(
-                    restaurant: results[i],
-                    onTap: () {
-                      widget.onViewPlace(results[i]);
-                      Navigator.pop(context);
-                    },
-                  ),
+                  itemBuilder: (_, index) {
+                    final restaurant = results[index];
+                    return _RestaurantCard(
+                      restaurant: restaurant,
+                      onTap: () {
+                        widget.onViewPlace(restaurant);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
                 ),
         ),
       ],
@@ -555,8 +363,11 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.search_off_rounded,
-              size: 52, color: AppColors.textHint),
+          const Icon(
+            Icons.search_off_rounded,
+            size: 52,
+            color: AppColors.textHint,
+          ),
           const SizedBox(height: 14),
           Text(
             '"$_query" 검색 결과가 없습니다',
@@ -567,7 +378,7 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            '다른 키워드로 다시 시도해보세요',
+            '다른 검색어로 다시 시도해보세요',
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
         ],
@@ -576,10 +387,74 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
   }
 }
 
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.onSubmitted,
+    required this.onSearchTap,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onSubmitted;
+  final VoidCallback onSearchTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, size: 16, color: AppColors.textHint),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              textInputAction: TextInputAction.search,
+              onSubmitted: onSubmitted,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: '음식점 또는 메뉴를 검색',
+                hintStyle: TextStyle(color: AppColors.textHint),
+              ),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.search_rounded,
+              size: 16,
+              color: AppColors.primary500,
+            ),
+            onPressed: onSearchTap,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: '검색',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RestaurantCard extends StatelessWidget {
+  const _RestaurantCard({
+    required this.restaurant,
+    required this.onTap,
+  });
+
   final RestaurantModel restaurant;
   final VoidCallback onTap;
-  const _RestaurantCard({required this.restaurant, required this.onTap});
 
   Color get _trustColor {
     if (restaurant.truthScore >= 80) return const Color(0xFF4CBB87);
@@ -595,8 +470,9 @@ class _RestaurantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -613,8 +489,11 @@ class _RestaurantCard extends StatelessWidget {
                 color: const Color(0xFFF0EDE8),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.restaurant_rounded,
-                  size: 28, color: Color(0xFFCCBBAA)),
+              child: const Icon(
+                Icons.restaurant_rounded,
+                size: 28,
+                color: Color(0xFFCCBBAA),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -623,67 +502,60 @@ class _RestaurantCard extends StatelessWidget {
                 children: [
                   Text(
                     restaurant.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
-                    '${restaurant.category} · ${restaurant.address}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
+                    restaurant.primaryCategory,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
+                  Text(
+                    restaurant.address,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 11, color: AppColors.textHint),
-                      const SizedBox(width: 2),
-                      Text(
-                        restaurant.distance > 0
-                            ? '${restaurant.distance}m'
-                            : restaurant.address,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textHint),
+                      _TruthBadge(
+                        score: restaurant.truthScore,
+                        color: _trustColor,
+                        backgroundColor: _trustBgColor,
                       ),
+                      const SizedBox(width: 8),
+                      if (restaurant.distance > 0)
+                        Text(
+                          '${restaurant.distance}m',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                          ),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _trustBgColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '${restaurant.truthScore}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: _trustColor,
-                    ),
-                  ),
-                  Text(
-                    'TRUTH',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w500,
-                      color: _trustColor,
-                    ),
-                  ),
-                ],
-              ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textHint,
             ),
           ],
         ),
@@ -692,56 +564,45 @@ class _RestaurantCard extends StatelessWidget {
   }
 }
 
-class _CardSkeleton extends StatefulWidget {
-  const _CardSkeleton();
+class _TruthBadge extends StatelessWidget {
+  const _TruthBadge({
+    required this.score,
+    required this.color,
+    required this.backgroundColor,
+  });
 
-  @override
-  State<_CardSkeleton> createState() => _CardSkeletonState();
-}
-
-class _CardSkeletonState extends State<_CardSkeleton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Widget _box(double w, double h) => AnimatedBuilder(
-        animation: _anim,
-        builder: (_, __) => Opacity(
-          opacity: _anim.value,
-          child: Container(
-            width: w,
-            height: h,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE4E4EC),
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-        ),
-      );
+  final int score;
+  final Color color;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$score%',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _CardSkeleton extends StatelessWidget {
+  const _CardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
@@ -749,22 +610,30 @@ class _CardSkeletonState extends State<_CardSkeleton>
       ),
       child: Row(
         children: [
-          _box(64, 64),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFECECF4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _box(120, 14),
-                const SizedBox(height: 6),
-                _box(180, 11),
-                const SizedBox(height: 6),
-                _box(80, 11),
+                Container(
+                    width: 140, height: 14, color: const Color(0xFFECECF4)),
+                const SizedBox(height: 8),
+                Container(
+                    width: 90, height: 12, color: const Color(0xFFECECF4)),
+                const SizedBox(height: 8),
+                Container(
+                    width: 180, height: 12, color: const Color(0xFFECECF4)),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          _box(48, 48),
         ],
       ),
     );
