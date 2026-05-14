@@ -118,7 +118,7 @@ class _BlogCardSkeleton extends StatelessWidget {
 typedef ReviewOpenGuard = Future<bool> Function(BlogReview review);
 
 class ReviewListSection extends StatefulWidget {
-  final ShopInfo shopInfo;
+  final ShopInfo? shopInfo;
   final List<BlogReview> blogs;
   final bool hasMoreReviews;
   final bool isLoadingReviewBatch;
@@ -127,7 +127,7 @@ class ReviewListSection extends StatefulWidget {
 
   const ReviewListSection({
     super.key,
-    required this.shopInfo,
+    this.shopInfo,
     required this.blogs,
     this.hasMoreReviews = false,
     this.isLoadingReviewBatch = false,
@@ -160,7 +160,7 @@ class _ReviewListSectionState extends State<ReviewListSection>
   void didUpdateWidget(covariant ReviewListSection oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    final shopChanged = oldWidget.shopInfo.name != widget.shopInfo.name;
+    final shopChanged = oldWidget.shopInfo?.name != widget.shopInfo?.name;
     final blogsChanged = !identical(oldWidget.blogs, widget.blogs) ||
         oldWidget.blogs.length != widget.blogs.length;
 

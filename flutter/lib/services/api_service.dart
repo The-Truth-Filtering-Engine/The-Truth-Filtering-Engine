@@ -6,7 +6,6 @@ import '../data/models/ai_recommend_item.dart';
 import '../data/models/blog_review_model.dart';
 import '../features/map/models/map_point.dart';
 import '../features/map/models/restaurant_model.dart';
-import '../models/search_result.dart';
 
 class ApiService {
   final _dio = Dio(
@@ -16,11 +15,6 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 60),
     ),
   );
-
-  Future<SearchResult> search(String query) async {
-    final res = await _dio.get('/search', queryParameters: {'query': query});
-    return SearchResult.fromJson(res.data);
-  }
 
   Future<List<RestaurantModel>> fetchNearbyRestaurants({
     required MapPoint center,
@@ -72,18 +66,6 @@ class ApiService {
       '/search/cached',
       queryParameters: {
         'query': query,
-        'limit': '100',
-      },
-    );
-    return _parseReviews(res.data);
-  }
-
-  Future<List<BlogReviewModel>> fetchFreshReviews(String query) async {
-    final res = await _dio.get(
-      '/search',
-      queryParameters: {
-        'query': query,
-        'refresh': 'true',
         'limit': '100',
       },
     );

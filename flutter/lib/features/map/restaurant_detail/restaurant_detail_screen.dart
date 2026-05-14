@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import '../../../core/providers/recent_visit_provider.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +35,13 @@ class _ReviewFetchResult {
   final bool hasMore;
 
   const _ReviewFetchResult({required this.reviews, required this.hasMore});
+}
+
+class _SseBatch {
+  final List<BlogReview> reviews;
+  final bool done;
+
+  const _SseBatch({required this.reviews, required this.done});
 }
 
 class _AnalysisRequestException implements Exception {
@@ -91,55 +99,83 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
   );
 }
 
-// ── API: 신규 크롤링 + AI 분석 ────────────────────────────────────────────────
+// ── API: SSE 스트리밍 ─────────────────────────────────────────────────────────
 
-Future<_ReviewFetchResult> _fetchFreshReviews(
+Stream<_SseBatch> _streamFreshReviews(
   RestaurantModel restaurant,
   AnalysisMode mode, {
   required Map<String, String> authHeaders,
   bool refresh = false,
   int naverStart = 1,
-}) async {
-  final queryParameters = _reviewQueryParameters(
+}) async* {
+  final params = _reviewQueryParameters(
     restaurant,
     extra: {
       'mode': mode.name,
       'naverStart': '$naverStart',
       'limit': '$_reviewBatchSize',
       'maxResults': '$_maxReviewResults',
+      if (refresh) 'refresh': 'true',
     },
   );
-  if (refresh) queryParameters['refresh'] = 'true';
 
-  final uri = BackendConfig.apiUri('/search', queryParameters: queryParameters);
+  final uri = BackendConfig.apiUri('/search/stream', queryParameters: params);
+  final request = http.Request('GET', uri);
+  final token = _currentAccessToken();
+  if (token != null) request.headers['Authorization'] = 'Bearer $token';
 
-  final res = await http
-      .get(
-        uri,
-        headers: authHeaders.isEmpty ? null : authHeaders,
-      )
-      .timeout(const Duration(seconds: 90));
-  if (res.statusCode != 200) {
-    throw _AnalysisRequestException(
-      _readApiError(res) ?? '서버 오류 (${res.statusCode})',
-      res.statusCode,
-    );
+  final client = http.Client();
+  try {
+    // 헤더 수신까지 타임아웃
+    final response =
+        await client.send(request).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 402) {
+      final body = await response.stream.bytesToString();
+      throw _AnalysisRequestException(
+          _readApiErrorFromString(body) ?? '추가분석을 위해 코인을 충전해 주세요', 402);
+    }
+    if (response.statusCode != 200) {
+      final body = await response.stream.bytesToString();
+      throw _AnalysisRequestException(
+          _readApiErrorFromString(body) ?? '서버 오류 (${response.statusCode})',
+          response.statusCode);
+    }
+
+    await for (final line in response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())) {
+      if (!line.startsWith('data: ')) continue;
+      final json =
+          jsonDecode(line.substring(6)) as Map<String, dynamic>;
+      final done = json['done'] as bool? ?? false;
+      final rawList = json['reviews'] as List<dynamic>? ?? [];
+      final reviews = rawList
+          .map((e) =>
+              BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
+          .toList();
+      yield _SseBatch(reviews: reviews, done: done);
+      if (done) break;
+    }
+  } finally {
+    client.close();
   }
-
-  final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-  final list = body['reviews'] as List<dynamic>? ?? [];
-
-  return _ReviewFetchResult(
-    reviews: list
-        .map((e) => BlogReview.fromApiWithMode(e as Map<String, dynamic>, mode))
-        .toList(),
-    hasMore: body['hasMore'] as bool? ?? false,
-  );
 }
 
-String? _readApiError(http.Response response) {
+String? _currentAccessToken() {
+  if (!SupabaseConfig.isConfigured) return null;
+
   try {
-    final text = utf8.decode(response.bodyBytes);
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (token == null || token.isEmpty) return null;
+    return token;
+  } catch (_) {
+    return null;
+  }
+}
+
+String? _parseApiError(String text) {
+  try {
     if (text.isEmpty) return null;
     final decoded = jsonDecode(text);
     if (decoded is Map) {
@@ -149,6 +185,10 @@ String? _readApiError(http.Response response) {
   } catch (_) {}
   return null;
 }
+
+String? _readApiError(http.Response r) => _parseApiError(utf8.decode(r.bodyBytes));
+
+String? _readApiErrorFromString(String body) => _parseApiError(body);
 
 Map<String, String> _reviewQueryParameters(
   RestaurantModel restaurant, {
@@ -197,6 +237,7 @@ class _RestaurantDetailScreenState
   ShopInfo? _shopInfo;
   bool _hasMoreReviewBatches = false;
   bool _isLoadingReviewBatch = false;
+  StreamSubscription<_SseBatch>? _streamSub;
 
   RestaurantModel get _r => widget.restaurant;
 
@@ -209,48 +250,32 @@ class _RestaurantDetailScreenState
     });
   }
 
+  @override
+  void dispose() {
+    _streamSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _onDetailTap() async {
     if (!mounted) return;
-    setState(() => _state = _ScreenState.checking); // 로딩 스피너만 표시
+    setState(() => _state = _ScreenState.checking);
 
     try {
       final mode = ref.read(analysisModeProvider);
       final authHeaders = _currentAuthHeaders();
       final cached = await _fetchCachedReviews(_r, mode, authHeaders);
       if (!mounted) return;
-      final shouldLoadFirstBatch =
-          cached.reviews.isEmpty || cached.reviews.length < _reviewBatchSize;
 
-      if (shouldLoadFirstBatch) {
-        // _onAnalyzeTap() 호출 대신 직접 인라인 처리 (noData/analyzing 상태 스킵)
-        try {
-          final fresh = await _fetchFreshReviews(
-            _r,
-            mode,
-            authHeaders: authHeaders,
-            naverStart: 1,
-          );
-          if (!mounted) return;
-          _applyReviews(fresh);
-        } catch (e) {
-          if (!mounted) return;
-          if (_isUsageRequiredError(e)) {
-            setState(() => _state = _ScreenState.noData);
-            _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
-            return;
-          }
+      // hasMore: false이면 캐시가 완전한 상태 (리뷰가 적은 가게도 포함)
+      final shouldLoadFirstBatch = cached.reviews.isEmpty || cached.hasMore;
 
-          if (cached.reviews.isNotEmpty) {
-            _applyReviews(cached);
-            _showError('추가 리뷰를 불러오지 못해 저장된 리뷰만 표시합니다: $e');
-          } else {
-            setState(() => _state = _ScreenState.noData);
-            _showError('분석 중 오류가 발생했어요: $e');
-          }
-        }
-      } else {
+      if (!shouldLoadFirstBatch) {
         _applyReviews(cached);
+        return;
       }
+
+      setState(() => _state = _ScreenState.analyzing);
+      _startStream(mode, refresh: false);
     } catch (e) {
       if (!mounted) return;
       setState(() => _state = _ScreenState.noData);
@@ -261,59 +286,72 @@ class _RestaurantDetailScreenState
   Future<void> _onAnalyzeTap() async {
     if (!mounted) return;
     setState(() => _state = _ScreenState.analyzing);
-
-    try {
-      final mode = ref.read(analysisModeProvider);
-      final authHeaders = _currentAuthHeaders();
-      final fresh = await _fetchFreshReviews(
-        _r,
-        mode,
-        authHeaders: authHeaders,
-        refresh: true,
-        naverStart: 1,
-      );
-      if (!mounted) return;
-      _applyReviews(fresh);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _state = _ScreenState.noData);
-      _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
-    }
+    _startStream(ref.read(analysisModeProvider), refresh: true);
   }
 
-  Future<void> _loadReviewBatchForPage(int pageIndex) async {
-    if (_isLoadingReviewBatch || !_hasMoreReviewBatches) return;
+  void _startStream(AnalysisMode mode, {required bool refresh}) {
+    _streamSub?.cancel();
+    _streamSub = _streamFreshReviews(_r, mode, refresh: refresh)
+        // 이벤트 간 90초 타임아웃 (총 스트림 시간이 아니라 이벤트 간 간격 기준)
+        .timeout(const Duration(seconds: 90))
+        .listen(
+          (batch) {
+            if (batch.done) {
+              _finalizeStream();
+            } else {
+              _appendBatch(batch.reviews);
+            }
+          },
+          onError: (e) {
+            if (!mounted) return;
+            if (_isUsageRequiredError(e)) {
+              setState(() => _state = _ScreenState.noData);
+              _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
+              return;
+            }
+            if (_reviews.isNotEmpty) {
+              _refreshRecentAnalyses(); // 부분 성공 시에도 이력 갱신
+              _showError('추가 리뷰를 불러오지 못했습니다: $e');
+            } else {
+              setState(() => _state = _ScreenState.noData);
+              _showError('분석 중 오류가 발생했어요: $e');
+            }
+          },
+          onDone: () {
+            // done: true 없이 스트림이 닫힌 경우 방어 처리
+            if (mounted && _shopInfo == null && _reviews.isNotEmpty) {
+              _finalizeStream();
+            }
+          },
+        );
+  }
 
-    final pageStart = pageIndex * 10;
-    if (pageStart < _reviews.length || _reviews.length >= _maxReviewResults) {
-      return;
-    }
+  // 중간 배치: 리뷰 누적 + 목록 즉시 표시
+  void _appendBatch(List<BlogReview> incoming) {
+    if (!mounted || incoming.isEmpty) return;
+    setState(() {
+      _reviews = _mergeReviews(_reviews, incoming);
+      _state = _ScreenState.loaded;
+    });
+  }
 
-    final naverStart = (pageStart ~/ _reviewBatchSize) * _reviewBatchSize + 1;
-
-    setState(() => _isLoadingReviewBatch = true);
-    try {
-      final mode = ref.read(analysisModeProvider);
-      final authHeaders = _currentAuthHeaders();
-      final fresh = await _fetchFreshReviews(
-        _r,
-        mode,
-        authHeaders: authHeaders,
-        naverStart: naverStart,
-      );
-      if (!mounted) return;
-      final merged = _mergeReviews(_reviews, fresh.reviews);
-      _applyReviews(
-        _ReviewFetchResult(reviews: merged, hasMore: fresh.hasMore),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _hasMoreReviewBatches = false;
-        _isLoadingReviewBatch = false;
-      });
-      _showError(_errorMessage(e, '추가 리뷰를 불러오지 못했습니다'));
-    }
+  // 스트림 완료: 요약 정보 최종 계산
+  void _finalizeStream() {
+    if (!mounted || _reviews.isEmpty) return;
+    final shopInfo = ShopInfo.fromApiResponse(
+      name: _r.name,
+      category: '${_r.category} · ${_r.address}',
+      reviews: _reviews,
+    );
+    final wordFreqs =
+        WordFreqBuilder.build(_reviews.map((r) => r.title).toList());
+    setState(() {
+      _shopInfo = shopInfo;
+      _wordFreqs = wordFreqs;
+      _hasMoreReviewBatches = false;
+      _isLoadingReviewBatch = false;
+    });
+    _refreshRecentAnalyses();
   }
 
   List<BlogReview> _mergeReviews(
@@ -556,7 +594,9 @@ class _RestaurantDetailScreenState
                   final aiCard = AiAnalysisCard(
                     truthScore: _shopInfo?.trustScore ?? _r.truthScore,
                   );
-                  final wordCloud = WordCloudCard(wordFreqs: _wordFreqs);
+                  final wordCloud = _wordFreqs.isNotEmpty
+                      ? WordCloudCard(wordFreqs: _wordFreqs)
+                      : const _WordCloudSkeleton();
                   final isNarrow = constraints.maxWidth < 640;
 
                   if (isNarrow) {
@@ -585,16 +625,16 @@ class _RestaurantDetailScreenState
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
           // ── 블로그 리스트 (스크롤 이어짐) ──
-          if (_shopInfo != null)
+          if (_reviews.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: ReviewListSection(
-                  shopInfo: _shopInfo!,
+                  shopInfo: _shopInfo,
                   blogs: _reviews,
                   hasMoreReviews: _hasMoreReviewBatches,
                   isLoadingReviewBatch: _isLoadingReviewBatch,
-                  onRequestReviewBatch: _loadReviewBatchForPage,
+                  onRequestReviewBatch: null,
                   onReviewTap: _recordRecentReviewOpen,
                 ),
               ),
@@ -676,6 +716,25 @@ class _RestaurantDetailScreenState
         preferredSize: const Size.fromHeight(0.5),
         child: Container(height: 0.5, color: const Color(0xFFEEEEEE)),
       ),
+    );
+  }
+}
+
+// ── 워드클라우드 스켈레톤 ──────────────────────────────────────────────────────
+
+class _WordCloudSkeleton extends StatelessWidget {
+  const _WordCloudSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160, // narrow 레이아웃 점프 방지. wide는 SizedBox(height:220)+stretch로 자동 조정
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE4E4EC), width: 0.5),
+      ),
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
   }
 }
