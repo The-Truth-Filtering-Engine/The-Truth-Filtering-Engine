@@ -13,6 +13,180 @@ body {
   min-height: 100%;
 }
 
+.intro-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.98)),
+    var(--color-bg-default);
+  animation: intro-splash-exit 420ms ease 3400ms forwards;
+}
+
+.intro-splash::before,
+.intro-splash::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.intro-splash::before {
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(17, 24, 39, 0.06) 45%, transparent 72%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(17, 24, 39, 0.035) 0 1px,
+      transparent 1px 84px
+    );
+  transform: translateX(18%);
+  animation: intro-grid-sweep 1800ms cubic-bezier(0.22, 0.9, 0.22, 1) forwards;
+}
+
+.intro-splash::after {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.78),
+    transparent 28%,
+    transparent 70%,
+    rgba(255, 255, 255, 0.78)
+  );
+}
+
+.intro-splash-track {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100vw;
+  height: 220px;
+  place-items: center;
+}
+
+.intro-splash-track::before {
+  position: absolute;
+  top: 50%;
+  left: 116%;
+  width: clamp(104px, 12vw, 156px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: 1px solid rgba(86, 80, 60, 0.18);
+  border-radius: var(--radius-lg);
+  background:
+    url('/logo.png') center / 58% auto no-repeat,
+    rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 18px 38px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  content: "";
+  filter: drop-shadow(0 12px 20px rgba(86, 80, 60, 0.12));
+  transform-origin: center;
+  animation: intro-logo-pass 3300ms cubic-bezier(0.2, 0.84, 0.12, 1) forwards;
+}
+
+.intro-splash-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(720px, 76vw);
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(86, 80, 60, 0.14),
+    rgba(185, 28, 28, 0.22),
+    rgba(37, 99, 235, 0.16),
+    transparent
+  );
+  transform: translate(-50%, -50%) scaleX(0.2);
+  animation: intro-light-trail 1900ms cubic-bezier(0.2, 0.8, 0.18, 1) forwards;
+}
+
+.intro-splash-logo {
+  display: none;
+}
+
+@keyframes intro-logo-pass {
+  0% {
+    left: 116%;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.78) rotate(-9deg);
+  }
+
+  10% {
+    left: 88%;
+    opacity: 1;
+  }
+
+  44% {
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1.08) rotate(0deg);
+  }
+
+  76% {
+    left: 18%;
+    opacity: 1;
+  }
+
+  100% {
+    left: -16%;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.84) rotate(8deg);
+  }
+}
+
+@keyframes intro-light-trail {
+  0% {
+    opacity: 0;
+    transform: translate(-28%, -50%) scaleX(0.08);
+  }
+
+  28% {
+    opacity: 1;
+  }
+
+  74% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scaleX(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-72%, -50%) scaleX(0.28);
+  }
+}
+
+@keyframes intro-grid-sweep {
+  from {
+    transform: translateX(18%);
+  }
+
+  to {
+    transform: translateX(-18%);
+  }
+}
+
+@keyframes intro-splash-exit {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-splash,
+  .intro-splash::before,
+  .intro-splash-track::before,
+  .intro-splash-glow,
+  .intro-splash-logo {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+
 .map-page {
   display: grid;
   grid-template-columns: minmax(340px, 1fr) minmax(0, 2fr);

@@ -66,6 +66,7 @@ type RecentAnalysesState = {
 
 function App() {
   const [toastMessage, setToastMessage] = useState('')
+  const [showIntroSplash, setShowIntroSplash] = useState(true)
   const [activeSidePanel, setActiveSidePanel] = useState<ActiveSidePanel>('search')
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [searchInput, setSearchInput] = useState('')
@@ -156,6 +157,11 @@ function App() {
   }
 
   const map = useMap(handleMapSelectRestaurant, showToast)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowIntroSplash(false), 3900)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (
@@ -487,208 +493,222 @@ function App() {
   }
 
   return (
-    <main className="map-page">
-      <section className="side-panel-column" aria-label="지도 사이드 패널">
-        {!auth.isLoggedIn ? (
-          <LoginPanel
-            authStatus={auth.authStatus}
-            authErrorMessage={auth.authErrorMessage}
-            supabaseAvailable={Boolean(supabase)}
-            onSignInWithGoogle={auth.signInWithGoogle}
-            onSignInWithTestAccount={auth.signInWithTestAccount}
-          />
-        ) : (
-          <>
-            {activeSidePanel === 'search' && (
-              <SearchPanel
-                searchInput={searchInput}
-                searchQuery={searchQuery}
-                searchResults={searchResults}
-                searchState={searchState}
-                searchErrorMessage={searchErrorMessage}
-                onSearchInputChange={(value) => {
-                  setSearchInput(value)
-                  if (!value.trim() && map.searchModeRef.current) {
-                    clearRestaurantSearch()
-                  }
-                }}
-                onSearchSubmit={submitRestaurantSearch}
-                onSelectResult={selectSearchResult}
-              />
-            )}
-            {selectedRestaurant && activeSidePanel === 'restaurant' && (
-              <RestaurantPanel
-                restaurant={selectedRestaurant}
-                bookmarkedStoreIds={bookmarks.bookmarkedStoreIds}
-                userProfile={userProfileState.profile}
-                onClose={() => { setSelectedRestaurant(null); setActiveSidePanel('search') }}
-                onCall={handleCall}
-                onToggleBookmark={bookmarks.toggleBookmark}
-                onRoute={handleRoute}
-                onShare={handleShare}
-                onDetailClick={handleDetailButtonClick}
-              />
-            )}
-            {selectedRestaurant && activeSidePanel === 'detail' && (
-              <DetailPanel
-                restaurant={selectedRestaurant}
-                bookmarkedStoreIds={bookmarks.bookmarkedStoreIds}
-                detailState={detail.detailState}
-                detailData={detail.detailData}
-                detailErrorMessage={detail.detailErrorMessage}
-                reviewSort={detail.reviewSort}
-                reviewPage={detail.reviewPage}
-                reviewTotalPages={detail.reviewTotalPages}
-                visibleDetailReviews={detail.visibleDetailReviews}
-                showReviewPageSkeleton={detail.showReviewPageSkeleton}
-                isReviewBatchLoading={detail.isReviewBatchLoading}
-                onBack={() => setActiveSidePanel('restaurant')}
-                onClose={() => { setSelectedRestaurant(null); setActiveSidePanel('search') }}
-                onCall={handleCall}
-                onToggleBookmark={bookmarks.toggleBookmark}
-                onRoute={handleRoute}
-                onShare={handleShare}
-                onRefresh={(restaurant) => openDetailPanel(restaurant, true)}
-                onChangeReviewSort={detail.changeReviewSort}
-                onChangeReviewPage={(page) => detail.changeReviewPage(page, selectedRestaurant)}
-                reviewActivityAvailable={reviewActivity.isAvailable}
-                getReviewLikeState={reviewActivity.getReviewLikeState}
-                getReviewReportState={reviewActivity.getReviewReportState}
-                onToggleReviewHeart={reviewActivity.toggleReviewHeart}
-                onSubmitReviewReport={reviewActivity.submitReviewReport}
-                onHideReview={detail.hideDetailReview}
-                onOpenReviewSource={reviewActivity.openReviewSource}
-                onShowToast={showToast}
-              />
-            )}
-            {activeSidePanel === 'bookmarks' && (
-              <BookmarkPanel
-                bookmarkedRestaurants={bookmarks.bookmarkedRestaurants}
-                onClose={() => setActiveSidePanel('search')}
-                onSelectRestaurant={selectBookmarkedRestaurant}
-                onToggleBookmark={bookmarks.toggleBookmark}
-              />
-            )}
-            {activeSidePanel === 'recent' && (
-              <RecentPanel
-                recentAnalysesState={recentAnalysesState}
-                hasApiAuth={auth.hasApiAuth}
-                onClose={() => setActiveSidePanel('search')}
-                onFocusItem={focusRecentAnalysis}
-                onRetry={loadRecentAnalyses}
-              />
-            )}
-            {activeSidePanel === 'ai' && (
-              <AiPanel
-                aiRecommendState={aiRecommendState}
-                aiRegionScope={aiRegionScope}
-                currentPositionExists={Boolean(map.currentPosition)}
-                onClose={() => setActiveSidePanel('search')}
-                onLoadPage={loadAiRecommendations}
-                onChangeRegionScope={changeAiRegionScope}
-                onFocusItem={focusAiRecommendation}
-              />
-            )}
-            {activeSidePanel === 'settings' && (
-              <SettingsPanel
-                userProfileState={userProfileState}
-                onClose={() => setActiveSidePanel('search')}
-                onTogglePremium={toggleUserPremium}
-                onChargeCoins={chargeCoins}
-                onSignOut={auth.signOut}
-                onRetryLoadProfile={loadUserProfile}
-                reviewActivityAvailable={reviewActivity.isAvailable}
-                likedReviewsState={reviewActivity.likedReviewsState}
-                recentReviewsState={reviewActivity.recentReviewsState}
-                onLoadLikedReviews={reviewActivity.loadLikedReviews}
-                onLoadRecentReviews={reviewActivity.loadRecentReviews}
-                onOpenLikedReview={reviewActivity.openReviewSource}
-                onOpenRecentReview={reviewActivity.openRecentReviewSource}
-                onRemoveLikedReview={reviewActivity.removeLikedReview}
-                onRemoveRecentReview={reviewActivity.removeRecentReview}
-                onClearRecentReviews={reviewActivity.clearRecentReviews}
-              />
-            )}
-          </>
-        )}
-      </section>
+    <>
+      <main className="map-page">
+        <section className="side-panel-column" aria-label="지도 사이드 패널">
+          {!auth.isLoggedIn ? (
+            <LoginPanel
+              authStatus={auth.authStatus}
+              authErrorMessage={auth.authErrorMessage}
+              supabaseAvailable={Boolean(supabase)}
+              onSignInWithGoogle={auth.signInWithGoogle}
+              onSignInWithTestAccount={auth.signInWithTestAccount}
+            />
+          ) : (
+            <>
+              {activeSidePanel === 'search' && (
+                <SearchPanel
+                  searchInput={searchInput}
+                  searchQuery={searchQuery}
+                  searchResults={searchResults}
+                  searchState={searchState}
+                  searchErrorMessage={searchErrorMessage}
+                  onSearchInputChange={(value) => {
+                    setSearchInput(value)
+                    if (!value.trim() && map.searchModeRef.current) {
+                      clearRestaurantSearch()
+                    }
+                  }}
+                  onSearchSubmit={submitRestaurantSearch}
+                  onSelectResult={selectSearchResult}
+                />
+              )}
+              {selectedRestaurant && activeSidePanel === 'restaurant' && (
+                <RestaurantPanel
+                  restaurant={selectedRestaurant}
+                  bookmarkedStoreIds={bookmarks.bookmarkedStoreIds}
+                  userProfile={userProfileState.profile}
+                  onClose={() => { setSelectedRestaurant(null); setActiveSidePanel('search') }}
+                  onCall={handleCall}
+                  onToggleBookmark={bookmarks.toggleBookmark}
+                  onRoute={handleRoute}
+                  onShare={handleShare}
+                  onDetailClick={handleDetailButtonClick}
+                />
+              )}
+              {selectedRestaurant && activeSidePanel === 'detail' && (
+                <DetailPanel
+                  restaurant={selectedRestaurant}
+                  bookmarkedStoreIds={bookmarks.bookmarkedStoreIds}
+                  detailState={detail.detailState}
+                  detailData={detail.detailData}
+                  detailErrorMessage={detail.detailErrorMessage}
+                  reviewSort={detail.reviewSort}
+                  reviewPage={detail.reviewPage}
+                  reviewTotalPages={detail.reviewTotalPages}
+                  visibleDetailReviews={detail.visibleDetailReviews}
+                  showReviewPageSkeleton={detail.showReviewPageSkeleton}
+                  isReviewBatchLoading={detail.isReviewBatchLoading}
+                  onBack={() => setActiveSidePanel('restaurant')}
+                  onClose={() => { setSelectedRestaurant(null); setActiveSidePanel('search') }}
+                  onCall={handleCall}
+                  onToggleBookmark={bookmarks.toggleBookmark}
+                  onRoute={handleRoute}
+                  onShare={handleShare}
+                  onRefresh={(restaurant) => openDetailPanel(restaurant, true)}
+                  onChangeReviewSort={detail.changeReviewSort}
+                  onChangeReviewPage={(page) => detail.changeReviewPage(page, selectedRestaurant)}
+                  reviewActivityAvailable={reviewActivity.isAvailable}
+                  getReviewLikeState={reviewActivity.getReviewLikeState}
+                  getReviewReportState={reviewActivity.getReviewReportState}
+                  onToggleReviewHeart={reviewActivity.toggleReviewHeart}
+                  onSubmitReviewReport={reviewActivity.submitReviewReport}
+                  onHideReview={detail.hideDetailReview}
+                  onOpenReviewSource={reviewActivity.openReviewSource}
+                  onShowToast={showToast}
+                />
+              )}
+              {activeSidePanel === 'bookmarks' && (
+                <BookmarkPanel
+                  bookmarkedRestaurants={bookmarks.bookmarkedRestaurants}
+                  onClose={() => setActiveSidePanel('search')}
+                  onSelectRestaurant={selectBookmarkedRestaurant}
+                  onToggleBookmark={bookmarks.toggleBookmark}
+                />
+              )}
+              {activeSidePanel === 'recent' && (
+                <RecentPanel
+                  recentAnalysesState={recentAnalysesState}
+                  hasApiAuth={auth.hasApiAuth}
+                  onClose={() => setActiveSidePanel('search')}
+                  onFocusItem={focusRecentAnalysis}
+                  onRetry={loadRecentAnalyses}
+                />
+              )}
+              {activeSidePanel === 'ai' && (
+                <AiPanel
+                  aiRecommendState={aiRecommendState}
+                  aiRegionScope={aiRegionScope}
+                  currentPositionExists={Boolean(map.currentPosition)}
+                  onClose={() => setActiveSidePanel('search')}
+                  onLoadPage={loadAiRecommendations}
+                  onChangeRegionScope={changeAiRegionScope}
+                  onFocusItem={focusAiRecommendation}
+                />
+              )}
+              {activeSidePanel === 'settings' && (
+                <SettingsPanel
+                  userProfileState={userProfileState}
+                  onClose={() => setActiveSidePanel('search')}
+                  onTogglePremium={toggleUserPremium}
+                  onChargeCoins={chargeCoins}
+                  onSignOut={auth.signOut}
+                  onRetryLoadProfile={loadUserProfile}
+                  reviewActivityAvailable={reviewActivity.isAvailable}
+                  likedReviewsState={reviewActivity.likedReviewsState}
+                  recentReviewsState={reviewActivity.recentReviewsState}
+                  onLoadLikedReviews={reviewActivity.loadLikedReviews}
+                  onLoadRecentReviews={reviewActivity.loadRecentReviews}
+                  onOpenLikedReview={reviewActivity.openReviewSource}
+                  onOpenRecentReview={reviewActivity.openRecentReviewSource}
+                  onRemoveLikedReview={reviewActivity.removeLikedReview}
+                  onRemoveRecentReview={reviewActivity.removeRecentReview}
+                  onClearRecentReviews={reviewActivity.clearRecentReviews}
+                />
+              )}
+            </>
+          )}
+        </section>
 
-      <section className="map-view" aria-label="지도">
-        <div ref={map.mapContainerRef} className="map-container" />
-        {map.loadState === 'loading' && (
-          <div className="map-status">카카오맵을 불러오는 중입니다</div>
-        )}
-        {map.loadState === 'error' && (
-          <div className="map-status map-status-error">{map.errorMessage}</div>
-        )}
-        {map.loadState === 'ready' && map.placesErrorMessage && (
-          <div className="map-status map-status-error">{map.placesErrorMessage}</div>
-        )}
-        {auth.isLoggedIn && (
-          <MapUsageBadge
-            profile={userProfileState.profile}
-            isLoading={userProfileState.isLoading}
-          />
-        )}
-        <nav className="map-tool-rail" aria-label="지도 메뉴">
-          <div className="map-tool-brand" aria-hidden="true">
-            <img src={appLogoUrl} alt="" />
-          </div>
-          <button
-            type="button"
-            className="map-tool-button"
-            aria-label="장소 검색"
-            onClick={() => { setSelectedRestaurant(null); setActiveSidePanel('search') }}
-          >
-            <Search aria-hidden="true" size={20} strokeWidth={2.2} />
-          </button>
-          <button
-            type="button"
-            className="map-tool-button"
-            aria-label="내 위치로 이동"
-            onClick={map.focusCurrentLocationOnMap}
-          >
-            <LocateFixed aria-hidden="true" size={20} strokeWidth={2.2} />
-          </button>
-          <button
-            type="button"
-            className="map-tool-button"
-            aria-label="북마크"
-            onClick={() => {
-              setSelectedRestaurant(null)
-              setActiveSidePanel((current) => current === 'bookmarks' ? 'search' : 'bookmarks')
-            }}
-          >
-            <Bookmark aria-hidden="true" size={20} strokeWidth={2.2} />
-          </button>
-          <button
-            type="button"
-            className="map-tool-button"
-            aria-label="최근분석"
-            onClick={openRecentPanel}
-          >
-            <Clock aria-hidden="true" size={20} strokeWidth={2.2} />
-          </button>
-          <button
-            type="button"
-            className="map-tool-button"
-            aria-label="AI 추천"
-            onClick={openAiPanel}
-          >
-            <Sparkles aria-hidden="true" size={20} strokeWidth={2.2} />
-          </button>
-          <button
-            type="button"
-            className="map-tool-button"
-            aria-label="설정"
-            onClick={openSettingsPanel}
-          >
-            <Settings aria-hidden="true" size={20} strokeWidth={2.2} />
-          </button>
-        </nav>
-        {toastMessage && <div className="map-toast">{toastMessage}</div>}
-      </section>
-    </main>
+        <section className="map-view" aria-label="지도">
+          <div ref={map.mapContainerRef} className="map-container" />
+          {map.loadState === 'loading' && (
+            <div className="map-status">카카오맵을 불러오는 중입니다</div>
+          )}
+          {map.loadState === 'error' && (
+            <div className="map-status map-status-error">{map.errorMessage}</div>
+          )}
+          {map.loadState === 'ready' && map.placesErrorMessage && (
+            <div className="map-status map-status-error">{map.placesErrorMessage}</div>
+          )}
+          {auth.isLoggedIn && (
+            <MapUsageBadge
+              profile={userProfileState.profile}
+              isLoading={userProfileState.isLoading}
+            />
+          )}
+          <nav className="map-tool-rail" aria-label="지도 메뉴">
+            <div className="map-tool-brand" aria-hidden="true">
+              <img src={appLogoUrl} alt="" />
+            </div>
+            <button
+              type="button"
+              className="map-tool-button"
+              aria-label="장소 검색"
+              onClick={() => { setSelectedRestaurant(null); setActiveSidePanel('search') }}
+            >
+              <Search aria-hidden="true" size={20} strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="map-tool-button"
+              aria-label="내 위치로 이동"
+              onClick={map.focusCurrentLocationOnMap}
+            >
+              <LocateFixed aria-hidden="true" size={20} strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="map-tool-button"
+              aria-label="북마크"
+              onClick={() => {
+                setSelectedRestaurant(null)
+                setActiveSidePanel((current) => current === 'bookmarks' ? 'search' : 'bookmarks')
+              }}
+            >
+              <Bookmark aria-hidden="true" size={20} strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="map-tool-button"
+              aria-label="최근분석"
+              onClick={openRecentPanel}
+            >
+              <Clock aria-hidden="true" size={20} strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="map-tool-button"
+              aria-label="AI 추천"
+              onClick={openAiPanel}
+            >
+              <Sparkles aria-hidden="true" size={20} strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="map-tool-button"
+              aria-label="설정"
+              onClick={openSettingsPanel}
+            >
+              <Settings aria-hidden="true" size={20} strokeWidth={2.2} />
+            </button>
+          </nav>
+          {toastMessage && <div className="map-toast">{toastMessage}</div>}
+        </section>
+      </main>
+      {showIntroSplash && <IntroSplash />}
+    </>
+  )
+}
+
+function IntroSplash() {
+  return (
+    <section className="intro-splash" aria-label="진실의 입 시작 화면">
+      <div className="intro-splash-track" aria-hidden="true">
+        <div className="intro-splash-glow" />
+        <img className="intro-splash-logo" src={appLogoUrl} alt="" />
+      </div>
+    </section>
   )
 }
 
