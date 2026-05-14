@@ -9,6 +9,7 @@ from services.electra_service import predict_and_score_batch
 from services.naver_service import (
     build_naver_blog_query,
     fetch_blog_previews,
+    fetch_first_store_blog_page,
     fetch_store_blog_previews,
     filter_blogs_by_store_name,
     iter_store_blog_pages,
@@ -436,7 +437,15 @@ async def search_stream(
     auth_email = await _get_optional_auth_email(authorization)
 
     async def event_generator():
-        cached = await get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+        # Supabase 조회 + Naver API 동시 시작
+        cache_task = asyncio.create_task(
+            get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+        )
+        naver_task = asyncio.create_task(
+            fetch_first_store_blog_page(naver_query, query, start=normalized_start)
+        )
+
+        cached = await cache_task   # Supabase 결과 먼저 확인
         place_detail_request = _is_place_detail_request(store_id)
         if place_detail_request:
             cached = _filter_reviews_for_place(cached, place_metadata)
@@ -467,16 +476,9 @@ async def search_stream(
 
             print(f"[DEBUG] → Naver API 호출 | naverQuery: {naver_query}", flush=True)
 
-            async for page_blogs in iter_store_blog_pages(
-                naver_query,
-                query,
-                start=normalized_start,
-                max_results=max_review_results,
-            ):
-                # NAVER 필드명("link")으로 이미 스트림한 URL 제외
-                new_blogs = [b for b in page_blogs if b.get("link") not in seen_urls]
-                if not new_blogs:
-                    continue
+            page_blogs = await naver_task
+            new_blogs = [b for b in page_blogs if b.get("link") not in seen_urls]
+            if new_blogs:
                 seen_urls.update(b.get("link") for b in new_blogs)
 
                 reviews = _blogs_to_reviews(query, new_blogs, normalized_start, place_metadata)
@@ -514,6 +516,7 @@ async def search_stream(
                     save_reviews_with_scores(query, new_blogs, page_scores, place_metadata)
                 )
         else:
+            naver_task.cancel() 
             targets = [r for r in cached if r.get("is_ad_finetuned_pred") is None]
             print(f"[DEBUG] → Supabase 캐시 hit | cached: {cached_count} | unscored: {len(targets)}", flush=True)
             for i in range(0, len(targets), STREAM_BATCH_SIZE):

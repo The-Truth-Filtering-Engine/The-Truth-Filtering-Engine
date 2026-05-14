@@ -236,6 +236,20 @@ async def iter_store_blog_pages(
             if len(page) < NAVER_BLOG_MAX_DISPLAY:
                 break
 
+async def fetch_first_store_blog_page(
+    query: str,
+    store_name: str,
+    *,
+    start: int = 1,
+) -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        page = await _fetch_blog_previews_page(
+            client,
+            query,
+            start=normalize_naver_start(start),
+            display=NAVER_BLOG_MAX_DISPLAY,
+        )
+        return filter_blogs_by_store_name(page, store_name)
 
 async def fetch_blog_previews(
     query: str,
