@@ -76,7 +76,7 @@ class AiAnalysisCard extends StatelessWidget {
                   _StatBar(
                     label: '광고 의심 게재',
                     value: 100 - truthScore,
-                    color: const Color(0xFFE85C5C),
+                    color: const Color.fromARGB(255, 232, 169, 92),
                   ),
                   const SizedBox(height: 8),
                   _StatBar(
@@ -121,14 +121,14 @@ class AiAnalysisCard extends StatelessWidget {
   }
 
   Color _trustColor(int score) {
-    if (score >= 80) return const Color(0xFF4CBB87);
-    if (score >= 60) return const Color(0xFFF5A623);
+    if (score >= 75) return const Color(0xFF4CBB87);
+    if (score >= 25) return const Color(0xFFF5A623);
     return const Color(0xFFE85C5C);
   }
 
   Color _trustTextColor(int score) {
-    if (score >= 80) return const Color(0xFF1A7A4A);
-    if (score >= 60) return const Color(0xFFA05800);
+    if (score >= 75) return const Color(0xFF1A7A4A);
+    if (score >= 25) return const Color(0xFFA05800);
     return const Color(0xFFC0392B);
   }
 }
