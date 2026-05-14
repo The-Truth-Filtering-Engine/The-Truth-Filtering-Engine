@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,7 @@ import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
 import '../../../screens/restaurant_list_screen.dart';
 import '../restaurant_detail/restaurant_detail_screen.dart';
+import '../../search/search_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenSettings;
@@ -46,11 +48,91 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   static const _initialCenter =
       MapPoint(latitude: 37.5245, longitude: 127.0370);
   static const _initialLevel = 4;
+  static const _mapCategoryChips = <_MapCategoryChipData>[
+    _MapCategoryChipData(
+      label: '백반',
+      keywords: ['백반', '집밥', '가정식'],
+      icon: Icons.rice_bowl_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '한식',
+      keywords: ['한식', '국밥', '찌개', '전골', '냉면'],
+      icon: Icons.soup_kitchen_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '일식',
+      keywords: ['일식', '초밥', '라멘', '돈카츠', '우동'],
+      icon: Icons.set_meal_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '중식',
+      keywords: ['중식', '짜장면', '짬뽕', '마라탕', '훠궈'],
+      icon: Icons.ramen_dining_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '양식',
+      keywords: ['양식', '파스타', '스테이크', '피자', '햄버거', '치킨'],
+      icon: Icons.local_pizza_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '세계',
+      keywords: ['세계음식', '쌀국수', '커리', '멕시칸', '인도', '태국', '베트남', '터키'],
+      icon: Icons.public_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '뷔페',
+      keywords: ['뷔페', '샐러드바', '무한리필'],
+      icon: Icons.table_restaurant_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '야식',
+      keywords: ['야식', '심야', '술안주'],
+      icon: Icons.nightlife_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '후식',
+      keywords: ['카페', '베이커리', '디저트', '아이스크림', '음료'],
+      icon: Icons.local_cafe_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '분식',
+      keywords: ['분식', '떡볶이', '김밥', '튀김', '순대'],
+      icon: Icons.fastfood_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '채식',
+      keywords: ['샐러드', '포케', '비건', '채식', '건강식'],
+      icon: Icons.eco_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '회식',
+      keywords: ['고기', '구이', '해산물', '횟집', '술집', '해장'],
+      icon: Icons.groups_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '급식',
+      keywords: ['구내식당', '학생식당', '사내식당', '직원식당'],
+      icon: Icons.business_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '특식',
+      keywords: ['보양식', '삼계탕', '장어', '추어탕', '갈비탕', '전복죽'],
+      icon: Icons.workspace_premium_rounded,
+    ),
+    _MapCategoryChipData(
+      label: '코스',
+      keywords: ['고급요리', '파인다이닝', '오마카세', '코스요리', '맡김차림', '런치코스', '디너코스'],
+      icon: Icons.restaurant_rounded,
+    ),
+  ];
 
   List<RestaurantModel>? _viewportRestaurants;
   String? _viewportSearchError;
   MapPoint? _lastSearchedCenter;
   int? _lastSearchedLevel;
+  String? _lastSearchedCategoryLabel;
+  KakaoMapCamera? _latestCamera;
+  _MapCategoryChipData? _selectedMapCategory;
   int _latestMapLevel = _initialLevel;
   bool _isLayerToggled = false;
 
@@ -86,14 +168,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         if (!mounted) return;
         _mapViewKey.currentState?.moveTo(
           MapPoint(latitude: next.latitude, longitude: next.longitude),
-          level: 3,
+          level: 0,
         );
+        setState(() {
+          _isLayerToggled = false;
+        });
       });
     });
 
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
     final currentLocation = ref.watch(currentLocationProvider);
-    final focusedRestaurant = ref.watch(mapFocusRestaurantProvider);
+    final focusedRestaurant = _selectedMapCategory == null
+        ? ref.watch(mapFocusRestaurantProvider)
+        : null;
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
     final displayRestaurants = _reduceRestaurantOverdraw(
       restaurants: _appendRestaurantIfMissing(
@@ -157,6 +244,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               child: MapSearchBar(
                 controller: _searchController,
                 hintText: '음식점 또는 메뉴를 검색',
+                onTap: () {
+                  final currentLocation = ref.read(currentLocationProvider);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SearchScreen(
+                        initialLatitude: currentLocation?.latitude,
+                        initialLongitude: currentLocation?.longitude,
+                        onViewPlace: _showRestaurantFromSearchResult,
+                      ),
+                    ),
+                  );
+                },
                 onSubmitted: (value) {
                   final query = value.trim();
                   if (query.isEmpty) {
@@ -182,6 +282,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   );
                 },
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: MediaQuery.paddingOf(context).top + 66,
+            child: PointerInterceptor(
+              child: _MapCategoryChipRow(
+                chips: _mapCategoryChips,
+                selectedLabel: _selectedMapCategory?.label,
+                onSelected: _openMapCategory,
               ),
             ),
           ),
@@ -271,11 +383,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _showRestaurantFromSearchResult(RestaurantModel restaurant) {
+    setState(() {
+      _selectedMapCategory = null;
+      _lastSearchedCategoryLabel = null;
+    });
     ref.read(mapFocusRestaurantProvider.notifier).state = restaurant;
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
   }
 
+  void _openMapCategory(_MapCategoryChipData category) {
+    final shouldClear = _selectedMapCategory?.label == category.label;
+    final nextCategory = shouldClear ? null : category;
+
+    _viewportSearchTimer?.cancel();
+    setState(() {
+      _selectedMapCategory = nextCategory;
+      _viewportRestaurants = const [];
+      _viewportSearchError = null;
+      _lastSearchedCenter = null;
+      _lastSearchedLevel = null;
+      _lastSearchedCategoryLabel = null;
+    });
+
+    ref.read(selectedRestaurantProvider.notifier).state = null;
+    ref.read(mapFocusRestaurantProvider.notifier).state = null;
+
+    _refreshRestaurantsForCurrentViewport(category: nextCategory);
+  }
+
   void _onCameraIdle(KakaoMapCamera camera) {
+    _latestCamera = camera;
     _latestMapLevel = camera.level;
     _onViewportChanged(camera);
   }
@@ -348,6 +485,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         center: camera.center,
         level: camera.level,
         radiusMeters: radiusMeters,
+        category: _selectedMapCategory,
       );
     });
   }
@@ -357,8 +495,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     final movedMeters = distanceMeters(center, _lastSearchedCenter!);
     final levelChanged = level != _lastSearchedLevel;
+    final categoryChanged =
+        _selectedMapCategory?.label != _lastSearchedCategoryLabel;
 
-    return movedMeters >= _refreshDistanceMeters || levelChanged;
+    return categoryChanged ||
+        movedMeters >= _refreshDistanceMeters ||
+        levelChanged;
   }
 
   int _calculateViewportRadius(MapBounds bounds, MapPoint center) {
@@ -393,6 +535,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     required MapPoint center,
     required int level,
     required int radiusMeters,
+    _MapCategoryChipData? category,
   }) async {
     final requestId = ++_viewportSearchReqId;
     if (!mounted) return;
@@ -400,13 +543,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() => _viewportSearchError = null);
 
     try {
-      final uri =
-          BackendConfig.uri('/places/nearby-restaurants', queryParameters: {
-        'lat': center.latitude.toString(),
-        'lng': center.longitude.toString(),
-        'radius': radiusMeters.toString(),
-        'display': '10',
-      });
+      final uri = category == null
+          ? BackendConfig.uri('/places/nearby-restaurants', queryParameters: {
+              'lat': center.latitude.toString(),
+              'lng': center.longitude.toString(),
+              'radius': radiusMeters.toString(),
+              'display': '10',
+            })
+          : BackendConfig.uri('/places/search-restaurants', queryParameters: {
+              'query': category.searchQuery,
+              'lat': center.latitude.toString(),
+              'lng': center.longitude.toString(),
+              'radius': radiusMeters.toString(),
+              'display': '10',
+            });
 
       final response = await http.get(uri);
 
@@ -418,6 +568,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       final data = jsonDecode(response.body);
       final List items = data['restaurants'] ?? [];
+      if (category != null && category.keywords.length > 1) {
+        final seenIds = {
+          for (final item in items)
+            if (item is Map && item['id'] != null) item['id'].toString(),
+        };
+
+        for (final keyword in category.keywords.skip(1)) {
+          final keywordUri =
+              BackendConfig.uri('/places/search-restaurants', queryParameters: {
+            'query': keyword,
+            'lat': center.latitude.toString(),
+            'lng': center.longitude.toString(),
+            'radius': radiusMeters.toString(),
+            'display': '10',
+          });
+          final keywordResponse = await http.get(keywordUri);
+          if (keywordResponse.statusCode != 200) {
+            if (!mounted || requestId != _viewportSearchReqId) return;
+            setState(
+              () => _viewportSearchError =
+                  '서버 오류 (${keywordResponse.statusCode})',
+            );
+            return;
+          }
+
+          final keywordData = jsonDecode(keywordResponse.body);
+          final List keywordItems = keywordData['restaurants'] ?? [];
+          for (final item in keywordItems) {
+            if (item is! Map || item['id'] == null) continue;
+            final id = item['id'].toString();
+            if (seenIds.contains(id)) continue;
+            seenIds.add(id);
+            items.add(item);
+          }
+        }
+      }
 
       final restaurants = items
           .map((item) => RestaurantModel(
@@ -435,15 +621,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 longitude: (item['lng'] as num).toDouble(),
               ))
           .toList();
+      restaurants.sort((a, b) => a.distance.compareTo(b.distance));
+      final visibleRestaurants = restaurants.take(_maxMapRestaurants).toList();
 
       if (!mounted || requestId != _viewportSearchReqId) return;
 
-      final focusedRestaurant = ref.read(mapFocusRestaurantProvider);
+      final focusedRestaurant =
+          category == null ? ref.read(mapFocusRestaurantProvider) : null;
       final mergedRestaurants = _appendRestaurantIfMissing(
-            restaurants,
+            visibleRestaurants,
             focusedRestaurant,
           ) ??
-          restaurants;
+          visibleRestaurants;
       final selectedRestaurant = ref.read(selectedRestaurantProvider);
       if (selectedRestaurant != null &&
           mergedRestaurants.every((r) => r.id != selectedRestaurant.id)) {
@@ -452,14 +641,38 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       setState(() {
         _viewportRestaurants = mergedRestaurants;
-        _viewportSearchError = null;
+        _viewportSearchError = category != null && mergedRestaurants.isEmpty
+            ? '${category.label} 주변 결과가 없습니다'
+            : null;
         _lastSearchedCenter = center;
         _lastSearchedLevel = level;
+        _lastSearchedCategoryLabel = category?.label;
       });
     } catch (_) {
       if (!mounted || requestId != _viewportSearchReqId) return;
       setState(() => _viewportSearchError = '네트워크 에러가 발생했습니다');
     }
+  }
+
+  void _refreshRestaurantsForCurrentViewport({
+    _MapCategoryChipData? category,
+  }) {
+    final camera = _latestCamera;
+    final center =
+        camera?.center ?? ref.read(currentLocationProvider) ?? _initialCenter;
+    final level = camera?.level ?? _latestMapLevel;
+    final radiusMeters = camera == null
+        ? 1500
+        : _calculateViewportRadius(camera.bounds, camera.center);
+
+    if (radiusMeters <= 0) return;
+
+    _searchViewportRestaurants(
+      center: center,
+      level: level,
+      radiusMeters: radiusMeters,
+      category: category,
+    );
   }
 
   int _mockTrustScore(String id) {
@@ -584,4 +797,132 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}
   }
+}
+
+class _MapCategoryChipRow extends StatelessWidget {
+  const _MapCategoryChipRow({
+    required this.chips,
+    this.selectedLabel,
+    required this.onSelected,
+  });
+
+  final List<_MapCategoryChipData> chips;
+  final String? selectedLabel;
+  final ValueChanged<_MapCategoryChipData> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 34,
+      width: double.infinity,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.stylus,
+            PointerDeviceKind.invertedStylus,
+          },
+        ),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          primary: false,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: chips.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final chip = chips[index];
+            return _MapCategoryChip(
+              data: chip,
+              isSelected: chip.label == selectedLabel,
+              onTap: () => onSelected(chip),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MapCategoryChip extends StatelessWidget {
+  const _MapCategoryChip({
+    required this.data,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final _MapCategoryChipData data;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const normalBackground = Color(0xFFF2F3F5);
+    const selectedBackground = AppColors.success50;
+    const normalBorder = Color(0xFFD9DDE3);
+    const selectedBorder = AppColors.success400;
+    final contentColor =
+        isSelected ? AppColors.success700 : AppColors.textSecondary;
+
+    return Material(
+      color: isSelected ? selectedBackground : normalBackground,
+      borderRadius: BorderRadius.circular(17),
+      elevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(17),
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: isSelected ? selectedBorder : normalBorder,
+              width: 0.7,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                data.icon,
+                size: 14,
+                color: contentColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                data.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      isSelected ? AppColors.success700 : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapCategoryChipData {
+  const _MapCategoryChipData({
+    required this.label,
+    required this.keywords,
+    required this.icon,
+  });
+
+  final String label;
+  final List<String> keywords;
+  final IconData icon;
+
+  String get searchQuery => keywords.first;
 }

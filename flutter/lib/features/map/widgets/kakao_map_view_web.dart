@@ -37,13 +37,16 @@ class KakaoMapView extends StatefulWidget {
 
 class KakaoMapViewState extends State<KakaoMapView> {
   static Completer<void>? _sdkLoader;
+  static const double _ultraZoomScale = 1.28;
 
   late final String _viewType;
+  late final html.DivElement _clipContainer;
   late final html.DivElement _container;
 
   js.JsObject? _map;
   bool _mapReady = false;
   bool _roadmapType = true;
+  bool _ultraZoomEnabled = false;
   String? _loadError;
   final List<js.JsObject> _restaurantOverlays = [];
   js.JsObject? _currentLocationOverlay;
@@ -52,16 +55,26 @@ class KakaoMapViewState extends State<KakaoMapView> {
   void initState() {
     super.initState();
     _viewType = 'kakao-map-${DateTime.now().microsecondsSinceEpoch}';
-    _container = html.DivElement()
+    _clipContainer = html.DivElement()
       ..id = _viewType
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.overflow = 'hidden';
+
+    _container = html.DivElement()
+      ..id = '$_viewType-inner'
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.border = '0'
       ..style.cursor = 'pointer';
+    _container.style.setProperty('backface-visibility', 'hidden');
+
+    _clipContainer.append(_container);
+    _clipContainer.onWheel.listen(_handleWheel);
 
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
-      (int viewId) => _container,
+      (int viewId) => _clipContainer,
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -113,6 +126,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
       _map = js.JsObject(maps['Map'], [_container, options]);
       _mapReady = true;
+      _applyLevelBounds();
 
       _addMapListener('idle', _emitCameraIdle);
       _addMapListener('click', () {
@@ -310,32 +324,100 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
   void moveTo(MapPoint point, {int? level}) {
     if (_map == null) return;
-    _map!.callMethod('setCenter', [_latLng(point)]);
     if (level != null) {
-      _map!.callMethod('setLevel', [level]);
+      final isUltraZoom = level <= 0;
+      _map!.callMethod('setMapTypeId', [_maps['MapTypeId']['ROADMAP']]);
+      _roadmapType = true;
+      _applyLevelBounds();
+      if (isUltraZoom) {
+        _map!.callMethod('setLevel', [1]);
+        _enableUltraZoom();
+      } else {
+        _disableUltraZoom();
+        _map!.callMethod('setLevel', [level]);
+      }
     }
+    _map!.callMethod('panTo', [_latLng(point)]);
     _emitCameraIdle();
+  }
+
+  void _applyLevelBounds() {
+    if (_map == null) return;
+    _map!.callMethod('setMinLevel', [0]);
+    _map!.callMethod('setMaxLevel', [14]);
   }
 
   void zoomIn() {
     if (_map == null) return;
     final level = (_map!.callMethod('getLevel') as num).toInt();
-    _map!.callMethod('setLevel', [level > 1 ? level - 1 : 1]);
+    final targetLevel = level > 0 ? level - 1 : 0;
+    if (_roadmapType && targetLevel <= 1) {
+      _map!.callMethod('setLevel', [1]);
+      _enableUltraZoom();
+      return;
+    }
+    _disableUltraZoom();
+    _map!.callMethod('setLevel', [targetLevel]);
   }
 
   void zoomOut() {
     if (_map == null) return;
+    if (_ultraZoomEnabled) {
+      _disableUltraZoom();
+      _map!.callMethod('setLevel', [1]);
+      return;
+    }
     final level = (_map!.callMethod('getLevel') as num).toInt();
     _map!.callMethod('setLevel', [level + 1]);
   }
 
   void toggleMapType() {
     if (_map == null) return;
+    _disableUltraZoom();
     final mapTypeId = _roadmapType
-        ? _maps['MapTypeId']['SKYVIEW']
+        ? _maps['MapTypeId']['HYBRID']
         : _maps['MapTypeId']['ROADMAP'];
     _map!.callMethod('setMapTypeId', [mapTypeId]);
     _roadmapType = !_roadmapType;
+    _applyLevelBounds();
+  }
+
+  void _handleWheel(html.WheelEvent event) {
+    if (_map == null || !_roadmapType) return;
+
+    final level = (_map!.callMethod('getLevel') as num).toInt();
+    if (event.deltaY < 0 && level <= 1) {
+      event.preventDefault();
+      event.stopPropagation();
+      _map!.callMethod('setLevel', [1]);
+      _enableUltraZoom();
+      return;
+    }
+
+    if (event.deltaY > 0 && _ultraZoomEnabled) {
+      event.preventDefault();
+      event.stopPropagation();
+      _disableUltraZoom();
+      _map!.callMethod('setLevel', [1]);
+    }
+  }
+
+  void _enableUltraZoom() {
+    if (_ultraZoomEnabled) return;
+
+    _ultraZoomEnabled = true;
+    _container.style.transform = 'scale($_ultraZoomScale)';
+    _container.style.transformOrigin = 'center center';
+    _container.style.transition = 'transform 0.18s ease-out';
+    _container.style.setProperty('will-change', 'transform');
+  }
+
+  void _disableUltraZoom() {
+    if (!_ultraZoomEnabled) return;
+
+    _ultraZoomEnabled = false;
+    _container.style.transform = 'scale(1)';
+    _container.style.setProperty('will-change', 'auto');
   }
 
   String _markerEmoji(RestaurantModel restaurant) {

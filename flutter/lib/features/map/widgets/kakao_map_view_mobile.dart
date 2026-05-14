@@ -166,16 +166,24 @@ class KakaoMapViewState extends State<KakaoMapView> {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         * { -webkit-tap-highlight-color: transparent; }
-        body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        body, html, #mapClip { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        #map {
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+        }
     </style>
 </head>
 <body>
-    <div id="map"></div>
+    <div id="mapClip"><div id="map"></div></div>
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=$apiKey&autoload=false"></script>
     <script>
         var map;
         var markers = [];
         var currentLocationOverlay;
+        var isRoadmap = true;
+        var ultraZoomEnabled = false;
+        var ULTRA_ZOOM_SCALE = 1.28;
 
         kakao.maps.load(function() {
             var container = document.getElementById('map');
@@ -184,6 +192,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
                 level: ${widget.initialLevel}
             };
             map = new kakao.maps.Map(container, options);
+            applyLevelBounds();
 
             kakao.maps.event.addListener(map, 'idle', function() {
                 var center = map.getCenter();
@@ -210,8 +219,20 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
         function moveTo(lat, lng, level) {
             var loc = new kakao.maps.LatLng(lat, lng);
-            map.setCenter(loc);
-            if (level) map.setLevel(level);
+            if (level !== null && level !== undefined) {
+                var ultraZoom = level <= 0;
+                map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+                isRoadmap = true;
+                applyLevelBounds();
+                if (ultraZoom) {
+                    map.setLevel(1);
+                    enableUltraZoom();
+                } else {
+                    disableUltraZoom();
+                    map.setLevel(level);
+                }
+            }
+            map.panTo(loc);
         }
 
         function setMarkers(restaurantsJson) {
@@ -282,15 +303,61 @@ class KakaoMapViewState extends State<KakaoMapView> {
         }
 
         function setMapType(type) {
-            if (type === 'SKYVIEW') {
-                map.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
+            disableUltraZoom();
+            if (type === 'HYBRID') {
+                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
+                isRoadmap = false;
             } else {
                 map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+                isRoadmap = true;
             }
+            applyLevelBounds();
         }
 
-        function zoomIn() { map.setLevel(map.getLevel() - 1); }
-        function zoomOut() { map.setLevel(map.getLevel() + 1); }
+        function applyLevelBounds() {
+            if (!map) return;
+            map.setMinLevel(0);
+            map.setMaxLevel(14);
+        }
+
+        function zoomIn() {
+            var targetLevel = Math.max(map.getLevel() - 1, 0);
+            if (isRoadmap && targetLevel <= 1) {
+                map.setLevel(1);
+                enableUltraZoom();
+                return;
+            }
+            disableUltraZoom();
+            map.setLevel(targetLevel);
+        }
+        function zoomOut() {
+            if (ultraZoomEnabled) {
+                disableUltraZoom();
+                map.setLevel(1);
+                return;
+            }
+            map.setLevel(map.getLevel() + 1);
+        }
+
+        function enableUltraZoom() {
+            if (ultraZoomEnabled) return;
+
+            ultraZoomEnabled = true;
+            var mapElement = document.getElementById('map');
+            mapElement.style.transform = 'scale(' + ULTRA_ZOOM_SCALE + ')';
+            mapElement.style.transformOrigin = 'center center';
+            mapElement.style.transition = 'transform 0.18s ease-out';
+            mapElement.style.willChange = 'transform';
+        }
+
+        function disableUltraZoom() {
+            if (!ultraZoomEnabled) return;
+
+            ultraZoomEnabled = false;
+            var mapElement = document.getElementById('map');
+            mapElement.style.transform = 'scale(1)';
+            mapElement.style.willChange = 'auto';
+        }
     </script>
 </body>
 </html>
@@ -362,7 +429,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
     if (!_mapReady) return;
     _roadmapType = !_roadmapType;
     _controller.runJavaScript(
-      "setMapType('${_roadmapType ? 'ROADMAP' : 'SKYVIEW'}')",
+      "setMapType('${_roadmapType ? 'ROADMAP' : 'HYBRID'}')",
     );
   }
 
