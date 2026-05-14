@@ -11,6 +11,8 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/backend_config.dart';
+import '../../../core/providers/current_user_provider.dart';
+import '../../../core/providers/user_profile_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bookmarks/bookmark_provider.dart';
 import '../models/map_point.dart';
@@ -53,6 +55,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int? _lastSearchedLevel;
   int _latestMapLevel = _initialLevel;
   bool _isLayerToggled = false;
+  bool _requestedProfileForMapBadge = false;
 
   @override
   void initState() {
@@ -95,6 +98,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final currentLocation = ref.watch(currentLocationProvider);
     final focusedRestaurant = ref.watch(mapFocusRestaurantProvider);
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
+    final authState = ref.watch(appAuthProvider);
+    final profileState = ref.watch(userProfileProvider);
+    _loadProfileForMapBadge(authState, profileState);
     final displayRestaurants = _reduceRestaurantOverdraw(
       restaurants: _appendRestaurantIfMissing(
         _viewportRestaurants,
@@ -185,6 +191,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
+          if (authState.isLoggedIn)
+            Positioned(
+              left: 16,
+              top: 74,
+              child: SafeArea(
+                child: PointerInterceptor(
+                  child: _MapUsageBadge(profileState: profileState),
+                ),
+              ),
+            ),
           Positioned(
             right: 16,
             bottom: selectedRestaurant != null ? 230 : 100,
@@ -264,6 +280,26 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ],
       ),
     );
+  }
+
+  void _loadProfileForMapBadge(
+    AppAuthState authState,
+    AsyncValue<UserProfile?> profileState,
+  ) {
+    if (!authState.isLoggedIn) {
+      _requestedProfileForMapBadge = false;
+      return;
+    }
+    if (profileState.isLoading || profileState.hasError) return;
+    if (profileState.asData?.value != null) return;
+    if (_requestedProfileForMapBadge) return;
+
+    _requestedProfileForMapBadge = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(userProfileProvider.notifier).loadIfPossible();
+    });
   }
 
   void _onMarkerTapped(RestaurantModel restaurant) {
@@ -583,5 +619,104 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref.read(currentLocationProvider.notifier).state = location;
       _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}
+  }
+}
+
+class _MapUsageBadge extends StatelessWidget {
+  final AsyncValue<UserProfile?> profileState;
+
+  const _MapUsageBadge({required this.profileState});
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = profileState.asData?.value;
+    final isLoading = profileState.isLoading && profile == null;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _MapUsageBadgeItem(
+              icon: Icons.paid_outlined,
+              label: '코인',
+              value: isLoading ? '-' : (profile?.coin ?? 0).toString(),
+              color: AppColors.warning700,
+            ),
+            const SizedBox(width: 10),
+            _MapUsageBadgeItem(
+              icon: Icons.bolt_outlined,
+              label: '무료분석',
+              value: isLoading ? '-' : (profile?.freecount ?? 0).toString(),
+              color: AppColors.success700,
+            ),
+            const SizedBox(width: 10),
+            _MapUsageBadgeItem(
+              icon: Icons.workspace_premium_outlined,
+              label: '추가분석',
+              value: isLoading ? '-' : (profile?.premiumcount ?? 0).toString(),
+              color: AppColors.primary700,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapUsageBadgeItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _MapUsageBadgeItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            height: 1,
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
+      ],
+    );
   }
 }

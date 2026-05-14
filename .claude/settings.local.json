@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(bash \"C:/Users/user/.claude/statusline-command.sh\")",
-      "Bash(flutter analyze *)"
-    ]
-  }
-}

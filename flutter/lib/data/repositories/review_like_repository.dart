@@ -9,13 +9,12 @@ class ReviewLikeRepository {
   Future<ReviewLikeState> fetchState({
     required String reviewId,
     required int userId,
-    String? accessToken,
+    Map<String, String>? authHeaders,
   }) async {
     final row = await _source.fetchLikes(reviewId);
     final likes = parseUserIdEntryList(row['likes']);
-    final dislikes = parseUserIdEntryList(row['dislikes']);
     final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
-    final accountLikedIds = await _fetchAccountLikedIds(accessToken);
+    final accountLikedIds = await _fetchAccountLikedIds(authHeaders);
     final isLiked = _isLiked(
       accountLikedIds: accountLikedIds,
       reviewId: reviewId,
@@ -26,9 +25,8 @@ class ReviewLikeRepository {
       await _reconcileSources(
         reviewId: reviewId,
         userId: userId,
-        accessToken: accessToken,
+        authHeaders: authHeaders,
         likes: likes,
-        dislikes: dislikes,
         accountLikedIds: accountLikedIds,
         isLiked: isLiked,
       );
@@ -45,13 +43,12 @@ class ReviewLikeRepository {
   Future<ReviewLikeState> toggleHeart({
     required String reviewId,
     required int userId,
-    String? accessToken,
+    Map<String, String>? authHeaders,
   }) async {
     final row = await _source.fetchLikes(reviewId);
     final likes = parseUserIdEntryList(row['likes']);
-    final dislikes = parseUserIdEntryList(row['dislikes']);
     final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
-    final accountLikedIds = await _fetchAccountLikedIds(accessToken);
+    final accountLikedIds = await _fetchAccountLikedIds(authHeaders);
     final isAlreadyLiked = _isLiked(
       accountLikedIds: accountLikedIds,
       reviewId: reviewId,
@@ -69,13 +66,11 @@ class ReviewLikeRepository {
           'likedAt': now,
           'updatedAt': now,
         });
-      dislikes.removeWhere((entry) => entry['user_id'] == userId);
     }
 
     await _source.updateLikes(
       reviewId: reviewId,
       likes: likes,
-      dislikes: dislikes,
     );
 
     final nextState = ReviewLikeState(
@@ -83,11 +78,10 @@ class ReviewLikeRepository {
       isLiked: likes.any((entry) => entry['user_id'] == userId),
     );
 
-    final token = accessToken?.trim() ?? '';
-    if (token.isNotEmpty) {
+    if (authHeaders != null && authHeaders.isNotEmpty) {
       try {
         await _source.syncUserReaction(
-          accessToken: token,
+          authHeaders: authHeaders,
           reviewId: reviewId,
           reaction: nextState.isLiked ? LikeType.like : null,
         );
@@ -99,9 +93,11 @@ class ReviewLikeRepository {
     return nextState;
   }
 
-  Future<Set<String>?> _fetchAccountLikedIds(String? accessToken) async {
+  Future<Set<String>?> _fetchAccountLikedIds(
+    Map<String, String>? authHeaders,
+  ) async {
     try {
-      return await _source.fetchUserLikedReviewIds(accessToken);
+      return await _source.fetchUserLikedReviewIds(authHeaders);
     } catch (_) {
       return null;
     }
@@ -121,16 +117,14 @@ class ReviewLikeRepository {
   Future<void> _reconcileSources({
     required String reviewId,
     required int userId,
-    required String? accessToken,
+    required Map<String, String>? authHeaders,
     required List<Map<String, dynamic>> likes,
-    required List<Map<String, dynamic>> dislikes,
     required Set<String>? accountLikedIds,
     required bool isLiked,
   }) async {
     if (accountLikedIds == null) return;
 
     final isRowLiked = likes.any((entry) => entry['user_id'] == userId);
-    final token = accessToken?.trim() ?? '';
 
     if (isLiked && !isRowLiked) {
       final now = DateTime.now().toUtc().toIso8601String();
@@ -139,19 +133,20 @@ class ReviewLikeRepository {
         'likedAt': now,
         'updatedAt': now,
       });
-      dislikes.removeWhere((entry) => entry['user_id'] == userId);
       await _source.updateLikes(
         reviewId: reviewId,
         likes: likes,
-        dislikes: dislikes,
       );
       return;
     }
 
-    if (isLiked && token.isNotEmpty && !accountLikedIds.contains(reviewId)) {
+    if (isLiked &&
+        authHeaders != null &&
+        authHeaders.isNotEmpty &&
+        !accountLikedIds.contains(reviewId)) {
       try {
         await _source.syncUserReaction(
-          accessToken: token,
+          authHeaders: authHeaders,
           reviewId: reviewId,
           reaction: LikeType.like,
         );
@@ -163,7 +158,6 @@ class ReviewLikeRepository {
       await _source.updateLikes(
         reviewId: reviewId,
         likes: likes,
-        dislikes: dislikes,
       );
     }
   }

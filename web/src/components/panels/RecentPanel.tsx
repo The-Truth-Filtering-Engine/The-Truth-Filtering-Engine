@@ -12,8 +12,7 @@ type RecentAnalysesState = {
 
 type Props = {
   recentAnalysesState: RecentAnalysesState
-  isTemporaryAdmin: boolean
-  authSessionExists: boolean
+  hasApiAuth: boolean
   onClose: () => void
   onFocusItem: (item: RecentAnalysisItem) => void
   onRetry: () => void
@@ -21,8 +20,7 @@ type Props = {
 
 export function RecentPanel({
   recentAnalysesState,
-  isTemporaryAdmin,
-  authSessionExists,
+  hasApiAuth,
   onClose,
   onFocusItem,
   onRetry,
@@ -51,9 +49,9 @@ export function RecentPanel({
           </div>
         </div>
 
-        {isTemporaryAdmin || !authSessionExists ? (
+        {!hasApiAuth ? (
           <div className="bookmark-empty">
-            Google 로그인 후 최근분석을 확인할 수 있습니다
+            로그인 후 최근분석을 확인할 수 있습니다
           </div>
         ) : (
           <>

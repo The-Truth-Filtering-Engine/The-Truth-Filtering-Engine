@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/test_account_auth_config.dart';
+import '../../../../core/providers/current_user_provider.dart';
 import '../../../../data/models/review_like_model.dart';
 import '../../../../data/repositories/review_like_repository.dart';
 import '../../../../data/sources/review_like_remote_source.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final reviewLikeRepositoryProvider = Provider<ReviewLikeRepository>(
   (ref) => ReviewLikeRepository(
@@ -55,7 +57,7 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
   final ReviewLikeRepository _repo;
   final String _reviewId;
   final int _userId;
-  final String? _accessToken;
+  final Map<String, String> _authHeaders;
   bool _hasUserToggled = false;
   bool _isToggling = false;
 
@@ -63,11 +65,11 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
     required ReviewLikeRepository repo,
     required String reviewId,
     required int userId,
-    String? accessToken,
+    required Map<String, String> authHeaders,
   })  : _repo = repo,
         _reviewId = reviewId,
         _userId = userId,
-        _accessToken = accessToken,
+        _authHeaders = authHeaders,
         super(ReviewLikeNotifierState(likeState: const ReviewLikeState())) {
     _load();
   }
@@ -78,7 +80,7 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
       final likeState = await _repo.fetchState(
         reviewId: _reviewId,
         userId: _userId,
-        accessToken: _accessToken,
+        authHeaders: _authHeaders,
       );
       if (_hasUserToggled) {
         state = state.copyWith(isLoading: false);
@@ -109,7 +111,7 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
       final likeState = await _repo.toggleHeart(
         reviewId: _reviewId,
         userId: _userId,
-        accessToken: _accessToken,
+        authHeaders: _authHeaders,
       );
 
       state = state.copyWith(isLoading: false, likeState: likeState);
@@ -142,10 +144,15 @@ class ReviewLikeNotifier extends StateNotifier<ReviewLikeNotifierState> {
 
 final reviewLikeProvider = StateNotifierProviderFamily<ReviewLikeNotifier,
     ReviewLikeNotifierState, ReviewLikeProviderKey>(
-  (ref, key) => ReviewLikeNotifier(
-    repo: ref.read(reviewLikeRepositoryProvider),
-    reviewId: key.reviewId,
-    userId: key.userId,
-    accessToken: Supabase.instance.client.auth.currentSession?.accessToken,
-  ),
+  (ref, key) {
+    final authState = ref.watch(appAuthProvider);
+    return ReviewLikeNotifier(
+      repo: ref.read(reviewLikeRepositoryProvider),
+      reviewId: key.reviewId,
+      userId: key.userId,
+      authHeaders: TestAccountAuthConfig.headers(
+        isTestAccountLogin: authState.isTestAccountLogin,
+      ),
+    );
+  },
 );

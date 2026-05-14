@@ -1,19 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/current_user_provider.dart';
 import '../map/models/restaurant_model.dart';
 import 'bookmark_service.dart';
 
 final bookmarkRestaurantsProvider =
     StateNotifierProvider<BookmarkRestaurantsNotifier, List<RestaurantModel>>(
-  (ref) => BookmarkRestaurantsNotifier(),
+  (ref) {
+    final authState = ref.watch(appAuthProvider);
+    return BookmarkRestaurantsNotifier(
+      bookmarkService: BookmarkService(
+        isTestAccountLogin: authState.isTestAccountLogin,
+      ),
+    );
+  },
 );
 
 class BookmarkRestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
   final BookmarkService _bookmarkService;
 
   BookmarkRestaurantsNotifier({
-    BookmarkService? bookmarkService,
-  })  : _bookmarkService = bookmarkService ?? BookmarkService(),
+    required BookmarkService bookmarkService,
+  })  : _bookmarkService = bookmarkService,
         super(const []) {
     _load();
   }

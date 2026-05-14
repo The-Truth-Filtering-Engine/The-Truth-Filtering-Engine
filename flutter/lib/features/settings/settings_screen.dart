@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/supabase_config.dart';
+import '../../core/config/test_account_auth_config.dart';
+import '../../core/providers/current_user_provider.dart';
 import '../../core/providers/liked_reviews_provider.dart';
 import '../../core/providers/recent_visit_provider.dart';
 import '../../core/providers/user_profile_provider.dart';
@@ -30,18 +32,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _errorMessage;
   bool _isSaving = false;
 
-  String? get _accessToken {
-    if (!SupabaseConfig.isConfigured) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
+  Map<String, String> get _authHeaders {
+    final authState = ref.read(appAuthProvider);
+    return TestAccountAuthConfig.headers(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   }
 
-  bool get _hasGoogleSession => _accessToken != null;
+  bool get _hasApiAuth => _authHeaders.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_hasGoogleSession) {
+      if (_hasApiAuth) {
         ref.read(userProfileProvider.notifier).loadIfPossible(force: true);
       }
     });
