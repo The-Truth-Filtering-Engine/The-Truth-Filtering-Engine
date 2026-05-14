@@ -582,14 +582,14 @@ class _RestaurantCard extends StatelessWidget {
   const _RestaurantCard({required this.restaurant, required this.onTap});
 
   Color get _trustColor {
-    if (restaurant.truthScore >= 80) return const Color(0xFF4CBB87);
-    if (restaurant.truthScore >= 60) return const Color(0xFFF5A623);
+    if (restaurant.truthScore >= 75) return const Color(0xFF4CBB87);
+    if (restaurant.truthScore >= 25) return const Color(0xFFF5A623);
     return const Color(0xFFE85C5C);
   }
 
   Color get _trustBgColor {
-    if (restaurant.truthScore >= 80) return const Color(0xFFE8F6EE);
-    if (restaurant.truthScore >= 60) return const Color(0xFFFEF5E7);
+    if (restaurant.truthScore >= 75) return const Color(0xFFE8F6EE);
+    if (restaurant.truthScore >= 25) return const Color(0xFFFEF5E7);
     return const Color(0xFFFEF0F0);
   }
 

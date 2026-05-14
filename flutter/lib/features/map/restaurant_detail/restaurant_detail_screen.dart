@@ -147,8 +147,7 @@ Stream<_SseBatch> _streamFreshReviews(
         .transform(utf8.decoder)
         .transform(const LineSplitter())) {
       if (!line.startsWith('data: ')) continue;
-      final json =
-          jsonDecode(line.substring(6)) as Map<String, dynamic>;
+      final json = jsonDecode(line.substring(6)) as Map<String, dynamic>;
       final done = json['done'] as bool? ?? false;
       final rawList = json['reviews'] as List<dynamic>? ?? [];
       final reviews = rawList
@@ -175,7 +174,8 @@ String? _parseApiError(String text) {
   return null;
 }
 
-String? _readApiError(http.Response r) => _parseApiError(utf8.decode(r.bodyBytes));
+String? _readApiError(http.Response r) =>
+    _parseApiError(utf8.decode(r.bodyBytes));
 
 String? _readApiErrorFromString(String body) => _parseApiError(body);
 
@@ -290,35 +290,35 @@ class _RestaurantDetailScreenState
         // 이벤트 간 90초 타임아웃 (총 스트림 시간이 아니라 이벤트 간 간격 기준)
         .timeout(const Duration(seconds: 90))
         .listen(
-          (batch) {
-            if (batch.done) {
-              _finalizeStream();
-            } else {
-              _appendBatch(batch.reviews);
-            }
-          },
-          onError: (e) {
-            if (!mounted) return;
-            if (_isUsageRequiredError(e)) {
-              setState(() => _state = _ScreenState.noData);
-              _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
-              return;
-            }
-            if (_reviews.isNotEmpty) {
-              _refreshRecentAnalyses(); // 부분 성공 시에도 이력 갱신
-              _showError('추가 리뷰를 불러오지 못했습니다: $e');
-            } else {
-              setState(() => _state = _ScreenState.noData);
-              _showError('분석 중 오류가 발생했어요: $e');
-            }
-          },
-          onDone: () {
-            // done: true 없이 스트림이 닫힌 경우 방어 처리
-            if (mounted && _shopInfo == null && _reviews.isNotEmpty) {
-              _finalizeStream();
-            }
-          },
-        );
+      (batch) {
+        if (batch.done) {
+          _finalizeStream();
+        } else {
+          _appendBatch(batch.reviews);
+        }
+      },
+      onError: (e) {
+        if (!mounted) return;
+        if (_isUsageRequiredError(e)) {
+          setState(() => _state = _ScreenState.noData);
+          _showError(_errorMessage(e, '분석 중 오류가 발생했어요'));
+          return;
+        }
+        if (_reviews.isNotEmpty) {
+          _refreshRecentAnalyses(); // 부분 성공 시에도 이력 갱신
+          _showError('추가 리뷰를 불러오지 못했습니다: $e');
+        } else {
+          setState(() => _state = _ScreenState.noData);
+          _showError('분석 중 오류가 발생했어요: $e');
+        }
+      },
+      onDone: () {
+        // done: true 없이 스트림이 닫힌 경우 방어 처리
+        if (mounted && _shopInfo == null && _reviews.isNotEmpty) {
+          _finalizeStream();
+        }
+      },
+    );
   }
 
   // 중간 배치: 리뷰 누적 + 목록 즉시 표시
@@ -365,7 +365,6 @@ class _RestaurantDetailScreenState
 
   void _applyReviews(_ReviewFetchResult result) {
     if (!mounted) return;
-
     final reviews = result.reviews;
 
     if (reviews.isEmpty) {
@@ -380,21 +379,23 @@ class _RestaurantDetailScreenState
       return;
     }
 
+    final merged = _mergeReviews(_reviews, reviews);
+
     final shopInfo = ShopInfo.fromApiResponse(
       name: _r.name,
       category: '${_r.category} · ${_r.address}',
-      reviews: reviews,
+      reviews: merged,
     );
     final wordFreqs = WordFreqBuilder.build(
-      reviews.map((r) => r.title).toList(),
+      merged.map((r) => r.title).toList(),
     );
 
     setState(() {
-      _reviews = reviews;
+      _reviews = merged;
       _shopInfo = shopInfo;
       _wordFreqs = wordFreqs;
       _hasMoreReviewBatches =
-          result.hasMore && reviews.length < _maxReviewResults;
+          result.hasMore && merged.length < _maxReviewResults;
       _isLoadingReviewBatch = false;
       _state = _ScreenState.loaded;
     });
@@ -723,7 +724,8 @@ class _WordCloudSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 160, // narrow 레이아웃 점프 방지. wide는 SizedBox(height:220)+stretch로 자동 조정
+      height:
+          160, // narrow 레이아웃 점프 방지. wide는 SizedBox(height:220)+stretch로 자동 조정
       decoration: BoxDecoration(
         color: const Color(0xFFF7F7FA),
         borderRadius: BorderRadius.circular(12),

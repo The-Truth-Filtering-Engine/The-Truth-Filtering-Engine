@@ -6,44 +6,44 @@ enum ReviewStatus { real, suspicious, ad }
 /// 광고 확률 등급
 /// 1에 가까울수록 광고 → 등급이 높을수록 광고성 강함
 enum AdGrade {
-  low, // < 0.3  → 상 (진성)
-  mid, // 0.3 ~ 0.6 → 중 (의심)
-  high, // > 0.6  → 하 (광고)
+  low, // < 0.778  → 상 (진성)
+  // mid, //
+  high, // > 0.778  → 하 (광고)
 }
 
 extension AdGradeX on AdGrade {
   String get label => switch (this) {
-        AdGrade.low => '상',
-        AdGrade.mid => '중',
-        AdGrade.high => '하',
+        AdGrade.low => '일반',
+        // AdGrade.mid => '중',
+        AdGrade.high => '의심',
       };
 
   Color get color {
     switch (this) {
       case AdGrade.low:
         return const Color(0xFF34A853);
-      case AdGrade.mid:
-        return const Color(0xFFF9A825);
+      // case AdGrade.mid:
+      //   return const Color(0xFFF9A825);
       case AdGrade.high:
-        return const Color(0xFFE53935);
+        return const Color.fromARGB(255, 229, 144, 53);
     }
   }
 
   Color get bgColor {
     switch (this) {
       case AdGrade.low:
-        return const Color(0xFFE8F5E9);
-      case AdGrade.mid:
-        return const Color(0xFFFFFDE7);
+        return const Color.fromARGB(255, 240, 248, 240);
+      // case AdGrade.mid:
+      //   return const Color(0xFFFFFDE7);
       case AdGrade.high:
-        return const Color(0xFFFFEBEE);
+        return const Color.fromARGB(255, 255, 245, 235);
     }
   }
 }
 
 AdGrade adGradeFromScore(double score) {
-  if (score >= 0.6) return AdGrade.high;
-  if (score >= 0.3) return AdGrade.mid;
+  if (score >= 0.778) return AdGrade.high;
+  // if (score >= 0.3) return AdGrade.mid;
   return AdGrade.low;
 }
 
@@ -211,9 +211,18 @@ class ShopInfo {
     required List<BlogReview> reviews,
   }) {
     final total = reviews.length;
-    final adCount = reviews.where((r) => r.status == ReviewStatus.ad).length;
-    final realCount = total - adCount;
+    // status 대신 adGrade 기준으로 통일
+    final adCount = reviews.where((r) {
+      if (r.adGrade != null) return r.adGrade == AdGrade.high;
+      return r.status == ReviewStatus.ad; // adGrade 없을 때 fallback
+    }).length;
 
+    final realCount = reviews.where((r) {
+      if (r.adGrade != null) return r.adGrade == AdGrade.low;
+      return r.status == ReviewStatus.real;
+    }).length;
+
+    // suspicious/mid는 총계에는 포함되지만 양쪽 다 아님
     final int adRatio = total == 0 ? 0 : (adCount / total * 100).round();
     final int realRatio = total == 0 ? 0 : (realCount / total * 100).round();
 

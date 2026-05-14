@@ -86,15 +86,15 @@ export function isAnalysisUsageRequiredError(error: unknown) {
 }
 
 export function gradeFromScore(adScore: number | null): ReviewGrade {
-  if (adScore === null) return 'suspicious'
-  if (adScore >= 0.6) return 'ad'
-  if (adScore >= 0.3) return 'suspicious'
+  if (adScore === null) return 'ad'
+  if (adScore >= 0.778) return 'ad'
+  // if (adScore >= 0.3) return 'suspicious'
   return 'real'
 }
 
 export function gradeLabel(grade: ReviewGrade) {
-  if (grade === 'real') return '진성'
-  if (grade === 'ad') return '광고'
+  if (grade === 'real') return '일반'
+  if (grade === 'ad') return '의심'
   return '의심'
 }
 
@@ -110,8 +110,8 @@ export function parseReviewLikeEntries(value: unknown): ReviewLikeEntry[] {
         : {}
     const userId = Number(
       source.user_id ??
-        source.userId ??
-        (typeof entry === 'number' || typeof entry === 'string' ? entry : NaN),
+      source.userId ??
+      (typeof entry === 'number' || typeof entry === 'string' ? entry : NaN),
     )
 
     if (!Number.isFinite(userId)) continue
