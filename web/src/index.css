@@ -128,10 +128,11 @@ body {
   left: 100%;
   z-index: 1;
   display: grid;
-  width: clamp(86px, 10vw, 132px);
+  width: clamp(62px, 10vw, 132px);
   aspect-ratio: 1;
   box-sizing: border-box;
   place-items: center;
+  --intro-group-half: clamp(175px, 21.6vw, 366px);
   filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.24));
   opacity: 0;
   transform-origin: center;
@@ -193,7 +194,7 @@ body {
 
 .intro-splash-car:nth-child(2) {
   --intro-delay: 70ms;
-  --intro-follow: clamp(86px, 8.5vw, 150px);
+  --intro-follow: clamp(72px, 8.5vw, 150px);
   --y-1: 8px;
   --y-2: -6px;
   --y-3: 7px;
@@ -206,7 +207,7 @@ body {
 
 .intro-splash-car:nth-child(3) {
   --intro-delay: 140ms;
-  --intro-follow: clamp(172px, 17vw, 300px);
+  --intro-follow: clamp(144px, 17vw, 300px);
   --y-1: -9px;
   --y-2: 6px;
   --y-3: -5px;
@@ -219,7 +220,7 @@ body {
 
 .intro-splash-car:nth-child(4) {
   --intro-delay: 210ms;
-  --intro-follow: clamp(258px, 25.5vw, 450px);
+  --intro-follow: clamp(216px, 25.5vw, 450px);
   --y-1: 6px;
   --y-2: -8px;
   --y-3: 7px;
@@ -232,7 +233,7 @@ body {
 
 .intro-splash-car:nth-child(5) {
   --intro-delay: 280ms;
-  --intro-follow: clamp(344px, 34vw, 600px);
+  --intro-follow: clamp(288px, 34vw, 600px);
   --y-1: -5px;
   --y-2: 9px;
   --y-3: -7px;
@@ -255,7 +256,7 @@ body {
 
 .intro-splash-letter {
   color: color-mix(in srgb, var(--color-surface-brand) 82%, white);
-  font-size: clamp(38px, 5vw, 66px);
+  font-size: clamp(34px, 5vw, 66px);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
@@ -273,43 +274,28 @@ body {
 @keyframes intro-piece-pass {
   0% {
     opacity: 0;
-    transform: translate(var(--intro-follow, 0px), -50%) rotate(0deg) scale(0.9);
+    transform: translate(calc(12vw + var(--intro-follow, 0px)), -50%) rotate(0deg) scale(0.9);
   }
 
-  10% {
+  16% {
     opacity: 1;
-    transform: translate(calc(-10vw - 10% + var(--intro-follow, 0px)), calc(-50% + var(--y-1))) rotate(var(--r-1)) scale(0.98);
+    transform: translate(calc(-18vw + var(--intro-follow, 0px)), calc(-50% + var(--y-1))) rotate(var(--r-1)) scale(0.98);
   }
 
-  24% {
-    transform: translate(calc(-26vw - 26% + var(--intro-follow, 0px)), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(1.02);
-  }
-
-  39% {
-    transform: translate(calc(-43vw - 43% + var(--intro-follow, 0px)), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(0.99);
-  }
-
-  55% {
-    transform: translate(calc(-61vw - 61% + var(--intro-follow, 0px)), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(1.01);
-  }
-
-  71% {
-    transform: translate(calc(-79vw - 79% + var(--intro-follow, 0px)), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(0.98);
-  }
-
-  86% {
+  28%,
+  70% {
     opacity: 1;
-    transform: translate(calc(-96vw - 96% + var(--intro-follow, 0px)), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(1);
+    transform: translate(calc(-50vw - var(--intro-group-half) + var(--intro-follow, 0px)), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(1);
   }
 
-  92% {
+  84% {
     opacity: 1;
-    transform: translate(calc(-106vw - 106% + var(--intro-follow, 0px)), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(0.98);
+    transform: translate(calc(-88vw - var(--intro-group-half) + var(--intro-follow, 0px)), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(0.98);
   }
 
   100% {
     opacity: 0;
-    transform: translate(calc(-128vw - 148%), -50%) rotate(0deg) scale(0.92);
+    transform: translate(calc(-124vw - var(--intro-group-half) + var(--intro-follow, 0px)), -50%) rotate(0deg) scale(0.92);
   }
 }
 
