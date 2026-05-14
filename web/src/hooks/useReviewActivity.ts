@@ -2,15 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   parseBlogReview,
   parseReviewLikeEntries,
+  type ReportCategoryCode,
   type BlogReview,
   type ReviewLikeEntry,
+  type ReviewReport,
 } from '../api/reviews'
 import { cleanText } from '../lib/format'
 import { supabase } from '../lib/supabase'
 
 const USER_SELECT_COLUMNS = 'id,email,review_likes,recent_visits'
 const REVIEW_SELECT_COLUMNS =
-  'id,name,review_title,review_description,review_bloggername,review_url,review_postdate,is_ad_finetuned_pred,likes,store_id,category_name,category_group_code,category_group_name,phone,address_name,road_address_name,place_url'
+  'id,name,review_title,review_description,review_bloggername,review_url,review_postdate,is_ad_finetuned_pred,likes,report,confirm,store_id,category_name,category_group_code,category_group_name,phone,address_name,road_address_name,place_url'
 const MAX_RECENT_REVIEWS = 30
 
 type ReviewReaction = {
@@ -40,6 +42,12 @@ export type ReviewLikeViewState = {
   likeCount: number
   isSaving: boolean
 }
+
+export type ReviewReportViewState = {
+  isReported: boolean
+}
+
+export type ReviewReportSubmitResult = 'submitted' | 'duplicate' | 'error'
 
 export type LikedReviewItem = BlogReview & {
   likedAt: string
@@ -152,6 +160,10 @@ function limitRecentVisits(recentVisits: Record<string, RecentVisit>) {
 
 function hasUserLike(likes: ReviewLikeEntry[], userId: number) {
   return likes.some((entry) => entry.user_id === userId)
+}
+
+function isSameEmail(first: string, second: string) {
+  return cleanText(first).toLowerCase() === cleanText(second).toLowerCase()
 }
 
 function nextLikedEntries(likes: ReviewLikeEntry[], userId: number, isLiked: boolean) {
@@ -286,6 +298,7 @@ export function useReviewActivity(
 ) {
   const [currentUser, setCurrentUser] = useState<ReviewUserRow | null>(null)
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewLikeViewState>>({})
+  const [reportStates, setReportStates] = useState<Record<string, ReviewReportViewState>>({})
   const [likedReviewsState, setLikedReviewsState] =
     useState<ReviewCollectionState<LikedReviewItem>>(() =>
       emptyCollectionState<LikedReviewItem>(),
@@ -387,6 +400,27 @@ export function useReviewActivity(
     [],
   )
 
+  const setReportStateForKeys = useCallback(
+    (
+      review: Pick<BlogReview, 'id' | 'reviewId' | 'url'>,
+      state: ReviewReportViewState,
+    ) => {
+      const keys = [
+        reviewActivityKey(review),
+        review.reviewId,
+        review.url,
+        String(review.id),
+      ].filter(Boolean)
+
+      setReportStates((prev) => {
+        const next = { ...prev }
+        for (const key of keys) next[key] = state
+        return next
+      })
+    },
+    [],
+  )
+
   const getReviewLikeState = useCallback(
     (review: BlogReview): ReviewLikeViewState => {
       const override = reviewStates[reviewActivityKey(review)]
@@ -403,6 +437,22 @@ export function useReviewActivity(
       }
     },
     [currentUser, reviewStates],
+  )
+
+  const getReviewReportState = useCallback(
+    (review: BlogReview): ReviewReportViewState => {
+      const override = reportStates[reviewActivityKey(review)]
+      if (override) return override
+
+      return {
+        isReported: Boolean(
+          authEmail &&
+            review.report?.user_email &&
+            isSameEmail(review.report.user_email, authEmail),
+        ),
+      }
+    },
+    [authEmail, reportStates],
   )
 
   const toggleReviewHeart = useCallback(
@@ -484,6 +534,64 @@ export function useReviewActivity(
       showToast,
       updateUserReviewLikes,
     ],
+  )
+
+  const submitReviewReport = useCallback(
+    async (
+      review: BlogReview,
+      category: ReportCategoryCode,
+      memo?: string,
+    ): Promise<ReviewReportSubmitResult> => {
+      if (!isAvailable) {
+        showToast('로그인 후 사용할 수 있습니다')
+        return 'error'
+      }
+
+      try {
+        const client = requireSupabaseClient()
+        const resolved = await resolveReviewRow(client, review)
+        if (!resolved) {
+          throw new Error('저장된 리뷰 정보를 찾지 못했습니다')
+        }
+
+        const existingReport = resolved.report
+        if (existingReport?.user_email && isSameEmail(existingReport.user_email, authEmail)) {
+          setReportStateForKeys(review, { isReported: true })
+          setReportStateForKeys(resolved, { isReported: true })
+          return 'submitted'
+        }
+
+        if (existingReport) {
+          showToast('이미 다른 사용자가 신고한 리뷰입니다')
+          return 'duplicate'
+        }
+
+        const normalizedMemo = cleanText(memo)
+        const report: ReviewReport = {
+          category,
+          user_email: authEmail,
+          ...(normalizedMemo ? { memo: normalizedMemo } : {}),
+        }
+
+        const { data, error } = await client
+          .from('reviews')
+          .update({ report, confirm: 0 })
+          .eq('id', resolved.reviewId)
+          .select(REVIEW_SELECT_COLUMNS)
+          .single()
+
+        if (error) throw error
+
+        const updatedReview = parseBlogReview(data as Record<string, unknown>)
+        setReportStateForKeys(review, { isReported: true })
+        setReportStateForKeys(updatedReview, { isReported: true })
+        return 'submitted'
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : '신고를 접수하지 못했습니다')
+        return 'error'
+      }
+    },
+    [authEmail, isAvailable, setReportStateForKeys, showToast],
   )
 
   const loadLikedReviews = useCallback(async () => {
@@ -703,13 +811,16 @@ export function useReviewActivity(
   }, [ensureCurrentUser, isAvailable, updateUserRecentVisits])
 
   useEffect(() => {
-    setCurrentUser(null)
-    setReviewStates({})
-    setLikedReviewsState(emptyCollectionState())
-    setRecentReviewsState(emptyCollectionState())
-    if (!isAvailable) return
+    const resetTimer = window.setTimeout(() => {
+      setCurrentUser(null)
+      setReviewStates({})
+      setReportStates({})
+      setLikedReviewsState(emptyCollectionState())
+      setRecentReviewsState(emptyCollectionState())
+      if (isAvailable) void ensureCurrentUser().catch(() => {})
+    }, 0)
 
-    void ensureCurrentUser().catch(() => {})
+    return () => window.clearTimeout(resetTimer)
   }, [ensureCurrentUser, isAvailable])
 
   return useMemo(
@@ -718,7 +829,9 @@ export function useReviewActivity(
       likedReviewsState,
       recentReviewsState,
       getReviewLikeState,
+      getReviewReportState,
       toggleReviewHeart,
+      submitReviewReport,
       loadLikedReviews,
       removeLikedReview,
       openReviewSource,
@@ -730,6 +843,7 @@ export function useReviewActivity(
     [
       clearRecentReviews,
       getReviewLikeState,
+      getReviewReportState,
       isAvailable,
       likedReviewsState,
       loadLikedReviews,
@@ -739,6 +853,7 @@ export function useReviewActivity(
       recentReviewsState,
       removeLikedReview,
       removeRecentReview,
+      submitReviewReport,
       toggleReviewHeart,
     ],
   )

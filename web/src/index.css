@@ -269,7 +269,11 @@ body {
 .map-search-submit:focus-visible,
 .review-tabs button:focus-visible,
 .review-heart-button:focus-visible,
+.review-report-button:focus-visible,
 .review-open-button:focus-visible,
+.review-report-close:focus-visible,
+.review-report-option:focus-visible,
+.review-report-submit:focus-visible,
 .review-card:focus-visible,
 .search-result-card:focus-visible,
 .settings-back-button:focus-visible,
@@ -1112,7 +1116,15 @@ body {
   margin-bottom: 8px;
 }
 
+.review-card-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .review-heart-button,
+.review-report-button,
 .review-open-button {
   display: inline-flex;
   align-items: center;
@@ -1132,13 +1144,28 @@ body {
   padding: 0 9px;
 }
 
+.review-report-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-color: var(--color-border-default);
+  color: var(--color-text-muted);
+}
+
 .review-heart-button.active {
   border-color: color-mix(in srgb, var(--button-danger-text) 35%, var(--button-danger-border));
   background: var(--button-danger-bg);
   color: var(--button-danger-text);
 }
 
-.review-heart-button:disabled {
+.review-report-button.active {
+  border-color: color-mix(in srgb, var(--button-danger-text) 35%, var(--button-danger-border));
+  background: var(--button-danger-bg);
+  color: var(--button-danger-text);
+}
+
+.review-heart-button:disabled,
+.review-report-button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -1162,6 +1189,167 @@ body {
 .review-grade.ad {
   background: var(--color-status-ad-bg);
   color: var(--color-status-ad-text);
+}
+
+.review-report-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.review-report-dialog {
+  display: grid;
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  box-sizing: border-box;
+  gap: 16px;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-default);
+  box-shadow: var(--shadow-lg);
+}
+
+.review-report-header {
+  display: grid;
+  grid-template-columns: 34px 1fr 32px;
+  gap: 10px;
+  align-items: start;
+}
+
+.review-report-header-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--button-danger-bg);
+  color: var(--button-danger-text);
+}
+
+.review-report-header h2,
+.review-report-header p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.review-report-header h2 {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.review-report-header p {
+  display: -webkit-box;
+  margin-top: 5px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-report-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-circle);
+  background: var(--color-surface-default);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.review-report-options {
+  display: grid;
+  gap: 8px;
+}
+
+.review-report-option {
+  display: grid;
+  min-height: 46px;
+  grid-template-columns: 20px 1fr 20px;
+  gap: 10px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-subtle);
+  cursor: pointer;
+  font: var(--font-weight-heavy) 13px/1.2 var(--font-family-sans);
+  text-align: left;
+}
+
+.review-report-option.active {
+  border-color: color-mix(in srgb, var(--button-danger-text) 40%, var(--button-danger-border));
+  background: var(--button-danger-bg);
+  color: var(--button-danger-text);
+}
+
+.review-report-option svg:last-child {
+  justify-self: end;
+}
+
+.review-report-memo {
+  display: grid;
+  gap: 8px;
+}
+
+.review-report-memo span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.review-report-memo textarea {
+  width: 100%;
+  min-height: 92px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  outline: 0;
+  padding: 11px 12px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: var(--font-weight-bold) 13px/1.45 var(--font-family-sans);
+}
+
+.review-report-memo textarea:focus {
+  border-color: var(--input-focus-border);
+  box-shadow: var(--shadow-focus);
+}
+
+.review-report-memo textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+.review-report-submit {
+  display: inline-flex;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--button-danger-text);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  font: var(--font-weight-heavy) 14px/1 var(--font-family-sans);
+}
+
+.review-report-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .review-card-skeleton {

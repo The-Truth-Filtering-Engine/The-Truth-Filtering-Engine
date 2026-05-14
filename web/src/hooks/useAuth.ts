@@ -25,11 +25,21 @@ export type UseAuthReturn = {
   signOut: () => Promise<void>
 }
 
+function readStoredTestAccountLogin() {
+  return (
+    typeof window !== 'undefined' &&
+    window.localStorage.getItem(TEST_ACCOUNT_AUTH_STORAGE_KEY) === 'true'
+  )
+}
+
 export function useAuth(onSignOut: () => void, showToast: (message: string) => void): UseAuthReturn {
   const [authSession, setAuthSession] = useState<Session | null>(null)
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking')
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => {
+    if (supabase) return 'checking'
+    return readStoredTestAccountLogin() ? 'signedIn' : 'signedOut'
+  })
   const [authErrorMessage, setAuthErrorMessage] = useState('')
-  const [isTestAccountLogin, setIsTestAccountLogin] = useState(false)
+  const [isTestAccountLogin, setIsTestAccountLogin] = useState(readStoredTestAccountLogin)
 
   const authEmail = authSession?.user?.email?.trim() || (isTestAccountLogin ? TEST_ACCOUNT_EMAIL : '')
   const authKey = authSession?.access_token || (isTestAccountLogin ? TEST_ACCOUNT_EMAIL : '')
@@ -46,12 +56,9 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
   const isLoggedIn = authSession !== null || isTestAccountLogin
 
   useEffect(() => {
-    const storedTestAccount =
-      window.localStorage.getItem(TEST_ACCOUNT_AUTH_STORAGE_KEY) === 'true'
-    setIsTestAccountLogin(storedTestAccount)
+    const storedTestAccount = readStoredTestAccountLogin()
 
     if (!supabase) {
-      setAuthStatus(storedTestAccount ? 'signedIn' : 'signedOut')
       if (!storedTestAccount) onSignOut()
       return
     }

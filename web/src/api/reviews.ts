@@ -4,6 +4,21 @@ import { type Restaurant } from '../lib/restaurant'
 
 export type ReviewGrade = 'real' | 'suspicious' | 'ad'
 
+export type ReportCategoryCode = 1 | 2 | 3 | 4
+
+export type ReviewReport = {
+  category: ReportCategoryCode
+  user_email: string
+  memo?: string
+}
+
+export const REPORT_CATEGORIES: Array<{ code: ReportCategoryCode; label: string }> = [
+  { code: 1, label: '광고' },
+  { code: 2, label: '관련 없는 내용' },
+  { code: 3, label: '부적절한 내용' },
+  { code: 4, label: '기타' },
+]
+
 export type ReviewLikeEntry = {
   user_id: number
   likedAt?: string
@@ -25,6 +40,7 @@ export type BlogReview = {
   adScore: number | null
   adProbability: number
   grade: ReviewGrade
+  report: ReviewReport | null
 }
 
 export type DetailData = {
@@ -110,6 +126,27 @@ export function parseReviewLikeEntries(value: unknown): ReviewLikeEntry[] {
   return [...byUserId.values()]
 }
 
+function isReportCategoryCode(value: number): value is ReportCategoryCode {
+  return value === 1 || value === 2 || value === 3 || value === 4
+}
+
+export function parseReviewReport(value: unknown): ReviewReport | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  const source = value as Record<string, unknown>
+  const category = Number(source.category)
+  if (!isReportCategoryCode(category)) return null
+
+  const userEmail = cleanText(source.user_email ?? source.userEmail)
+  const memo = cleanText(source.memo)
+
+  return {
+    category,
+    user_email: userEmail,
+    ...(memo ? { memo } : {}),
+  }
+}
+
 export function parseBlogReview(item: Record<string, unknown>): BlogReview {
   const scoreSource =
     typeof item.is_ad_finetuned_pred === 'number'
@@ -140,6 +177,7 @@ export function parseBlogReview(item: Record<string, unknown>): BlogReview {
     adScore,
     adProbability: adScore === null ? 50 : Math.round(adScore * 100),
     grade: gradeFromScore(adScore),
+    report: parseReviewReport(item.report),
   }
 }
 

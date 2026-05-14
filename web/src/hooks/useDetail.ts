@@ -33,6 +33,7 @@ export type UseDetailReturn = {
   reviewTotalPages: number
   visibleDetailReviews: ReturnType<typeof getSortedReviews>
   showReviewPageSkeleton: boolean
+  hideDetailReview: (reviewId: string) => void
   loadRestaurantDetail: (restaurant: Restaurant, forceFresh?: boolean) => Promise<void>
   loadReviewBatchForPage: (pageIndex: number, restaurant: Restaurant) => Promise<void>
   changeReviewPage: (nextPage: number, restaurant: Restaurant) => void
@@ -58,6 +59,7 @@ export function useDetail(
   const [detailErrorMessage, setDetailErrorMessage] = useState('')
   const [reviewSort, setReviewSort] = useState<'real' | 'latest'>('real')
   const [reviewPage, setReviewPage] = useState(0)
+  const [hiddenReviewIds, setHiddenReviewIds] = useState<Set<string>>(() => new Set())
   const [detailHasMoreReviews, setDetailHasMoreReviews] = useState(false)
   const [isReviewBatchLoading, setIsReviewBatchLoading] = useState(false)
   const detailRequestIdRef = useRef(0)
@@ -79,6 +81,7 @@ export function useDetail(
 
     setDetailErrorMessage('')
     setDetailData(null)
+    setHiddenReviewIds(new Set())
     setReviewSort('real')
     setReviewPage(0)
     setDetailHasMoreReviews(false)
@@ -246,7 +249,10 @@ export function useDetail(
     }
   }
 
-  const sortedDetailReviews = detailData ? getSortedReviews(detailData.reviews, reviewSort) : []
+  const visibleSourceReviews = detailData
+    ? detailData.reviews.filter((review) => !hiddenReviewIds.has(review.reviewId))
+    : []
+  const sortedDetailReviews = getSortedReviews(visibleSourceReviews, reviewSort)
   const loadedReviewPages =
     sortedDetailReviews.length === 0
       ? 0
@@ -261,6 +267,22 @@ export function useDetail(
   const visibleDetailReviews = showReviewPageSkeleton
     ? []
     : sortedDetailReviews.slice(reviewPageStart, reviewPageStart + REVIEW_PAGE_SIZE)
+
+  function hideDetailReview(reviewId: string) {
+    const normalizedReviewId = reviewId.trim()
+    if (!normalizedReviewId || hiddenReviewIds.has(normalizedReviewId)) return
+
+    const nextHiddenReviewIds = new Set(hiddenReviewIds)
+    nextHiddenReviewIds.add(normalizedReviewId)
+    setHiddenReviewIds(nextHiddenReviewIds)
+
+    if (!detailData) return
+    const nextVisibleCount = detailData.reviews.filter(
+      (review) => !nextHiddenReviewIds.has(review.reviewId),
+    ).length
+    const lastPageIndex = Math.max(0, Math.ceil(nextVisibleCount / REVIEW_PAGE_SIZE) - 1)
+    setReviewPage((current) => Math.min(current, lastPageIndex))
+  }
 
   function changeReviewPage(nextPage: number, restaurant: Restaurant) {
     const normalizedPage = Math.max(0, Math.min(nextPage, reviewTotalPages - 1))
@@ -288,6 +310,7 @@ export function useDetail(
     reviewTotalPages,
     visibleDetailReviews,
     showReviewPageSkeleton,
+    hideDetailReview,
     loadRestaurantDetail,
     loadReviewBatchForPage,
     changeReviewPage,

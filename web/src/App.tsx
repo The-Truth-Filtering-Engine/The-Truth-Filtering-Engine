@@ -24,6 +24,7 @@ import {
 import { fetchSearchRestaurants } from './api/places'
 import { fetchUserProfile, fetchRecentAnalyses, updateUserPremium, chargeUserCoins, type RecentAnalyses, type UserProfile } from './api/user'
 import { cleanText } from './lib/format'
+import { getDetailUsageInfo } from './lib/detailUsage'
 import { useAuth } from './hooks/useAuth'
 import { useBookmarks } from './hooks/useBookmarks'
 import { useDetail } from './hooks/useDetail'
@@ -31,7 +32,7 @@ import { useMap } from './hooks/useMap'
 import { useReviewActivity } from './hooks/useReviewActivity'
 import { LoginPanel } from './components/panels/LoginPanel'
 import { SearchPanel } from './components/panels/SearchPanel'
-import { RestaurantPanel, getDetailUsageInfo } from './components/panels/RestaurantPanel'
+import { RestaurantPanel } from './components/panels/RestaurantPanel'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { BookmarkPanel } from './components/panels/BookmarkPanel'
 import { RecentPanel } from './components/panels/RecentPanel'
@@ -552,8 +553,12 @@ function App() {
                 onChangeReviewPage={(page) => detail.changeReviewPage(page, selectedRestaurant)}
                 reviewActivityAvailable={reviewActivity.isAvailable}
                 getReviewLikeState={reviewActivity.getReviewLikeState}
+                getReviewReportState={reviewActivity.getReviewReportState}
                 onToggleReviewHeart={reviewActivity.toggleReviewHeart}
+                onSubmitReviewReport={reviewActivity.submitReviewReport}
+                onHideReview={detail.hideDetailReview}
                 onOpenReviewSource={reviewActivity.openReviewSource}
+                onShowToast={showToast}
               />
             )}
             {activeSidePanel === 'bookmarks' && (

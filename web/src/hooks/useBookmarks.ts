@@ -55,8 +55,8 @@ export function useBookmarks(
 
   useEffect(() => {
     if (!authKey) {
-      applyLocalBookmarkState([])
-      return
+      const resetTimer = window.setTimeout(() => applyLocalBookmarkState([]), 0)
+      return () => window.clearTimeout(resetTimer)
     }
 
     let canceled = false
