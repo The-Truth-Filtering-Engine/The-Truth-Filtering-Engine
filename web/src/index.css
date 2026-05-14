@@ -21,14 +21,30 @@ body {
   place-items: center;
   overflow: hidden;
   background:
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--color-status-info-text) 24%, transparent) 0%,
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at 16% 18%,
+      color-mix(in srgb, var(--color-status-real-accent) 16%, transparent) 0%,
+      transparent 30%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(10, 15, 31, 0.68) 0%,
+      rgba(8, 11, 22, 0.92) 58%,
+      rgba(5, 7, 14, 0.98) 100%
+    ),
     linear-gradient(
       126deg,
-      color-mix(in srgb, var(--color-surface-brand) 86%, white) 0%,
-      color-mix(in srgb, var(--color-bg-brand-subtle) 76%, white) 42%,
-      color-mix(in srgb, var(--color-status-info-bg) 82%, white) 100%
+      color-mix(in srgb, var(--color-logo-ink) 82%, black) 0%,
+      color-mix(in srgb, var(--color-text-brand) 34%, #050814) 48%,
+      #050814 100%
     ),
-    var(--color-bg-default);
-  animation: intro-splash-exit 520ms ease 5300ms forwards;
+    #050814;
+  animation: intro-splash-exit 520ms ease 6200ms forwards;
 }
 
 .intro-splash::before,
@@ -45,51 +61,51 @@ body {
       112deg,
       transparent 0%,
       transparent 18%,
-      rgba(255, 255, 255, 0.54) 18%,
-      rgba(255, 255, 255, 0.16) 32%,
+      rgba(255, 255, 255, 0.1) 18%,
+      rgba(255, 255, 255, 0.035) 32%,
       transparent 32%,
       transparent 56%,
-      color-mix(in srgb, var(--color-status-real-bg) 48%, transparent) 56%,
+      color-mix(in srgb, var(--color-status-real-accent) 16%, transparent) 56%,
       transparent 72%
     ),
     linear-gradient(
       294deg,
       transparent 0%,
       transparent 38%,
-      color-mix(in srgb, var(--color-status-ad-bg) 42%, transparent) 38%,
+      color-mix(in srgb, var(--color-status-ad-accent) 12%, transparent) 38%,
       transparent 58%,
       transparent 100%
     ),
     repeating-linear-gradient(
       90deg,
-      rgba(17, 24, 39, 0.035) 0 1px,
+      rgba(234, 242, 255, 0.04) 0 1px,
       transparent 1px 92px
     ),
     repeating-linear-gradient(
       0deg,
-      rgba(37, 99, 235, 0.026) 0 1px,
+      rgba(234, 242, 255, 0.025) 0 1px,
       transparent 1px 76px
     );
   transform: translateX(18%);
-  animation: intro-grid-sweep 5200ms linear forwards;
+  animation: intro-grid-sweep 6200ms linear forwards;
 }
 
 .intro-splash::after {
   background:
     linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.78),
-      transparent 22%,
-      transparent 74%,
-      rgba(255, 255, 255, 0.72)
+      180deg,
+      transparent 0%,
+      transparent 62%,
+      rgba(0, 0, 0, 0.18) 72%,
+      rgba(0, 0, 0, 0.58) 100%
     ),
     repeating-linear-gradient(
       118deg,
       transparent 0 34px,
-      rgba(86, 80, 60, 0.035) 34px 35px,
+      rgba(255, 255, 255, 0.026) 34px 35px,
       transparent 35px 118px
     );
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .intro-splash-track {
@@ -116,89 +132,137 @@ body {
   aspect-ratio: 1;
   box-sizing: border-box;
   place-items: center;
-  filter: drop-shadow(0 12px 20px rgba(86, 80, 60, 0.12));
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.24));
   opacity: 0;
   transform-origin: center;
-  animation: intro-piece-pass 4600ms cubic-bezier(0.37, 0, 0.18, 1) forwards;
+  animation: intro-piece-pass 5200ms cubic-bezier(0.37, 0, 0.18, 1) forwards;
   animation-delay: var(--intro-delay, 0ms);
+}
+
+.intro-splash-car::before,
+.intro-splash-car::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.intro-splash-car::before {
+  inset: -34%;
+  z-index: -1;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.78) 0%,
+    color-mix(in srgb, var(--color-status-info-bg) 62%, transparent) 24%,
+    color-mix(in srgb, var(--color-text-brand) 20%, transparent) 48%,
+    transparent 72%
+  );
+  filter: blur(3px);
+  opacity: 0.68;
+}
+
+.intro-splash-car::after {
+  left: 8%;
+  bottom: -38%;
+  z-index: -2;
+  width: 84%;
+  height: 22%;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    ellipse,
+    rgba(0, 0, 0, 0.46) 0%,
+    rgba(0, 0, 0, 0.25) 42%,
+    transparent 74%
+  );
+  filter: blur(4px);
+  opacity: 0.72;
 }
 
 .intro-splash-car:nth-child(1) {
   --intro-delay: 0ms;
-  --y-1: -10px;
-  --y-2: 7px;
-  --y-3: -5px;
-  --y-4: 4px;
-  --r-1: -2deg;
-  --r-2: 1deg;
-  --r-3: -1deg;
+  --intro-follow: 0px;
+  --y-1: -8px;
+  --y-2: 5px;
+  --y-3: -4px;
+  --y-4: 3px;
+  --r-1: -1.5deg;
+  --r-2: 0.8deg;
+  --r-3: -0.7deg;
   --r-4: 0deg;
 }
 
 .intro-splash-car:nth-child(2) {
-  --intro-delay: 220ms;
-  --y-1: 14px;
-  --y-2: -8px;
-  --y-3: 10px;
+  --intro-delay: 140ms;
+  --intro-follow: clamp(86px, 8.5vw, 150px);
+  --y-1: 8px;
+  --y-2: -6px;
+  --y-3: 7px;
   --y-4: -3px;
-  --r-1: 4deg;
-  --r-2: -3deg;
-  --r-3: 2deg;
-  --r-4: -1deg;
+  --r-1: 1.8deg;
+  --r-2: -1.4deg;
+  --r-3: 1deg;
+  --r-4: -0.6deg;
 }
 
 .intro-splash-car:nth-child(3) {
-  --intro-delay: 420ms;
-  --y-1: -16px;
-  --y-2: 11px;
-  --y-3: -7px;
-  --y-4: 5px;
-  --r-1: -5deg;
-  --r-2: 3deg;
-  --r-3: -2deg;
-  --r-4: 1deg;
+  --intro-delay: 280ms;
+  --intro-follow: clamp(172px, 17vw, 300px);
+  --y-1: -9px;
+  --y-2: 6px;
+  --y-3: -5px;
+  --y-4: 4px;
+  --r-1: -2deg;
+  --r-2: 1.5deg;
+  --r-3: -1deg;
+  --r-4: 0.7deg;
 }
 
 .intro-splash-car:nth-child(4) {
-  --intro-delay: 620ms;
-  --y-1: 8px;
-  --y-2: -14px;
-  --y-3: 12px;
-  --y-4: -6px;
-  --r-1: 3deg;
-  --r-2: -4deg;
-  --r-3: 2deg;
-  --r-4: -1deg;
+  --intro-delay: 420ms;
+  --intro-follow: clamp(258px, 25.5vw, 450px);
+  --y-1: 6px;
+  --y-2: -8px;
+  --y-3: 7px;
+  --y-4: -4px;
+  --r-1: 1.6deg;
+  --r-2: -1.8deg;
+  --r-3: 1.1deg;
+  --r-4: -0.7deg;
 }
 
 .intro-splash-car:nth-child(5) {
-  --intro-delay: 820ms;
-  --y-1: -6px;
-  --y-2: 16px;
-  --y-3: -11px;
-  --y-4: 6px;
-  --r-1: -3deg;
-  --r-2: 5deg;
-  --r-3: -3deg;
-  --r-4: 1deg;
+  --intro-delay: 560ms;
+  --intro-follow: clamp(344px, 34vw, 600px);
+  --y-1: -5px;
+  --y-2: 9px;
+  --y-3: -7px;
+  --y-4: 4px;
+  --r-1: -1.6deg;
+  --r-2: 2deg;
+  --r-3: -1.2deg;
+  --r-4: 0.7deg;
 }
 
 .intro-splash-logo-car {
-  border: 1px solid rgba(86, 80, 60, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.96);
   box-shadow:
-    0 14px 30px rgba(15, 23, 42, 0.15),
+    0 18px 36px rgba(0, 0, 0, 0.32),
+    0 0 36px color-mix(in srgb, var(--color-status-info-bg) 40%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .intro-splash-letter {
-  color: var(--color-logo-ink);
+  color: color-mix(in srgb, var(--color-surface-brand) 82%, white);
   font-size: clamp(38px, 5vw, 66px);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
-  text-shadow: 0 16px 28px rgba(15, 23, 42, 0.16);
+  text-shadow:
+    0 0 18px rgba(255, 255, 255, 0.5),
+    0 0 36px color-mix(in srgb, var(--color-status-info-bg) 36%, transparent),
+    0 18px 30px rgba(0, 0, 0, 0.5);
 }
 
 .intro-splash-logo {
@@ -209,42 +273,43 @@ body {
 @keyframes intro-piece-pass {
   0% {
     opacity: 0;
-    transform: translate(0, -50%) rotate(0deg) scale(0.9);
+    transform: translate(var(--intro-follow, 0px), -50%) rotate(0deg) scale(0.9);
   }
 
   10% {
     opacity: 1;
-    transform: translate(calc(-10vw - 10%), calc(-50% + var(--y-1))) rotate(var(--r-1)) scale(0.98);
+    transform: translate(calc(-10vw - 10% + var(--intro-follow, 0px)), calc(-50% + var(--y-1))) rotate(var(--r-1)) scale(0.98);
   }
 
   24% {
-    transform: translate(calc(-26vw - 26%), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(1.02);
+    transform: translate(calc(-26vw - 26% + var(--intro-follow, 0px)), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(1.02);
   }
 
   39% {
-    transform: translate(calc(-43vw - 43%), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(0.99);
+    transform: translate(calc(-43vw - 43% + var(--intro-follow, 0px)), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(0.99);
   }
 
   55% {
-    transform: translate(calc(-61vw - 61%), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(1.01);
+    transform: translate(calc(-61vw - 61% + var(--intro-follow, 0px)), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(1.01);
   }
 
   71% {
-    transform: translate(calc(-79vw - 79%), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(0.98);
+    transform: translate(calc(-79vw - 79% + var(--intro-follow, 0px)), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(0.98);
   }
 
   86% {
     opacity: 1;
-    transform: translate(calc(-96vw - 96%), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(1);
+    transform: translate(calc(-96vw - 96% + var(--intro-follow, 0px)), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(1);
   }
 
   92% {
     opacity: 1;
+    transform: translate(calc(-106vw - 106% + var(--intro-follow, 0px)), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(0.98);
   }
 
   100% {
     opacity: 0;
-    transform: translate(calc(-116vw - 116%), -50%) rotate(0deg) scale(0.92);
+    transform: translate(calc(-128vw - 148%), -50%) rotate(0deg) scale(0.92);
   }
 }
 

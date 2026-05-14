@@ -159,7 +159,7 @@ function App() {
   const map = useMap(handleMapSelectRestaurant, showToast)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowIntroSplash(false), 5900)
+    const timer = window.setTimeout(() => setShowIntroSplash(false), 7000)
     return () => window.clearTimeout(timer)
   }, [])
 
