@@ -463,29 +463,28 @@ async def search_stream(
     naver_query = build_naver_blog_query(query, place_metadata)
     auth_email = await _get_optional_auth_email(authorization, test_account_email)
 
+    cached = await get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+    place_detail_request = _is_place_detail_request(store_id)
+    if place_detail_request:
+        cached = _filter_reviews_for_place(cached, place_metadata)
+    cached_count = len(cached)
+    requested_batch_end = normalized_start + review_limit - 1
+
+    should_fetch = refresh or (
+        not place_detail_request and cached_count < requested_batch_end
+    ) or (
+        place_detail_request and cached_count == 0
+    )
+
+    print(f"[DEBUG] 스트림 검색 요청 | query: {query} | mode: {mode} | cached: {cached_count} | should_fetch: {should_fetch}", flush=True)
+
+    if should_fetch and auth_email:
+        await _ensure_analysis_usage_available(auth_email, store_id)
+
     async def event_generator():
-        # Supabase 조회 + Naver API 동시 시작
-        cache_task = asyncio.create_task(
-            get_cached_reviews(query, limit=max_review_results, store_id=store_id)
-        )
         naver_task = asyncio.create_task(
             fetch_first_store_blog_page(naver_query, query, start=normalized_start)
-        )
-
-        cached = await cache_task   # Supabase 결과 먼저 확인
-        place_detail_request = _is_place_detail_request(store_id)
-        if place_detail_request:
-            cached = _filter_reviews_for_place(cached, place_metadata)
-        cached_count = len(cached)
-        requested_batch_end = normalized_start + review_limit - 1
-
-        should_fetch = refresh or (
-            not place_detail_request and cached_count < requested_batch_end
-        ) or (
-            place_detail_request and cached_count == 0
-        )
-
-        print(f"[DEBUG] 스트림 검색 요청 | query: {query} | mode: {mode} | cached: {cached_count} | should_fetch: {should_fetch}", flush=True)
+        ) if should_fetch else None
 
         already_scored = [r for r in cached if r.get("is_ad_finetuned_pred") is not None]
 
@@ -494,9 +493,7 @@ async def search_stream(
 
         loop = asyncio.get_running_loop()
 
-        if should_fetch:
-            if auth_email:
-                await _ensure_analysis_usage_available(auth_email, store_id)
+        if should_fetch:    
 
             # Supabase 필드명("review_url")으로 중복 URL 집합 구성
             seen_urls = {r.get("review_url") for r in already_scored}
@@ -543,7 +540,8 @@ async def search_stream(
                     save_reviews_with_scores(query, new_blogs, page_scores, place_metadata)
                 )
         else:
-            naver_task.cancel() 
+            if naver_task is not None:
+                naver_task.cancel()
             targets = [r for r in cached if r.get("is_ad_finetuned_pred") is None]
             print(f"[DEBUG] → Supabase 캐시 hit | cached: {cached_count} | unscored: {len(targets)}", flush=True)
             for i in range(0, len(targets), STREAM_BATCH_SIZE):
