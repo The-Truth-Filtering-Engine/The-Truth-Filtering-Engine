@@ -1,4 +1,3 @@
-import { type Session } from '@supabase/supabase-js'
 import { flushSync } from 'react-dom'
 import { useState, useRef } from 'react'
 import {
@@ -50,7 +49,7 @@ function getSortedReviews(reviews: ReturnType<typeof parseBlogReview>[], sort: '
 }
 
 export function useDetail(
-  authSession: Session | null,
+  authHeaders: Record<string, string>,
   showToast: (message: string) => void,
   onProfileRefresh: (profile: ReturnType<typeof parseUserProfile>) => void,
 ) {
@@ -77,7 +76,6 @@ export function useDetail(
     streamControllerRef.current = controller
     const requestId = ++detailRequestIdRef.current
     const query = restaurant.name
-    const accessToken = authSession?.access_token
 
     setDetailErrorMessage('')
     setDetailData(null)
@@ -94,7 +92,7 @@ export function useDetail(
         const cached = await fetchDetailJson(
           buildReviewSearchPath('/api/search/cached', query, { restaurant }),
           controller.signal,
-          accessToken,
+          authHeaders,
         )
         if (requestId !== detailRequestIdRef.current) return
 
@@ -107,7 +105,7 @@ export function useDetail(
             for await (const chunk of streamReviews(
               buildReviewSearchPath('/api/search/stream', query, { naverStart: 1, restaurant }),
               controller.signal,
-              accessToken,
+              authHeaders,
             )) {
               if (requestId !== detailRequestIdRef.current) return
               const batch = (chunk.reviews ?? []).map(parseBlogReview)
@@ -139,7 +137,7 @@ export function useDetail(
         for await (const chunk of streamReviews(
           buildReviewSearchPath('/api/search/stream', query, { naverStart: 1, refresh: true, restaurant }),
           controller.signal,
-          accessToken,
+          authHeaders,
         )) {
           if (requestId !== detailRequestIdRef.current) return
           const batch = (chunk.reviews ?? []).map(parseBlogReview)
@@ -213,7 +211,7 @@ export function useDetail(
           restaurant,
         }),
         controller.signal,
-        authSession?.access_token,
+        authHeaders,
       )
       if (requestId !== reviewBatchRequestIdRef.current) return
 

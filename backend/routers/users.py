@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 from services.supabase_service import (
@@ -23,6 +23,8 @@ from services.supabase_service import (
 router = APIRouter()
 
 ALLOWED_COIN_AMOUNTS = {1000, 2000, 3000}
+TEST_ACCOUNT_EMAIL = "test@example.com"
+TEST_ACCOUNT_HEADER = "X-Test-Account-Email"
 
 
 class PremiumUpdateRequest(BaseModel):
@@ -45,7 +47,7 @@ class RecentVisitUpdateRequest(BaseModel):
 
 class ReviewReactionUpdateRequest(BaseModel):
     reviewId: str
-    reaction: Literal["like", "dislike"] | None = None
+    reaction: Literal["like"] | None = None
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
@@ -65,7 +67,26 @@ def _extract_bearer_token(authorization: str | None) -> str:
     return token.strip()
 
 
-async def _require_email(authorization: str | None) -> str:
+def _extract_test_account_email(test_account_email: str | None) -> str | None:
+    email = (test_account_email or "").strip().lower()
+    if not email:
+        return None
+    if email != TEST_ACCOUNT_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="테스트 계정 이메일이 올바르지 않습니다",
+        )
+    return TEST_ACCOUNT_EMAIL
+
+
+async def _require_email(
+    authorization: str | None,
+    test_account_email: str | None,
+) -> str:
+    account_email = _extract_test_account_email(test_account_email)
+    if account_email:
+        return account_email
+
     token = _extract_bearer_token(authorization)
 
     try:
@@ -85,9 +106,15 @@ async def _require_email(authorization: str | None) -> str:
     return email
 
 
+async def _require_email_from_headers(
+    authorization: str | None = Header(default=None),
+    test_account_email: str | None = Header(default=None, alias=TEST_ACCOUNT_HEADER),
+) -> str:
+    return await _require_email(authorization, test_account_email)
+
+
 @router.get("/user/me")
-async def get_my_profile(authorization: str | None = Header(default=None)):
-    email = await _require_email(authorization)
+async def get_my_profile(email: str = Depends(_require_email_from_headers)):
     try:
         return await ensure_user_profile(email)
     except RuntimeError as error:
@@ -100,9 +127,8 @@ async def get_my_profile(authorization: str | None = Header(default=None)):
 @router.patch("/user/me/premium")
 async def update_my_premium(
     payload: PremiumUpdateRequest,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
-    email = await _require_email(authorization)
     try:
         return await set_user_premium(email, payload.premium)
     except RuntimeError as error:
@@ -115,7 +141,7 @@ async def update_my_premium(
 @router.post("/user/me/coins")
 async def charge_my_coins(
     payload: CoinChargeRequest,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
     if payload.amount not in ALLOWED_COIN_AMOUNTS:
         raise HTTPException(
@@ -123,7 +149,6 @@ async def charge_my_coins(
             detail="충전 금액은 1000, 2000, 3000만 가능합니다",
         )
 
-    email = await _require_email(authorization)
     try:
         return await add_user_coins(email, payload.amount)
     except RuntimeError as error:
@@ -134,8 +159,7 @@ async def charge_my_coins(
 
 
 @router.get("/user/me/bookmarks")
-async def get_my_bookmarks(authorization: str | None = Header(default=None)):
-    email = await _require_email(authorization)
+async def get_my_bookmarks(email: str = Depends(_require_email_from_headers)):
     try:
         return await get_user_bookmarks(email)
     except RuntimeError as error:
@@ -147,9 +171,8 @@ async def get_my_bookmarks(authorization: str | None = Header(default=None)):
 
 @router.get("/user/me/recent-analyses")
 async def get_my_recent_analyses(
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
-    email = await _require_email(authorization)
     try:
         return await get_user_recent_analyses(email)
     except RuntimeError as error:
@@ -160,8 +183,7 @@ async def get_my_recent_analyses(
 
 
 @router.get("/user/me/recent-visits")
-async def get_my_recent_visits(authorization: str | None = Header(default=None)):
-    email = await _require_email(authorization)
+async def get_my_recent_visits(email: str = Depends(_require_email_from_headers)):
     try:
         return await get_user_recent_visits(email)
     except RuntimeError as error:
@@ -174,7 +196,7 @@ async def get_my_recent_visits(authorization: str | None = Header(default=None))
 @router.post("/user/me/bookmarks")
 async def add_my_bookmark(
     payload: BookmarkUpdateRequest,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
     store_id = payload.storeId.strip()
     if not store_id:
@@ -183,7 +205,6 @@ async def add_my_bookmark(
             detail="storeId가 필요합니다",
         )
 
-    email = await _require_email(authorization)
     try:
         return await add_user_bookmark(email, store_id, payload.store)
     except RuntimeError as error:
@@ -196,7 +217,7 @@ async def add_my_bookmark(
 @router.post("/user/me/recent-visits")
 async def add_my_recent_visit(
     payload: RecentVisitUpdateRequest,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
     review_id = payload.reviewId.strip()
     if not review_id:
@@ -205,7 +226,6 @@ async def add_my_recent_visit(
             detail="reviewId is required",
         )
 
-    email = await _require_email(authorization)
     try:
         return await add_user_recent_visit(email, review_id, payload.review)
     except RuntimeError as error:
@@ -217,9 +237,8 @@ async def add_my_recent_visit(
 
 @router.delete("/user/me/recent-visits")
 async def clear_my_recent_visits(
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
-    email = await _require_email(authorization)
     try:
         return await clear_user_recent_visits(email)
     except RuntimeError as error:
@@ -232,7 +251,7 @@ async def clear_my_recent_visits(
 @router.delete("/user/me/recent-visits/{review_id}")
 async def delete_my_recent_visit(
     review_id: str,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
     normalized_review_id = review_id.strip()
     if not normalized_review_id:
@@ -241,7 +260,6 @@ async def delete_my_recent_visit(
             detail="reviewId is required",
         )
 
-    email = await _require_email(authorization)
     try:
         return await remove_user_recent_visit(email, normalized_review_id)
     except RuntimeError as error:
@@ -254,7 +272,7 @@ async def delete_my_recent_visit(
 @router.delete("/user/me/bookmarks/{store_id}")
 async def delete_my_bookmark(
     store_id: str,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
     normalized_store_id = store_id.strip()
     if not normalized_store_id:
@@ -263,7 +281,6 @@ async def delete_my_bookmark(
             detail="storeId가 필요합니다",
         )
 
-    email = await _require_email(authorization)
     try:
         return await remove_user_bookmark(email, normalized_store_id)
     except RuntimeError as error:
@@ -275,9 +292,8 @@ async def delete_my_bookmark(
 
 @router.get("/user/me/review-reactions")
 async def get_my_review_reactions(
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
-    email = await _require_email(authorization)
     try:
         return await get_user_review_reactions(email)
     except RuntimeError as error:
@@ -290,9 +306,8 @@ async def get_my_review_reactions(
 @router.put("/user/me/review-reactions")
 async def update_my_review_reaction(
     payload: ReviewReactionUpdateRequest,
-    authorization: str | None = Header(default=None),
+    email: str = Depends(_require_email_from_headers),
 ):
-    email = await _require_email(authorization)
     try:
         return await update_user_review_reaction(
             email,

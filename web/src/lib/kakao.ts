@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../config'
+import { KAKAO_JS_KEY } from '../config'
 
 export type MapPoint = {
   latitude: number
@@ -64,25 +64,11 @@ declare global {
 const KAKAO_SDK_ID = 'kakao-map-sdk'
 let kakaoMapsLoader: Promise<KakaoMaps> | null = null
 
-export async function fetchKakaoJsKey() {
-  const response = await fetch(`${BACKEND_BASE_URL}/config`)
-
-  if (!response.ok) {
-    throw new Error(`백엔드 설정 요청 실패: ${response.status}`)
-  }
-
-  const data = (await response.json()) as { kakaoJsKey?: string }
-  const kakaoJsKey = data.kakaoJsKey?.trim()
-
-  if (!kakaoJsKey) {
-    throw new Error('백엔드 /config에 KAKAO_JS_KEY가 없습니다')
-  }
-
-  return kakaoJsKey
-}
-
-export function loadKakaoMaps(kakaoJsKey: string) {
+export function loadKakaoMaps() {
   if (kakaoMapsLoader) return kakaoMapsLoader
+  if (!KAKAO_JS_KEY) {
+    return Promise.reject(new Error('VITE_KAKAO_JS_KEY를 확인해 주세요'))
+  }
 
   kakaoMapsLoader = new Promise<KakaoMaps>((resolve, reject) => {
     const finishLoading = () => {
@@ -105,7 +91,7 @@ export function loadKakaoMaps(kakaoJsKey: string) {
     const script = document.createElement('script')
     script.id = KAKAO_SDK_ID
     script.async = true
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsKey}&autoload=false`
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(KAKAO_JS_KEY)}&autoload=false`
     script.onload = finishLoading
     script.onerror = () => reject(new Error('Kakao 지도 SDK 로드 실패'))
     document.head.appendChild(script)

@@ -1,9 +1,13 @@
 import { type Session } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
-import { GOOGLE_AUTH_REDIRECT_TO } from '../config'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  GOOGLE_AUTH_REDIRECT_TO,
+  TEST_ACCOUNT_AUTH_HEADER,
+  TEST_ACCOUNT_EMAIL,
+} from '../config'
 import { supabase } from '../lib/supabase'
 
-const TEMP_ADMIN_AUTH_STORAGE_KEY = 'truth_filtering_temp_admin_auth'
+const TEST_ACCOUNT_AUTH_STORAGE_KEY = 'truth_filtering_test_account_auth'
 
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn'
 
@@ -11,10 +15,13 @@ export type UseAuthReturn = {
   authSession: Session | null
   authStatus: AuthStatus
   authErrorMessage: string
-  isTemporaryAdmin: boolean
   isLoggedIn: boolean
+  authEmail: string
+  authHeaders: Record<string, string>
+  authKey: string
+  hasApiAuth: boolean
   signInWithGoogle: () => Promise<void>
-  signInAsTemporaryAdmin: () => void
+  signInWithTestAccount: () => void
   signOut: () => Promise<void>
 }
 
@@ -22,18 +29,30 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
   const [authSession, setAuthSession] = useState<Session | null>(null)
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking')
   const [authErrorMessage, setAuthErrorMessage] = useState('')
-  const [isTemporaryAdmin, setIsTemporaryAdmin] = useState(false)
+  const [isTestAccountLogin, setIsTestAccountLogin] = useState(false)
 
-  const isLoggedIn = authSession !== null || isTemporaryAdmin
+  const authEmail = authSession?.user?.email?.trim() || (isTestAccountLogin ? TEST_ACCOUNT_EMAIL : '')
+  const authKey = authSession?.access_token || (isTestAccountLogin ? TEST_ACCOUNT_EMAIL : '')
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    if (authSession?.access_token) {
+      return { Authorization: `Bearer ${authSession.access_token}` } as Record<string, string>
+    }
+    if (isTestAccountLogin) {
+      return { [TEST_ACCOUNT_AUTH_HEADER]: TEST_ACCOUNT_EMAIL } as Record<string, string>
+    }
+    return {} as Record<string, string>
+  }, [authSession?.access_token, isTestAccountLogin])
+  const hasApiAuth = authKey !== ''
+  const isLoggedIn = authSession !== null || isTestAccountLogin
 
   useEffect(() => {
-    setIsTemporaryAdmin(
-      window.localStorage.getItem(TEMP_ADMIN_AUTH_STORAGE_KEY) === 'true',
-    )
+    const storedTestAccount =
+      window.localStorage.getItem(TEST_ACCOUNT_AUTH_STORAGE_KEY) === 'true'
+    setIsTestAccountLogin(storedTestAccount)
 
     if (!supabase) {
-      setAuthStatus('signedOut')
-      onSignOut()
+      setAuthStatus(storedTestAccount ? 'signedIn' : 'signedOut')
+      if (!storedTestAccount) onSignOut()
       return
     }
 
@@ -45,9 +64,10 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
       if (error) {
         setAuthErrorMessage(error.message)
       }
-      setAuthSession(data.session ?? null)
-      setAuthStatus(data.session ? 'signedIn' : 'signedOut')
-      if (!data.session) {
+      const session = data.session ?? null
+      setAuthSession(session)
+      setAuthStatus(session || storedTestAccount ? 'signedIn' : 'signedOut')
+      if (!session && !storedTestAccount) {
         onSignOut()
       }
     })
@@ -58,8 +78,8 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
       setAuthSession(session)
       setAuthStatus(session ? 'signedIn' : 'signedOut')
       if (session) {
-        setIsTemporaryAdmin(false)
-        window.localStorage.removeItem(TEMP_ADMIN_AUTH_STORAGE_KEY)
+        setIsTestAccountLogin(false)
+        window.localStorage.removeItem(TEST_ACCOUNT_AUTH_STORAGE_KEY)
       } else {
         onSignOut()
       }
@@ -91,12 +111,12 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
     }
   }
 
-  function signInAsTemporaryAdmin() {
-    window.localStorage.setItem(TEMP_ADMIN_AUTH_STORAGE_KEY, 'true')
-    setIsTemporaryAdmin(true)
+  function signInWithTestAccount() {
+    window.localStorage.setItem(TEST_ACCOUNT_AUTH_STORAGE_KEY, 'true')
+    setIsTestAccountLogin(true)
     setAuthErrorMessage('')
     setAuthStatus('signedIn')
-    showToast('관리자 임시 로그인 상태입니다')
+    showToast(`${TEST_ACCOUNT_EMAIL} 계정으로 로그인되었습니다`)
   }
 
   async function signOut() {
@@ -106,8 +126,8 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
         if (error) throw error
       }
 
-      window.localStorage.removeItem(TEMP_ADMIN_AUTH_STORAGE_KEY)
-      setIsTemporaryAdmin(false)
+      window.localStorage.removeItem(TEST_ACCOUNT_AUTH_STORAGE_KEY)
+      setIsTestAccountLogin(false)
       setAuthSession(null)
       setAuthStatus('signedOut')
       onSignOut()
@@ -121,10 +141,13 @@ export function useAuth(onSignOut: () => void, showToast: (message: string) => v
     authSession,
     authStatus,
     authErrorMessage,
-    isTemporaryAdmin,
     isLoggedIn,
+    authEmail,
+    authHeaders,
+    authKey,
+    hasApiAuth,
     signInWithGoogle,
-    signInAsTemporaryAdmin,
+    signInWithTestAccount,
     signOut,
   }
 }

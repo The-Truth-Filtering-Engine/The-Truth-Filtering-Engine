@@ -5,14 +5,14 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/backend_config.dart';
-import '../config/supabase_config.dart';
+import '../config/test_account_auth_config.dart';
 import '../../data/models/review_like_model.dart';
 import '../../features/map/models/restaurant_model.dart';
 import 'current_user_provider.dart';
 import 'user_profile_provider.dart';
 
 const _likedReviewSelectColumns =
-    'id, review_title, review_description, review_url, name, likes, dislikes, '
+    'id, review_title, review_description, review_url, name, likes, '
     'store_id, category_name, category_group_code, category_group_name, '
     'phone, address_name, road_address_name, place_url';
 
@@ -29,7 +29,10 @@ final likedReviewsProvider =
       );
     }
 
-    return LikedReviewsNotifier(userId: userId);
+    return LikedReviewsNotifier(
+      userId: userId,
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   },
 );
 
@@ -97,9 +100,13 @@ class LikedReview {
 class LikedReviewsNotifier
     extends StateNotifier<AsyncValue<List<LikedReview>>> {
   final int? userId;
+  final bool isTestAccountLogin;
   final _locallyUnlikedReviewIds = <String>{};
 
-  LikedReviewsNotifier({required this.userId})
+  LikedReviewsNotifier({
+    required this.userId,
+    required this.isTestAccountLogin,
+  })
       : super(const AsyncValue.loading()) {
     load();
   }
@@ -263,13 +270,10 @@ class LikedReviewsNotifier
         'likedAt': now,
         'updatedAt': now,
       });
-    final dislikes = parseUserIdEntryList(row['dislikes'])
-      ..removeWhere((entry) => entry['user_id'] == currentUserId);
 
     try {
       await Supabase.instance.client.from('reviews').update({
         'likes': likes,
-        'dislikes': dislikes,
       }).eq('id', reviewId);
     } catch (_) {}
   }
@@ -352,13 +356,13 @@ class LikedReviewsNotifier
   }
 
   Future<Set<String>?> _loadAccountLikedReviewIds() async {
-    final token = _accessToken;
-    if (token == null) return null;
+    final headers = _authHeaders;
+    if (headers == null) return null;
 
     try {
       final response = await http.get(
         BackendConfig.apiUri('/user/me/review-reactions'),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return null;
@@ -380,13 +384,13 @@ class LikedReviewsNotifier
   }
 
   Future<void> _syncAccountReaction(String reviewId, String? reaction) async {
-    final token = _accessToken;
-    if (token == null) return;
+    final headers = _authHeaders;
+    if (headers == null) return;
 
     final response = await http.put(
       BackendConfig.apiUri('/user/me/review-reactions'),
       headers: {
-        'Authorization': 'Bearer $token',
+        ...headers,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -400,8 +404,10 @@ class LikedReviewsNotifier
     }
   }
 
-  String? get _accessToken {
-    if (!SupabaseConfig.isConfigured) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
+  Map<String, String>? get _authHeaders {
+    final headers = TestAccountAuthConfig.headers(
+      isTestAccountLogin: isTestAccountLogin,
+    );
+    return headers.isEmpty ? null : headers;
   }
 }

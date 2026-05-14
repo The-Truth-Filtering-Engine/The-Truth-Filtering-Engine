@@ -7,7 +7,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
     final profileError =
         profileState.hasError ? profileState.error.toString() : null;
 
-    if (!_hasGoogleSession) {
+    if (!_hasApiAuth) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -16,24 +16,8 @@ extension _SettingsAccountSection on _SettingsScreenState {
             children: [
               const ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.admin_panel_settings_outlined),
-                title: Text('임시 관리자 로그인'),
-                subtitle: Text('Google 로그인 사용자가 아니어서 결제 설정은 비활성화됩니다.'),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
-                  OutlinedButton(
-                    onPressed: null,
-                    child: Text('프리미엄 설정'),
-                  ),
-                  OutlinedButton(
-                    onPressed: null,
-                    child: Text('1,000 코인 충전'),
-                  ),
-                ],
+                leading: Icon(Icons.info_outline),
+                title: Text('계정 정보를 확인할 수 없습니다'),
               ),
             ],
           ),
@@ -77,7 +61,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
       return const Card(
         child: ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('Google 로그인 정보를 확인할 수 없습니다'),
+          title: Text('계정 정보를 확인할 수 없습니다'),
         ),
       );
     }
@@ -221,7 +205,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
 
   Future<void> _togglePremium() async {
     final profile = ref.read(userProfileProvider).asData?.value;
-    if (!_hasGoogleSession || profile == null) return;
+    if (!_hasApiAuth || profile == null) return;
 
     await _mutateProfile(
       () =>
@@ -231,7 +215,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Future<void> _chargeCoins(int amount) async {
-    if (!_hasGoogleSession) return;
+    if (!_hasApiAuth) return;
 
     await _mutateProfile(
       () => ref.read(userProfileProvider.notifier).chargeCoins(amount),
@@ -281,6 +265,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
     }
 
     if (!mounted) return;
+    ref.read(appAuthProvider.notifier).signOut();
     Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
   }
 }

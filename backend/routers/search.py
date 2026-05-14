@@ -9,6 +9,7 @@ from services.electra_service import predict_and_score_batch
 from services.naver_service import (
     build_naver_blog_query,
     fetch_blog_previews,
+    fetch_first_store_blog_page,
     fetch_store_blog_previews,
     filter_blogs_by_store_name,
     iter_store_blog_pages,
@@ -35,12 +36,16 @@ from services.supabase_service import (
 
 router = APIRouter()
 
+TEST_ACCOUNT_EMAIL = "test@example.com"
+TEST_ACCOUNT_HEADER = "X-Test-Account-Email"
+
 @router.get("/search/cached")
 async def search_cached(
     query: str,
     limit: int = Query(MAX_REVIEW_RESULTS, ge=1, le=MAX_REVIEW_RESULTS),
     store_id: str | None = Query(None, alias="storeId"),
     authorization: str | None = Header(default=None),
+    test_account_email: str | None = Header(default=None, alias=TEST_ACCOUNT_HEADER),
 ):
     review_limit = clamp_max_results(limit)
     cached = await get_cached_reviews(query, limit=review_limit, store_id=store_id, scored_only=True)
@@ -48,7 +53,7 @@ async def search_cached(
     if place_detail_request:
         cached = filter_blogs_by_store_name(cached, query)
     usage = None
-    auth_email = await _get_optional_auth_email(authorization)
+    auth_email = await _get_optional_auth_email(authorization, test_account_email)
 
     if cached and auth_email and store_id:
         usage = await _consume_analysis_usage(auth_email, store_id)
@@ -89,6 +94,7 @@ async def search(
     road_address_name: str | None = Query(None, alias="roadAddressName"),
     place_url: str | None = Query(None, alias="placeUrl"),
     authorization: str | None = Header(default=None),
+    test_account_email: str | None = Header(default=None, alias=TEST_ACCOUNT_HEADER),
 ):
     review_limit = clamp_review_limit(limit)
     max_review_results = clamp_max_results(max_results)
@@ -132,7 +138,7 @@ async def search(
     raw_fetched_count = 0
     naver_query = build_naver_blog_query(query, place_metadata)
     usage = None
-    auth_email = await _get_optional_auth_email(authorization)
+    auth_email = await _get_optional_auth_email(authorization, test_account_email)
 
     if should_fetch:
         if auth_email:
@@ -236,7 +242,28 @@ def _extract_optional_bearer_token(authorization: str | None) -> str | None:
     return token.strip()
 
 
-async def _get_optional_auth_email(authorization: str | None) -> str | None:
+def _extract_optional_test_account_email(
+    test_account_email: str | None,
+) -> str | None:
+    email = (test_account_email or "").strip().lower()
+    if not email:
+        return None
+    if email != TEST_ACCOUNT_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="테스트 계정 이메일이 올바르지 않습니다",
+        )
+    return TEST_ACCOUNT_EMAIL
+
+
+async def _get_optional_auth_email(
+    authorization: str | None,
+    test_account_email: str | None = None,
+) -> str | None:
+    account_email = _extract_optional_test_account_email(test_account_email)
+    if account_email:
+        return account_email
+
     token = _extract_optional_bearer_token(authorization)
     if not token:
         return None
@@ -417,6 +444,7 @@ async def search_stream(
     road_address_name: str | None = Query(None, alias="roadAddressName"),
     place_url: str | None = Query(None, alias="placeUrl"),
     authorization: str | None = Header(default=None),
+    test_account_email: str | None = Header(default=None, alias=TEST_ACCOUNT_HEADER),
 ):
     review_limit = clamp_review_limit(limit)
     max_review_results = clamp_max_results(max_results)
@@ -433,10 +461,18 @@ async def search_stream(
         place_url=place_url,
     )
     naver_query = build_naver_blog_query(query, place_metadata)
-    auth_email = await _get_optional_auth_email(authorization)
+    auth_email = await _get_optional_auth_email(authorization, test_account_email)
 
     async def event_generator():
-        cached = await get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+        # Supabase 조회 + Naver API 동시 시작
+        cache_task = asyncio.create_task(
+            get_cached_reviews(query, limit=max_review_results, store_id=store_id)
+        )
+        naver_task = asyncio.create_task(
+            fetch_first_store_blog_page(naver_query, query, start=normalized_start)
+        )
+
+        cached = await cache_task   # Supabase 결과 먼저 확인
         place_detail_request = _is_place_detail_request(store_id)
         if place_detail_request:
             cached = _filter_reviews_for_place(cached, place_metadata)
@@ -467,16 +503,9 @@ async def search_stream(
 
             print(f"[DEBUG] → Naver API 호출 | naverQuery: {naver_query}", flush=True)
 
-            async for page_blogs in iter_store_blog_pages(
-                naver_query,
-                query,
-                start=normalized_start,
-                max_results=max_review_results,
-            ):
-                # NAVER 필드명("link")으로 이미 스트림한 URL 제외
-                new_blogs = [b for b in page_blogs if b.get("link") not in seen_urls]
-                if not new_blogs:
-                    continue
+            page_blogs = await naver_task
+            new_blogs = [b for b in page_blogs if b.get("link") not in seen_urls]
+            if new_blogs:
                 seen_urls.update(b.get("link") for b in new_blogs)
 
                 reviews = _blogs_to_reviews(query, new_blogs, normalized_start, place_metadata)
@@ -514,6 +543,7 @@ async def search_stream(
                     save_reviews_with_scores(query, new_blogs, page_scores, place_metadata)
                 )
         else:
+            naver_task.cancel() 
             targets = [r for r in cached if r.get("is_ad_finetuned_pred") is None]
             print(f"[DEBUG] → Supabase 캐시 hit | cached: {cached_count} | unscored: {len(targets)}", flush=True)
             for i in range(0, len(targets), STREAM_BATCH_SIZE):

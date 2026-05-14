@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/backend_config.dart';
-import '../../../core/config/supabase_config.dart';
+import '../../../core/config/test_account_auth_config.dart';
+import '../../../core/providers/current_user_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -59,6 +59,7 @@ class _AnalysisRequestException implements Exception {
 Future<_ReviewFetchResult> _fetchCachedReviews(
   RestaurantModel restaurant,
   AnalysisMode mode,
+  Map<String, String> authHeaders,
 ) async {
   final uri = BackendConfig.apiUri(
     '/search/cached',
@@ -67,14 +68,11 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
       limit: '$_maxReviewResults',
     ),
   );
-  final accessToken = _currentAccessToken();
 
   final res = await http
       .get(
         uri,
-        headers: accessToken == null
-            ? null
-            : {'Authorization': 'Bearer $accessToken'},
+        headers: authHeaders.isEmpty ? null : authHeaders,
       )
       .timeout(const Duration(seconds: 15));
   if (res.statusCode == 402) {
@@ -106,6 +104,7 @@ Future<_ReviewFetchResult> _fetchCachedReviews(
 Stream<_SseBatch> _streamFreshReviews(
   RestaurantModel restaurant,
   AnalysisMode mode, {
+  required Map<String, String> authHeaders,
   bool refresh = false,
   int naverStart = 1,
 }) async* {
@@ -263,7 +262,8 @@ class _RestaurantDetailScreenState
 
     try {
       final mode = ref.read(analysisModeProvider);
-      final cached = await _fetchCachedReviews(_r, mode);
+      final authHeaders = _currentAuthHeaders();
+      final cached = await _fetchCachedReviews(_r, mode, authHeaders);
       if (!mounted) return;
 
       // hasMore: false이면 캐시가 완전한 상태 (리뷰가 적은 가게도 포함)
@@ -409,6 +409,13 @@ class _RestaurantDetailScreenState
   void _refreshRecentAnalyses() {
     if (!mounted) return;
     Future.microtask(() => ref.read(recentAnalysesProvider.notifier).load());
+  }
+
+  Map<String, String> _currentAuthHeaders() {
+    final authState = ref.read(appAuthProvider);
+    return TestAccountAuthConfig.headers(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
   }
 
   Future<bool> _recordRecentReviewOpen(BlogReview review) async {

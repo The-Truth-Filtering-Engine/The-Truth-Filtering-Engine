@@ -2,28 +2,34 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/backend_config.dart';
-import '../../core/config/supabase_config.dart';
+import '../../core/config/test_account_auth_config.dart';
+import '../../core/providers/current_user_provider.dart';
 import '../map/models/restaurant_model.dart';
 
 final recentAnalysesProvider =
     StateNotifierProvider<RecentAnalysesNotifier, AsyncValue<RecentAnalyses>>(
-  (ref) => RecentAnalysesNotifier(),
+  (ref) {
+    final authState = ref.watch(appAuthProvider);
+    return RecentAnalysesNotifier(
+      isTestAccountLogin: authState.isTestAccountLogin,
+    );
+  },
 );
 
 class RecentAnalysesNotifier extends StateNotifier<AsyncValue<RecentAnalyses>> {
-  RecentAnalysesNotifier() : super(const AsyncValue.data(RecentAnalyses.empty));
+  RecentAnalysesNotifier({required this.isTestAccountLogin})
+      : super(const AsyncValue.data(RecentAnalyses.empty));
 
-  String? get _accessToken {
-    if (!SupabaseConfig.isConfigured) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
-  }
+  final bool isTestAccountLogin;
+
+  Map<String, String> get _authHeaders =>
+      TestAccountAuthConfig.headers(isTestAccountLogin: isTestAccountLogin);
 
   Future<void> load() async {
-    final token = _accessToken;
-    if (token == null) {
+    final headers = _authHeaders;
+    if (headers.isEmpty) {
       state = const AsyncValue.data(RecentAnalyses.empty);
       return;
     }
@@ -34,7 +40,7 @@ class RecentAnalysesNotifier extends StateNotifier<AsyncValue<RecentAnalyses>> {
       final uri = BackendConfig.apiUri('/user/me/recent-analyses');
       final response = await http.get(
         uri,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       final text = utf8.decode(response.bodyBytes);
       final decoded = text.isEmpty ? null : jsonDecode(text);

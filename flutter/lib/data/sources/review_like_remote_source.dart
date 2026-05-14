@@ -15,19 +15,20 @@ class ReviewLikeRemoteSource {
   Future<Map<String, dynamic>> fetchLikes(String reviewId) async {
     final res = await _client
         .from(_table)
-        .select('likes, dislikes')
+        .select('likes')
         .eq('id', reviewId)
         .single();
     return res;
   }
 
-  Future<Set<String>?> fetchUserLikedReviewIds(String? accessToken) async {
-    final token = accessToken?.trim() ?? '';
-    if (token.isEmpty) return null;
+  Future<Set<String>?> fetchUserLikedReviewIds(
+    Map<String, String>? authHeaders,
+  ) async {
+    if (authHeaders == null || authHeaders.isEmpty) return null;
 
     final response = await http.get(
       BackendConfig.apiUri('/user/me/review-reactions'),
-      headers: {'Authorization': 'Bearer $token'},
+      headers: authHeaders,
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -49,25 +50,23 @@ class ReviewLikeRemoteSource {
   Future<void> updateLikes({
     required String reviewId,
     required List<Map<String, dynamic>> likes,
-    required List<Map<String, dynamic>> dislikes,
   }) async {
     await _client.from(_table).update({
       'likes': likes,
-      'dislikes': dislikes,
     }).eq('id', reviewId);
   }
 
   Future<void> syncUserReaction({
-    required String accessToken,
+    required Map<String, String> authHeaders,
     required String reviewId,
     required LikeType? reaction,
   }) async {
-    if (accessToken.isEmpty) return;
+    if (authHeaders.isEmpty) return;
 
     final response = await http.put(
       BackendConfig.apiUri('/user/me/review-reactions'),
       headers: {
-        'Authorization': 'Bearer $accessToken',
+        ...authHeaders,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
