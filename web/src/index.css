@@ -21,7 +21,7 @@ body {
   place-items: center;
   overflow: hidden;
   background: #ffffff;
-  animation: intro-splash-background 3000ms ease-in-out forwards;
+  animation: intro-splash-background 2400ms ease-in-out forwards;
 }
 
 .intro-splash::before,
@@ -47,7 +47,7 @@ body {
       transparent 46%,
       rgba(76, 187, 135, 0.04)
     );
-  animation: intro-splash-tone 3000ms ease-in-out forwards;
+  animation: intro-splash-tone 2400ms ease-in-out forwards;
 }
 
 .intro-splash::after {
@@ -65,7 +65,7 @@ body {
       rgba(86, 80, 60, 0.018) 38px 39px,
       transparent 39px 124px
     );
-  animation: intro-splash-pattern 3000ms ease-in-out forwards;
+  animation: intro-splash-pattern 2400ms ease-in-out forwards;
 }
 
 .intro-splash-track {
@@ -85,7 +85,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: clamp(8px, 2vw, 18px);
-  animation: intro-runner-fade 3000ms ease-in-out forwards;
+  animation: intro-runner-fade 2400ms ease-in-out forwards;
 }
 
 .intro-splash-runner::after {
@@ -103,7 +103,7 @@ body {
     transparent 74%
   );
   filter: blur(6px);
-  animation: intro-runner-shadow 3000ms ease-in-out forwards;
+  animation: intro-runner-shadow 2400ms ease-in-out forwards;
 }
 
 .intro-splash-car {
@@ -139,7 +139,7 @@ body {
   );
   filter: blur(2px);
   opacity: 0.56;
-  animation: intro-piece-glow 3000ms ease-in-out forwards;
+  animation: intro-piece-glow 2400ms ease-in-out forwards;
 }
 
 .intro-splash-car::after {
@@ -157,7 +157,7 @@ body {
   );
   filter: blur(4px);
   opacity: 0.68;
-  animation: intro-piece-shadow 3000ms ease-in-out forwards;
+  animation: intro-piece-shadow 2400ms ease-in-out forwards;
 }
 
 .intro-splash-car:nth-child(1) {
@@ -216,7 +216,7 @@ body {
   }
 
   28%,
-  79% {
+  75% {
     background-color: #f1f2f5;
   }
 
@@ -231,7 +231,7 @@ body {
   }
 
   22%,
-  80% {
+  75% {
     opacity: 1;
   }
 
@@ -242,7 +242,7 @@ body {
 
 @keyframes intro-splash-pattern {
   0%,
-  82% {
+  75% {
     opacity: 0.78;
   }
 
@@ -253,7 +253,7 @@ body {
 
 @keyframes intro-runner-fade {
   0%,
-  81% {
+  75% {
     opacity: 1;
     filter: blur(0);
   }
@@ -266,7 +266,7 @@ body {
 
 @keyframes intro-runner-shadow {
   0%,
-  81% {
+  75% {
     opacity: 1;
     transform: scaleX(1);
   }
@@ -310,7 +310,7 @@ body {
 
 @keyframes intro-piece-glow {
   0%,
-  81% {
+  75% {
     opacity: 0.56;
   }
 
@@ -321,7 +321,7 @@ body {
 
 @keyframes intro-piece-shadow {
   0%,
-  81% {
+  75% {
     opacity: 0.68;
     transform: scaleX(1);
   }
