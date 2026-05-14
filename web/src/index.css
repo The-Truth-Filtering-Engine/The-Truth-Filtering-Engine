@@ -117,7 +117,7 @@ body {
   filter: drop-shadow(0 12px 20px rgba(86, 80, 60, 0.12));
   opacity: 1;
   transform-origin: center;
-  animation: intro-piece-jump 540ms cubic-bezier(0.24, 1.32, 0.42, 1) var(--intro-delay, 0ms) both;
+  animation: intro-piece-jump 680ms linear var(--intro-delay, 0ms) both;
 }
 
 .intro-splash-car::before,
@@ -216,7 +216,7 @@ body {
   }
 
   28%,
-  58% {
+  79% {
     background-color: #f1f2f5;
   }
 
@@ -231,7 +231,7 @@ body {
   }
 
   22%,
-  60% {
+  80% {
     opacity: 1;
   }
 
@@ -242,7 +242,7 @@ body {
 
 @keyframes intro-splash-pattern {
   0%,
-  64% {
+  82% {
     opacity: 0.78;
   }
 
@@ -253,7 +253,7 @@ body {
 
 @keyframes intro-runner-fade {
   0%,
-  62% {
+  81% {
     opacity: 1;
     filter: blur(0);
   }
@@ -266,7 +266,7 @@ body {
 
 @keyframes intro-runner-shadow {
   0%,
-  62% {
+  81% {
     opacity: 1;
     transform: scaleX(1);
   }
@@ -278,23 +278,39 @@ body {
 }
 
 @keyframes intro-piece-jump {
-  0%,
+  0% {
+    transform: translateY(0) scaleX(1) scaleY(1);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.68, 0);
+  }
+
+  12% {
+    transform: translateY(5px) scaleX(1.05) scaleY(0.94);
+    animation-timing-function: cubic-bezier(0.18, 0.72, 0.18, 1);
+  }
+
+  48% {
+    transform: translateY(var(--jump-lift, -22px)) scaleX(0.97) scaleY(1.04);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.88, 0.42);
+  }
+
+  76% {
+    transform: translateY(0) scaleX(1.07) scaleY(0.92);
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  88% {
+    transform: translateY(-4px) scaleX(0.99) scaleY(1.02);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+
   100% {
-    transform: translateY(0) scale(1);
-  }
-
-  40% {
-    transform: translateY(var(--jump-lift, -22px)) scale(1.04);
-  }
-
-  74% {
-    transform: translateY(4px) scale(0.99);
+    transform: translateY(0) scaleX(1) scaleY(1);
   }
 }
 
 @keyframes intro-piece-glow {
   0%,
-  62% {
+  81% {
     opacity: 0.56;
   }
 
@@ -305,7 +321,7 @@ body {
 
 @keyframes intro-piece-shadow {
   0%,
-  62% {
+  81% {
     opacity: 0.68;
     transform: scaleX(1);
   }
