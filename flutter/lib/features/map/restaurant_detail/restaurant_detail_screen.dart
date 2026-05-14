@@ -121,8 +121,9 @@ Stream<_SseBatch> _streamFreshReviews(
 
   final uri = BackendConfig.apiUri('/search/stream', queryParameters: params);
   final request = http.Request('GET', uri);
-  final token = _currentAccessToken();
-  if (token != null) request.headers['Authorization'] = 'Bearer $token';
+  if (authHeaders.isNotEmpty) {
+    request.headers.addAll(authHeaders);
+  }
 
   final client = http.Client();
   try {
@@ -159,18 +160,6 @@ Stream<_SseBatch> _streamFreshReviews(
     }
   } finally {
     client.close();
-  }
-}
-
-String? _currentAccessToken() {
-  if (!SupabaseConfig.isConfigured) return null;
-
-  try {
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    if (token == null || token.isEmpty) return null;
-    return token;
-  } catch (_) {
-    return null;
   }
 }
 
@@ -291,7 +280,13 @@ class _RestaurantDetailScreenState
 
   void _startStream(AnalysisMode mode, {required bool refresh}) {
     _streamSub?.cancel();
-    _streamSub = _streamFreshReviews(_r, mode, refresh: refresh)
+    final authHeaders = _currentAuthHeaders();
+    _streamSub = _streamFreshReviews(
+      _r,
+      mode,
+      authHeaders: authHeaders,
+      refresh: refresh,
+    )
         // 이벤트 간 90초 타임아웃 (총 스트림 시간이 아니라 이벤트 간 간격 기준)
         .timeout(const Duration(seconds: 90))
         .listen(
