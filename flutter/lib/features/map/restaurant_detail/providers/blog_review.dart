@@ -211,9 +211,18 @@ class ShopInfo {
     required List<BlogReview> reviews,
   }) {
     final total = reviews.length;
-    final adCount = reviews.where((r) => r.status == ReviewStatus.ad).length;
-    final realCount = total - adCount;
+    // status 대신 adGrade 기준으로 통일
+    final adCount = reviews.where((r) {
+      if (r.adGrade != null) return r.adGrade == AdGrade.high;
+      return r.status == ReviewStatus.ad; // adGrade 없을 때 fallback
+    }).length;
 
+    final realCount = reviews.where((r) {
+      if (r.adGrade != null) return r.adGrade == AdGrade.low;
+      return r.status == ReviewStatus.real;
+    }).length;
+
+    // suspicious/mid는 총계에는 포함되지만 양쪽 다 아님
     final int adRatio = total == 0 ? 0 : (adCount / total * 100).round();
     final int realRatio = total == 0 ? 0 : (realCount / total * 100).round();
 
