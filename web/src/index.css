@@ -28,7 +28,7 @@ body {
       color-mix(in srgb, var(--color-status-info-bg) 82%, white) 100%
     ),
     var(--color-bg-default);
-  animation: intro-splash-exit 480ms ease 4200ms forwards;
+  animation: intro-splash-exit 520ms ease 5300ms forwards;
 }
 
 .intro-splash::before,
@@ -71,7 +71,7 @@ body {
       transparent 1px 76px
     );
   transform: translateX(18%);
-  animation: intro-grid-sweep 4000ms linear forwards;
+  animation: intro-grid-sweep 5200ms linear forwards;
 }
 
 .intro-splash::after {
@@ -97,42 +97,19 @@ body {
   z-index: 1;
   display: grid;
   width: 100vw;
-  height: 240px;
+  height: 300px;
   place-items: center;
 }
 
 .intro-splash-runner {
   position: absolute;
-  top: 50%;
-  left: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: clamp(4px, 0.8vw, 10px);
-  white-space: nowrap;
-  transform: translateY(-50%);
-  animation: intro-logo-pass 4000ms cubic-bezier(0.42, 0, 0.18, 1) forwards;
-}
-
-.intro-splash-runner::before {
-  position: absolute;
-  top: 50%;
-  left: clamp(68px, 8vw, 108px);
-  right: clamp(28px, 4vw, 54px);
-  height: 4px;
-  content: "";
-  background: linear-gradient(
-    90deg,
-    rgba(86, 80, 60, 0.2),
-    color-mix(in srgb, var(--color-text-brand) 36%, transparent),
-    rgba(86, 80, 60, 0.16)
-  );
-  border-radius: var(--radius-full);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
-  transform: translateY(-50%);
+  inset: 0;
 }
 
 .intro-splash-car {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 100%;
   z-index: 1;
   display: grid;
   width: clamp(86px, 10vw, 132px);
@@ -140,6 +117,70 @@ body {
   box-sizing: border-box;
   place-items: center;
   filter: drop-shadow(0 12px 20px rgba(86, 80, 60, 0.12));
+  opacity: 0;
+  transform-origin: center;
+  animation: intro-piece-pass 4600ms cubic-bezier(0.37, 0, 0.18, 1) forwards;
+  animation-delay: var(--intro-delay, 0ms);
+}
+
+.intro-splash-car:nth-child(1) {
+  --intro-delay: 0ms;
+  --y-1: -10px;
+  --y-2: 7px;
+  --y-3: -5px;
+  --y-4: 4px;
+  --r-1: -2deg;
+  --r-2: 1deg;
+  --r-3: -1deg;
+  --r-4: 0deg;
+}
+
+.intro-splash-car:nth-child(2) {
+  --intro-delay: 220ms;
+  --y-1: 14px;
+  --y-2: -8px;
+  --y-3: 10px;
+  --y-4: -3px;
+  --r-1: 4deg;
+  --r-2: -3deg;
+  --r-3: 2deg;
+  --r-4: -1deg;
+}
+
+.intro-splash-car:nth-child(3) {
+  --intro-delay: 420ms;
+  --y-1: -16px;
+  --y-2: 11px;
+  --y-3: -7px;
+  --y-4: 5px;
+  --r-1: -5deg;
+  --r-2: 3deg;
+  --r-3: -2deg;
+  --r-4: 1deg;
+}
+
+.intro-splash-car:nth-child(4) {
+  --intro-delay: 620ms;
+  --y-1: 8px;
+  --y-2: -14px;
+  --y-3: 12px;
+  --y-4: -6px;
+  --r-1: 3deg;
+  --r-2: -4deg;
+  --r-3: 2deg;
+  --r-4: -1deg;
+}
+
+.intro-splash-car:nth-child(5) {
+  --intro-delay: 820ms;
+  --y-1: -6px;
+  --y-2: 16px;
+  --y-3: -11px;
+  --y-4: 6px;
+  --r-1: -3deg;
+  --r-2: 5deg;
+  --r-3: -3deg;
+  --r-4: 1deg;
 }
 
 .intro-splash-logo-car {
@@ -165,44 +206,45 @@ body {
   height: auto;
 }
 
-@keyframes intro-logo-pass {
+@keyframes intro-piece-pass {
   0% {
     opacity: 0;
-    transform: translate(0, -50%) scale(0.94);
+    transform: translate(0, -50%) rotate(0deg) scale(0.9);
   }
 
   10% {
     opacity: 1;
-    transform: translate(calc(-12vw - 12%), calc(-50% - 10px)) scale(0.98);
+    transform: translate(calc(-10vw - 10%), calc(-50% + var(--y-1))) rotate(var(--r-1)) scale(0.98);
   }
 
-  23% {
-    transform: translate(calc(-27vw - 27%), calc(-50% + 8px)) scale(1);
+  24% {
+    transform: translate(calc(-26vw - 26%), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(1.02);
   }
 
-  36% {
-    transform: translate(calc(-42vw - 42%), calc(-50% - 7px)) scale(1.01);
+  39% {
+    transform: translate(calc(-43vw - 43%), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(0.99);
   }
 
-  50% {
-    transform: translate(calc(-58vw - 58%), calc(-50% + 6px)) scale(1);
+  55% {
+    transform: translate(calc(-61vw - 61%), calc(-50% + var(--y-4))) rotate(var(--r-4)) scale(1.01);
   }
 
-  64% {
-    transform: translate(calc(-74vw - 74%), calc(-50% - 5px)) scale(1.01);
+  71% {
+    transform: translate(calc(-79vw - 79%), calc(-50% + var(--y-2))) rotate(var(--r-2)) scale(0.98);
   }
 
-  78% {
-    transform: translate(calc(-90vw - 90%), calc(-50% + 4px)) scale(1);
+  86% {
+    opacity: 1;
+    transform: translate(calc(-96vw - 96%), calc(-50% + var(--y-3))) rotate(var(--r-3)) scale(1);
   }
 
-  90% {
+  92% {
     opacity: 1;
   }
 
   100% {
     opacity: 0;
-    transform: translate(calc(-112vw - 112%), -50%) scale(0.96);
+    transform: translate(calc(-116vw - 116%), -50%) rotate(0deg) scale(0.92);
   }
 }
 
@@ -226,7 +268,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .intro-splash,
   .intro-splash::before,
-  .intro-splash-runner {
+  .intro-splash-car {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
