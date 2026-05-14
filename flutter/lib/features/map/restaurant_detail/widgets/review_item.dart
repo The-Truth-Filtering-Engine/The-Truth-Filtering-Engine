@@ -196,7 +196,7 @@ class _AdGradeBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = switch (grade) {
       AdGrade.low => DsTone.real,
-      AdGrade.mid => DsTone.suspicious,
+      // AdGrade.mid => DsTone.suspicious,
       AdGrade.high => DsTone.ad,
     };
     return DsBadge(label: grade.label, tone: tone);
