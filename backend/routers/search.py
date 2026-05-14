@@ -478,7 +478,9 @@ async def search_stream(
 
     print(f"[DEBUG] 스트림 검색 요청 | query: {query} | mode: {mode} | cached: {cached_count} | should_fetch: {should_fetch}", flush=True)
 
-    if should_fetch and auth_email:
+    should_consume_usage = bool(auth_email and (should_fetch or (store_id and cached)))
+
+    if should_consume_usage and auth_email:
         await _ensure_analysis_usage_available(auth_email, store_id)
 
     async def event_generator():
@@ -564,7 +566,21 @@ async def search_stream(
                 asyncio.create_task(_save_to_supabase(chunk, scores))
                 yield f"data: {json.dumps({'reviews': chunk, 'done': False})}\n\n"
 
-        yield f"data: {json.dumps({'reviews': [], 'done': True, 'naverQuery': naver_query})}\n\n"
+        usage = None
+        if should_consume_usage and auth_email:
+            usage = await _consume_analysis_usage(auth_email, store_id if store_id else None)
+        elif auth_email:
+            usage = {
+                "charged": False,
+                "chargedBy": None,
+                "profile": None,
+            }
+
+        done_payload = {"reviews": [], "done": True, "naverQuery": naver_query}
+        if usage is not None:
+            done_payload["usage"] = usage
+
+        yield f"data: {json.dumps(done_payload)}\n\n"
         print(f"[DEBUG] 스트림 완료 | query: {query}", flush=True)
 
     return StreamingResponse(

@@ -311,7 +311,6 @@ function MainSettingsView({
               <Crown aria-hidden="true" size={19} strokeWidth={2.2} />
               <div>
                 <strong>프리미엄</strong>
-                <span>현재 계정의 premium 값을 1 또는 0으로 저장합니다.</span>
               </div>
             </div>
             <button

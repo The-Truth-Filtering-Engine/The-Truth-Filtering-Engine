@@ -48,6 +48,7 @@ export type ReviewStreamChunk = {
   reviews?: Record<string, unknown>[]
   done?: boolean
   naverQuery?: string
+  usage?: AnalysisUsage
 }
 
 export const REVIEW_BATCH_SIZE = 100

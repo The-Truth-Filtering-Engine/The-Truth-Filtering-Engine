@@ -116,6 +116,7 @@ export function useDetail(
                   setDetailState('loaded')
                 })
               }
+              applyUsageProfile(chunk.usage)
               if (chunk.done) break
             }
           } catch (error) {
@@ -148,6 +149,7 @@ export function useDetail(
               setDetailState('loaded')
             })
           }
+          applyUsageProfile(chunk.usage)
           if (chunk.done) break
         }
         if (requestId !== detailRequestIdRef.current) return
