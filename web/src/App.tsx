@@ -705,8 +705,15 @@ function IntroSplash() {
   return (
     <section className="intro-splash" aria-label="진실의 입 시작 화면">
       <div className="intro-splash-track" aria-hidden="true">
-        <div className="intro-splash-glow" />
-        <img className="intro-splash-logo" src={appLogoUrl} alt="" />
+        <div className="intro-splash-runner">
+          <span className="intro-splash-car intro-splash-logo-car">
+            <img className="intro-splash-logo" src={appLogoUrl} alt="" />
+          </span>
+          <span className="intro-splash-car intro-splash-letter">진</span>
+          <span className="intro-splash-car intro-splash-letter">실</span>
+          <span className="intro-splash-car intro-splash-letter">의</span>
+          <span className="intro-splash-car intro-splash-letter">입</span>
+        </div>
       </div>
     </section>
   )
