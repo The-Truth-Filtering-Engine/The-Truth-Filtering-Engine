@@ -17,7 +17,7 @@ import { type Restaurant } from '../lib/restaurant'
 
 const INITIAL_CENTER: MapPoint = { latitude: 37.5245, longitude: 127.037 }
 const INITIAL_LEVEL = 4
-const FOCUSED_LEVEL = 1
+const FOCUSED_LEVEL = 0
 const VIEWPORT_DEBOUNCE_MS = 600
 const REFRESH_DISTANCE_METERS = 150
 
