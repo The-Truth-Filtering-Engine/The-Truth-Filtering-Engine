@@ -13,15 +13,18 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../bookmarks/bookmark_metadata_picker.dart';
 import '../../bookmarks/bookmark_provider.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 import '../map_provider.dart';
+import '../utils/kakao_route_url.dart';
 import '../widgets/kakao_map_view.dart';
 import '../widgets/map_control_buttons.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
 import '../../../screens/restaurant_list_screen.dart';
+import '../../ai_recommend/ai_recommend_provider.dart';
 import '../restaurant_detail/restaurant_detail_screen.dart';
 import '../../search/search_screen.dart';
 
@@ -135,7 +138,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   KakaoMapCamera? _latestCamera;
   _MapCategoryChipData? _selectedMapCategory;
   int _latestMapLevel = _initialLevel;
-  bool _isLayerToggled = false;
 
   @override
   void initState() {
@@ -169,26 +171,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         if (!mounted) return;
         _mapViewKey.currentState?.moveTo(
           MapPoint(latitude: next.latitude, longitude: next.longitude),
-          level: 0,
+          level: 1,
         );
-        setState(() {
-          _isLayerToggled = false;
-        });
       });
     });
 
     final selectedRestaurant = ref.watch(selectedRestaurantProvider);
     final currentLocation = ref.watch(currentLocationProvider);
+    final isAiLocationPicking = ref.watch(aiRecommendMapPickModeProvider);
     final focusedRestaurant = _selectedMapCategory == null
         ? ref.watch(mapFocusRestaurantProvider)
         : null;
     final bookmarkedRestaurants = ref.watch(bookmarkRestaurantsProvider);
-    final displayRestaurants = _reduceRestaurantOverdraw(
+    final visibleRestaurants = _reduceRestaurantOverdraw(
       restaurants: _appendRestaurantIfMissing(
         _viewportRestaurants,
         focusedRestaurant,
       ),
       level: _latestMapLevel,
+    );
+    final displayRestaurants = _mergeBookmarksIntoMap(
+      visibleRestaurants,
+      bookmarkedRestaurants,
     );
     final isSelectedBookmarked = selectedRestaurant != null &&
         bookmarkedRestaurants.any(
@@ -301,17 +305,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           Positioned(
             right: 16,
-            bottom: selectedRestaurant != null ? 230 : 100,
+            bottom: selectedRestaurant != null ? 230 : 16,
             child: PointerInterceptor(
               child: MapControlButtons(
                 onLocationTap: _moveToCurrentLocation,
-                onLayerTap: _toggleLayer,
-                onZoomIn: () => _mapViewKey.currentState?.zoomIn(),
-                onZoomOut: () => _mapViewKey.currentState?.zoomOut(),
-                isLayerToggled: _isLayerToggled,
               ),
             ),
           ),
+          if (isAiLocationPicking) ...[
+            const Center(
+              child: Icon(
+                Icons.location_pin,
+                size: 42,
+                color: AppColors.primary700,
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: selectedRestaurant != null ? 250 : 20,
+              child: PointerInterceptor(
+                child: _AiLocationPickPanel(
+                  onApply: _applyMapCenterToAiRecommend,
+                  onCancel: () {
+                    ref.read(aiRecommendMapPickModeProvider.notifier).state =
+                        false;
+                  },
+                ),
+              ),
+            ),
+          ],
           if (selectedRestaurant != null)
             Positioned(
               left: 0,
@@ -334,23 +357,47 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       ),
                     );
                   },
-                  onBookmarkTap: () {
+                  onBookmarkTap: () async {
                     final previous = ref.read(bookmarkRestaurantsProvider);
                     final alreadyBookmarked = previous.any(
                       (item) =>
                           item.effectiveStoreId ==
                           selectedRestaurant.effectiveStoreId,
                     );
-                    ref
-                        .read(bookmarkRestaurantsProvider.notifier)
-                        .toggle(selectedRestaurant);
+                    if (alreadyBookmarked) {
+                      await ref
+                          .read(bookmarkRestaurantsProvider.notifier)
+                          .remove(selectedRestaurant);
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다',
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('북마크에서 해제되었습니다'),
+                          duration: Duration(seconds: 1),
                         ),
-                        duration: const Duration(seconds: 1),
+                      );
+                      return;
+                    }
+
+                    final selection = await showBookmarkMetadataPicker(
+                      context: context,
+                      restaurant: selectedRestaurant,
+                      customTopics: ref.read(bookmarkCustomTopicsProvider),
+                      hiddenTopicIds: ref.read(bookmarkHiddenTopicIdsProvider),
+                    );
+                    if (!context.mounted || selection == null) return;
+
+                    await ref.read(bookmarkRestaurantsProvider.notifier).add(
+                          selectedRestaurant,
+                          topicIds: selection.topicIds,
+                          colorKey: selection.colorKey,
+                        );
+
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('북마크에 저장했습니다'),
+                        duration: Duration(seconds: 1),
                       ),
                     );
                   },
@@ -361,7 +408,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     _copyRestaurantPhone(selectedRestaurant, context);
                   },
                   onRouteTap: () async {
-                    final link = selectedRestaurant.placeUrl?.trim();
+                    final link = buildKakaoCarRouteUrl(selectedRestaurant);
                     if (link != null && link.isNotEmpty) {
                       final uri = Uri.parse(link);
                       await launchUrl(uri,
@@ -763,15 +810,72 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return [restaurant, ...source];
   }
 
+  List<RestaurantModel> _mergeBookmarksIntoMap(
+    List<RestaurantModel> restaurants,
+    List<RestaurantModel> bookmarks,
+  ) {
+    if (bookmarks.isEmpty) return restaurants;
+
+    final bookmarkByStoreId = {
+      for (final bookmark in bookmarks) bookmark.effectiveStoreId: bookmark,
+    };
+    final restaurantByStoreId = {
+      for (final restaurant in restaurants)
+        restaurant.effectiveStoreId: restaurant,
+    };
+    final addedStoreIds = <String>{};
+    final merged = <RestaurantModel>[];
+
+    for (final bookmark in bookmarks) {
+      if (!_hasUsableLocation(bookmark)) continue;
+      final storeId = bookmark.effectiveStoreId;
+      if (storeId.isEmpty || !addedStoreIds.add(storeId)) continue;
+
+      final baseRestaurant = restaurantByStoreId[storeId] ?? bookmark;
+      merged.add(baseRestaurant.applyBookmarkMetadataFrom(bookmark));
+    }
+
+    for (final restaurant in restaurants) {
+      final storeId = restaurant.effectiveStoreId;
+      if (storeId.isNotEmpty && addedStoreIds.contains(storeId)) continue;
+
+      final bookmark = bookmarkByStoreId[restaurant.effectiveStoreId];
+      merged.add(
+        bookmark == null
+            ? restaurant
+            : restaurant.applyBookmarkMetadataFrom(bookmark),
+      );
+    }
+
+    return merged;
+  }
+
+  bool _hasUsableLocation(RestaurantModel restaurant) {
+    final lat = restaurant.latitude;
+    final lng = restaurant.longitude;
+    if (lat == 0 && lng == 0) return false;
+    return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  }
+
   void _moveToCurrentLocation() {
     _syncCurrentLocationToProvider();
   }
 
-  void _toggleLayer() {
-    _mapViewKey.currentState?.toggleMapType();
-    setState(() {
-      _isLayerToggled = !_isLayerToggled;
-    });
+  void _applyMapCenterToAiRecommend() {
+    final selectedCenter = _latestCamera?.center ??
+        ref.read(currentLocationProvider) ??
+        _initialCenter;
+    ref
+        .read(aiRecommendProvider.notifier)
+        .changePlanningLocationFromMap(selectedCenter);
+    ref.read(aiRecommendMapPickModeProvider.notifier).state = false;
+    widget.onSelectTab?.call(3);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('선택한 위치로 AI 추천을 다시 불러옵니다'),
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
   Future<void> _syncCurrentLocationToProvider() async {
@@ -798,6 +902,69 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref.read(currentLocationProvider.notifier).state = location;
       _mapViewKey.currentState?.moveTo(location, level: _initialLevel);
     } catch (_) {}
+  }
+}
+
+class _AiLocationPickPanel extends StatelessWidget {
+  final VoidCallback onApply;
+  final VoidCallback onCancel;
+
+  const _AiLocationPickPanel({
+    required this.onApply,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.auto_awesome_rounded,
+              color: AppColors.primary700,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '지도 가운데를 AI 추천 위치로 사용',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onCancel,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('취소'),
+            ),
+            const SizedBox(width: 6),
+            FilledButton(
+              onPressed: onApply,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(64, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: const Text('적용'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

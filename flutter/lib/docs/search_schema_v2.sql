@@ -27,18 +27,10 @@ create unique index if not exists trending_chips_label_unique_idx
 
 insert into trending_chips (label, sort_order)
 values
-  ('실시간 검색 맛집', 1),
-  ('많이 찾는 맛집', 2),
+  ('🔥 지금 뜨는 맛집', 1),
+  ('많이 찾는 맛집👍', 2),
   ('✨ 신상 맛집 ✨', 3),
-  ('데이트 장소', 4),
-  ('SNS 좋아요', 5),
-  ('힐링 맛집', 6),
-  ('예쁜 카페', 7),
-  ('이색 맛집', 8),
-  ('지역 전통 음식', 9),
-  ('고급 식당', 10),
-  ('TV 출연 가게', 11),
-  ('동네 오래된 맛집', 12)
+  ('🕰️ 추억의 맛집', 4)
 on conflict (label) do update set
   sort_order = excluded.sort_order,
   is_active = true,
@@ -48,19 +40,168 @@ update trending_chips
 set is_active = false,
     updated_at = now()
 where label not in (
-  '실시간 검색 맛집',
-  '많이 찾는 맛집',
+  '🔥 지금 뜨는 맛집',
+  '많이 찾는 맛집👍',
   '✨ 신상 맛집 ✨',
-  '데이트 장소',
-  'SNS 좋아요',
-  '힐링 맛집',
-  '예쁜 카페',
-  '이색 맛집',
-  '지역 전통 음식',
-  '고급 식당',
-  'TV 출연 가게',
-  '동네 오래된 맛집'
+  '🕰️ 추억의 맛집'
 );
+
+-- =========================================================
+-- SEARCH RELATED KEYWORDS
+-- Input-while-typing related keyword chips.
+-- Backend matches the user's query against triggers from this table.
+-- group_key can be used by backend ranking logic, e.g. cafe intent.
+-- =========================================================
+
+create table if not exists search_related_keywords (
+  id text primary key,
+  group_key text not null,
+  label text not null,
+  keyword text not null,
+  triggers text[] not null default '{}',
+  is_exclusive boolean not null default false,
+  sort_order integer not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists search_related_keywords_group_idx
+  on search_related_keywords (group_key);
+
+create index if not exists search_related_keywords_active_order_idx
+  on search_related_keywords (is_active, is_exclusive desc, sort_order);
+
+insert into search_related_keywords (
+  id,
+  group_key,
+  label,
+  keyword,
+  triggers,
+  is_exclusive,
+  sort_order,
+  is_active
+)
+values
+  (
+    'coffee-franchise-cafe',
+    'coffeebean',
+    '프랜차이즈 카페',
+    '프랜차이즈 카페',
+    array['커피빈', '커피빈코리아', 'coffee bean', 'coffeebean', 'the coffee bean'],
+    true,
+    1,
+    true
+  ),
+  (
+    'coffee-tumbler-md',
+    'coffeebean',
+    '텀블러MD',
+    '텀블러MD',
+    array['커피빈', '커피빈코리아', 'coffee bean', 'coffeebean', 'the coffee bean'],
+    true,
+    2,
+    true
+  ),
+  (
+    'coffee-americano',
+    'coffeebean',
+    '아메리카노',
+    '아메리카노',
+    array['커피빈', '커피빈코리아', 'coffee bean', 'coffeebean', 'the coffee bean'],
+    true,
+    3,
+    true
+  ),
+  (
+    'cafe-quiet-study',
+    'cafe',
+    '공부하기 좋은 조용한 카페',
+    '공부하기 좋은 조용한 카페',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    10,
+    true
+  ),
+  (
+    'cafe-late-night',
+    'cafe',
+    '늦게까지 하는 카페',
+    '늦게까지 하는 카페',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    11,
+    true
+  ),
+  (
+    'cafe-sweet-latte',
+    'cafe',
+    '달달한 라떼',
+    '달달한 라떼',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    12,
+    true
+  ),
+  (
+    'cafe-decaf-menu',
+    'cafe',
+    '디카페인 추천',
+    '디카페인 추천',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    13,
+    true
+  ),
+  (
+    'cafe-long-stay',
+    'cafe',
+    '오래 머물기 좋은 분위기',
+    '오래 머물기 좋은 분위기',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    14,
+    true
+  ),
+  (
+    'cafe-outlets',
+    'cafe',
+    '콘센트 많은 카페',
+    '콘센트 많은 카페',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    15,
+    true
+  ),
+  (
+    'cafe-less-crowded',
+    'cafe',
+    '현재 사람 적은 카페',
+    '현재 사람 적은 카페',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    16,
+    true
+  ),
+  (
+    'cafe-quiet-work',
+    'cafe',
+    '조용하게 작업하기 좋은 곳',
+    '조용하게 작업하기 좋은 곳',
+    array['커피', '카페', '라떼', '디카페인', '돌체', '돌체라떼', '스타벅스', '투썸', '이디야', '할리스', '메가커피', '컴포즈커피', '빽다방', '폴바셋'],
+    false,
+    17,
+    true
+  )
+on conflict (id) do update set
+  group_key = excluded.group_key,
+  label = excluded.label,
+  keyword = excluded.keyword,
+  triggers = excluded.triggers,
+  is_exclusive = excluded.is_exclusive,
+  sort_order = excluded.sort_order,
+  is_active = excluded.is_active,
+  updated_at = now();
 
 -- =========================================================
 -- SEARCH CACHE

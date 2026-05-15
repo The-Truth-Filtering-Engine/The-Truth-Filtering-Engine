@@ -20,27 +20,33 @@ class SearchTrendingChip {
   final String label;
 }
 
-const defaultSearchTrendingChips = <SearchTrendingChip>[
-  SearchTrendingChip(label: '실시간 검색 맛집'),
-  SearchTrendingChip(label: '많이 찾는 맛집'),
+const _defaultTrendingChips = <SearchTrendingChip>[
+  SearchTrendingChip(label: '🔥 지금 뜨는 맛집'),
+  SearchTrendingChip(label: '많이 찾는 맛집👍'),
   SearchTrendingChip(label: '✨ 신상 맛집 ✨'),
-  SearchTrendingChip(label: '데이트 장소'),
-  SearchTrendingChip(label: 'SNS 좋아요'),
-  SearchTrendingChip(label: '힐링 맛집'),
-  SearchTrendingChip(label: '예쁜 카페'),
-  SearchTrendingChip(label: '이색 맛집'),
-  SearchTrendingChip(label: '지역 전통 음식'),
-  SearchTrendingChip(label: '고급 식당'),
-  SearchTrendingChip(label: 'TV 출연 가게'),
-  SearchTrendingChip(label: '동네 오래된 맛집'),
+  SearchTrendingChip(label: '🕰️ 추억의 맛집'),
 ];
+
+const _removedTrendingChipLabels = {
+  '자연 속 맛집',
+  '자연 뷰 맛집',
+  '데이트 장소',
+  'SNS 좋아요',
+  '산수유람 맛집',
+  '예쁜 카페',
+  '이색 맛집',
+  '지역 전통 음식',
+  '고급 식당',
+  'TV 출연 가게',
+  '동네 오래된 맛집',
+};
 
 class SearchState {
   const SearchState({
     this.inputState = SearchInputState.beforeInput,
     this.query = '',
     this.preview,
-    this.trendingChips = defaultSearchTrendingChips,
+    this.trendingChips = _defaultTrendingChips,
     this.recentHistory = const [],
     this.isLoadingPreview = false,
     this.isLoadingHistory = false,
@@ -131,7 +137,8 @@ class SearchController extends StateNotifier<SearchState> {
     state = state.copyWith(
       query: query,
       inputState: SearchInputState.typing,
-      isLoadingPreview: true,
+      clearPreview: true,
+      isLoadingPreview: false,
       clearPreviewError: true,
     );
 
@@ -188,22 +195,61 @@ class SearchController extends StateNotifier<SearchState> {
   Future<void> _loadTrendingChips() async {
     try {
       final rows = await _repository.fetchTrendingChips();
-      if (!mounted || rows.isEmpty) return;
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        state = state.copyWith(trendingChips: _defaultTrendingChips);
+        return;
+      }
 
-      final chips = rows
-          .map(
-            (row) => SearchTrendingChip(
-              label: row['label']?.toString() ?? '',
-            ),
-          )
-          .where((chip) => chip.label.trim().isNotEmpty)
-          .toList();
-      if (chips.isEmpty) return;
+      final chips = _trendingChipsFromRows(rows);
+      if (chips.isEmpty) {
+        state = state.copyWith(trendingChips: _defaultTrendingChips);
+        return;
+      }
 
       state = state.copyWith(trendingChips: chips);
     } catch (_) {
-      // Local default trending chips remain available when the endpoint is absent.
+      if (!mounted) return;
+      state = state.copyWith(trendingChips: _defaultTrendingChips);
     }
+  }
+
+  List<SearchTrendingChip> _trendingChipsFromRows(
+    List<Map<String, dynamic>> rows,
+  ) {
+    final labels = <String>[];
+    for (final row in rows) {
+      final label = _normalizeTrendingChipLabel(
+        row['label']?.toString().trim() ?? '',
+      );
+      if (label.isEmpty) continue;
+      if (_removedTrendingChipLabels.contains(label)) continue;
+      if (label == '힐링 맛집') {
+        labels.add('산수유람 맛집');
+      } else if (label == '자연 속 힐링 맛집') {
+        labels.add('산수유람 맛집');
+      } else {
+        labels.add(label);
+      }
+    }
+
+    labels.addAll(_defaultTrendingChips.map((chip) => chip.label));
+
+    final seen = <String>{};
+    return labels
+        .where((label) => seen.add(label))
+        .map((label) => SearchTrendingChip(label: label))
+        .toList();
+  }
+
+  String _normalizeTrendingChipLabel(String label) {
+    return switch (label) {
+      '실시간 검색 맛집' => '🔥 지금 뜨는 맛집',
+      '지금 뜨는 맛집' => '🔥 지금 뜨는 맛집',
+      '신상 맛집' => '✨ 신상 맛집 ✨',
+      '추억의 맛집' => '🕰️ 추억의 맛집',
+      _ => label,
+    };
   }
 
   Future<void> _loadRecentHistory() async {
@@ -229,6 +275,12 @@ class SearchController extends StateNotifier<SearchState> {
     double? lat,
     double? lng,
   }) async {
+    if (!mounted || state.query.trim() != query) return;
+    state = state.copyWith(
+      isLoadingPreview: true,
+      clearPreviewError: true,
+    );
+
     try {
       final result = await _repository.fetchPreview(
         query: query,

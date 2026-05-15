@@ -53,24 +53,97 @@ _SCORE = {
 _PREVIEW_LIMIT = 3
 _SUGGESTION_LIMIT = 5
 _ISSUE_CHIP_LIMIT = 3
+_RELATED_CATEGORY_LIMIT = 3
 _HISTORY_LIMIT = 20
 _CACHE_TTL_DAYS = 14
 _MIN_QUERY_LENGTH = 2
 _VALID_CLICKED_TYPES = {"menu", "restaurant", "issue", "quick_preview"}
 
 _DEFAULT_TRENDING_CHIPS = [
-    {"id": "realtime", "label": "실시간 검색 맛집"},
-    {"id": "popular", "label": "많이 찾는 맛집"},
+    {"id": "realtime", "label": "🔥 지금 뜨는 맛집"},
+    {"id": "popular", "label": "많이 찾는 맛집👍"},
     {"id": "new", "label": "✨ 신상 맛집 ✨"},
-    {"id": "date", "label": "데이트 장소"},
-    {"id": "sns", "label": "SNS 좋아요"},
-    {"id": "healing", "label": "힐링 맛집"},
-    {"id": "pretty", "label": "예쁜 카페"},
-    {"id": "unique", "label": "이색 맛집"},
-    {"id": "local_traditional", "label": "지역 전통 음식"},
-    {"id": "premium", "label": "고급 식당"},
-    {"id": "tv", "label": "TV 출연 가게"},
-    {"id": "old", "label": "동네 오래된 맛집"},
+    {"id": "nostalgia", "label": "🕰️ 추억의 맛집"},
+]
+
+_TRENDING_LABEL_ALIASES = {
+    "실시간 검색 맛집": "🔥 지금 뜨는 맛집",
+    "지금 뜨는 맛집": "🔥 지금 뜨는 맛집",
+    "신상 맛집": "✨ 신상 맛집 ✨",
+    "추억의 맛집": "🕰️ 추억의 맛집",
+}
+
+_REMOVED_TRENDING_LABELS = {
+    "자연 속 맛집",
+    "자연 뷰 맛집",
+    "데이트 장소",
+    "SNS 좋아요",
+    "산수유람 맛집",
+    "예쁜 카페",
+    "이색 맛집",
+    "지역 전통 음식",
+    "고급 식당",
+    "TV 출연 가게",
+    "동네 오래된 맛집",
+}
+
+_RELATED_KEYWORD_FALLBACK_ROWS = [
+    {
+        "id": "coffee-franchise-cafe",
+        "group_key": "coffeebean",
+        "label": "프랜차이즈 카페",
+        "keyword": "프랜차이즈 카페",
+        "triggers": ["커피빈", "커피빈코리아", "coffee bean", "coffeebean"],
+        "is_exclusive": True,
+    },
+    {
+        "id": "coffee-tumbler-md",
+        "group_key": "coffeebean",
+        "label": "텀블러MD",
+        "keyword": "텀블러MD",
+        "triggers": ["커피빈", "커피빈코리아", "coffee bean", "coffeebean"],
+        "is_exclusive": True,
+    },
+    {
+        "id": "coffee-americano",
+        "group_key": "coffeebean",
+        "label": "아메리카노",
+        "keyword": "아메리카노",
+        "triggers": ["커피빈", "커피빈코리아", "coffee bean", "coffeebean"],
+        "is_exclusive": True,
+    },
+    {
+        "id": "cafe-sweet-latte",
+        "group_key": "cafe",
+        "label": "달달한 라떼",
+        "keyword": "달달한 라떼",
+        "triggers": ["커피", "카페", "라떼", "디카페인", "돌체", "돌체라떼"],
+        "is_exclusive": False,
+    },
+    {
+        "id": "cafe-decaf-menu",
+        "group_key": "cafe",
+        "label": "디카페인 추천",
+        "keyword": "디카페인 추천",
+        "triggers": ["커피", "카페", "라떼", "디카페인", "돌체", "돌체라떼"],
+        "is_exclusive": False,
+    },
+    {
+        "id": "cafe-quiet-study",
+        "group_key": "cafe",
+        "label": "공부하기 좋은 조용한 카페",
+        "keyword": "공부하기 좋은 조용한 카페",
+        "triggers": ["커피", "카페", "라떼", "디카페인", "돌체", "돌체라떼"],
+        "is_exclusive": False,
+    },
+    {
+        "id": "cafe-late-night",
+        "group_key": "cafe",
+        "label": "늦게까지 하는 카페",
+        "keyword": "늦게까지 하는 카페",
+        "triggers": ["커피", "카페", "라떼", "디카페인", "돌체", "돌체라떼"],
+        "is_exclusive": False,
+    },
 ]
 
 
@@ -210,17 +283,58 @@ async def _fetch_trending_chips(client: httpx.AsyncClient) -> list[dict]:
             "select": "id,label,sort_order",
         },
     )
-    if not chips:
-        return _DEFAULT_TRENDING_CHIPS
+    results = []
+    seen_labels = set()
+    for chip in chips:
+        label = str(chip.get("label", "")).strip()
+        if not label:
+            continue
 
-    return [
+        label = _TRENDING_LABEL_ALIASES.get(label, label)
+        if label in _REMOVED_TRENDING_LABELS or label in seen_labels:
+            continue
+
+        seen_labels.add(label)
+        results.append(
+            {
+                "id": str(chip.get("id", "")),
+                "label": label,
+            }
+        )
+
+    for default_chip in _DEFAULT_TRENDING_CHIPS:
+        label = default_chip["label"]
+        if label in seen_labels:
+            continue
+        seen_labels.add(label)
+        results.append(default_chip)
+
+    return results or _DEFAULT_TRENDING_CHIPS
+
+
+async def _fetch_related_keyword_rows(client: httpx.AsyncClient) -> list[dict]:
+    rows = await _fetch_optional_table(
+        client,
+        "search_related_keywords",
         {
-            "id": str(chip.get("id", "")),
-            "label": chip.get("label", ""),
-        }
-        for chip in chips
-        if chip.get("label")
-    ]
+            "is_active": "eq.true",
+            "order": "is_exclusive.desc,sort_order.asc",
+            "select": (
+                "id,group_key,label,keyword,triggers,is_exclusive,sort_order"
+            ),
+        },
+    )
+    if not rows:
+        return _RELATED_KEYWORD_FALLBACK_ROWS
+
+    merged = {
+        str(row.get("id", "")): row
+        for row in rows
+        if str(row.get("id", "")).strip()
+    }
+    for fallback in _RELATED_KEYWORD_FALLBACK_ROWS:
+        merged[str(fallback["id"])] = fallback
+    return list(merged.values())
 
 
 async def _fetch_active_issue_keywords(client: httpx.AsyncClient) -> list[dict]:
@@ -262,6 +376,30 @@ async def _fetch_menus_by_query(
     return response.json() or []
 
 
+async def _fetch_menus_by_restaurant_name_query(
+    client: httpx.AsyncClient,
+    query: str,
+    limit: int = 30,
+) -> list[dict]:
+    response = await client.get(
+        f"{SUPABASE_URL}/rest/v1/restaurant_menus",
+        headers=_headers(),
+        params={
+            "restaurant_name": f"ilike.*{query}*",
+            "order": "is_best.desc,name.asc",
+            "limit": str(limit),
+            "select": (
+                "id,restaurant_id,restaurant_name,name,price,price_label,"
+                "image_url,is_best"
+            ),
+        },
+        timeout=5,
+    )
+    if response.status_code != 200:
+        return []
+    return response.json() or []
+
+
 async def _fetch_restaurants_by_query(
     client: httpx.AsyncClient,
     query: str,
@@ -277,6 +415,69 @@ async def _fetch_restaurants_by_query(
             "select": (
                 "id,name,category_name,category_group_code,category_group_name,"
                 "phone,address_name,road_address_name,place_url,lat,lng"
+            ),
+        },
+        timeout=5,
+    )
+    if response.status_code != 200:
+        return []
+    return response.json() or []
+
+
+async def _fetch_cafe_restaurants(
+    client: httpx.AsyncClient,
+    lat: float | None,
+    lng: float | None,
+    limit: int = 30,
+) -> list[dict]:
+    response = await client.get(
+        f"{SUPABASE_URL}/rest/v1/restaurants",
+        headers=_headers(),
+        params={
+            "category_group_code": "eq.CE7",
+            "order": "name.asc",
+            "limit": str(limit),
+            "select": (
+                "id,name,category_name,category_group_code,category_group_name,"
+                "phone,address_name,road_address_name,place_url,lat,lng"
+            ),
+        },
+        timeout=5,
+    )
+    if response.status_code != 200:
+        return []
+
+    restaurants = response.json() or []
+    if lat is not None and lng is not None:
+        restaurants.sort(
+            key=lambda restaurant: _distance_meters(
+                lat,
+                lng,
+                _as_float(restaurant.get("lat")),
+                _as_float(restaurant.get("lng")),
+            )
+        )
+    return restaurants
+
+
+async def _fetch_menus_by_restaurant_ids(
+    client: httpx.AsyncClient,
+    restaurant_ids: list[str],
+    limit: int = 30,
+) -> list[dict]:
+    if not restaurant_ids:
+        return []
+
+    response = await client.get(
+        f"{SUPABASE_URL}/rest/v1/restaurant_menus",
+        headers=_headers(),
+        params={
+            "restaurant_id": _postgrest_in(restaurant_ids),
+            "order": "is_best.desc,name.asc",
+            "limit": str(limit),
+            "select": (
+                "id,restaurant_id,restaurant_name,name,price,price_label,"
+                "image_url,is_best"
             ),
         },
         timeout=5,
@@ -590,6 +791,139 @@ def _chips_from_trending(trending: list[dict]) -> list[dict]:
     ]
 
 
+def _build_related_categories(
+    query_norm: str,
+    rows: list[dict],
+) -> list[dict]:
+    query_key = _match_key(query_norm)
+    if not query_key or not rows:
+        return []
+
+    matched_rows = []
+    for row in rows:
+        trigger_keys = [_match_key(trigger) for trigger in (row.get("triggers") or [])]
+        is_exclusive = bool(row.get("is_exclusive"))
+        matched = any(
+            trigger_key
+            and (
+                trigger_key in query_key
+                or (
+                    is_exclusive
+                    and len(query_key) >= 3
+                    and query_key in trigger_key
+                )
+                or (not is_exclusive and query_key in trigger_key)
+            )
+            for trigger_key in trigger_keys
+        )
+        if matched:
+            matched_rows.append(row)
+
+    exclusive_rows = [row for row in matched_rows if row.get("is_exclusive")]
+    source_rows = exclusive_rows or matched_rows
+
+    categories = []
+    seen_ids: set[str] = set()
+    seen_labels: set[str] = set()
+    for row in source_rows:
+        category_id = str(row.get("id", "")).strip()
+        label = str(row.get("label", "")).strip()
+        if (
+            not category_id
+            or not label
+            or category_id in seen_ids
+            or label in seen_labels
+        ):
+            continue
+
+        seen_ids.add(category_id)
+        seen_labels.add(label)
+        categories.append(
+            {
+                "id": category_id,
+                "label": label,
+                "keyword": row.get("keyword") or label,
+                "score": 80 - len(categories),
+                "groupKey": row.get("group_key") or "",
+                "isExclusive": bool(row.get("is_exclusive")),
+            }
+        )
+        if len(categories) >= _RELATED_CATEGORY_LIMIT:
+            break
+
+    return categories
+
+
+def _is_cafe_intent(related_categories: list[dict]) -> bool:
+    return any(
+        category.get("groupKey") == "cafe"
+        and not category.get("isExclusive")
+        for category in related_categories
+    )
+
+
+def _dedupe_restaurants(restaurants: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    result = []
+    for restaurant in restaurants:
+        restaurant_id = str(restaurant.get("id", "")).strip()
+        if not restaurant_id or restaurant_id in seen:
+            continue
+        seen.add(restaurant_id)
+        result.append(restaurant)
+    return result
+
+
+def _dedupe_menus(menus: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    result = []
+    for menu in menus:
+        menu_id = str(menu.get("id", "")).strip()
+        if not menu_id or menu_id in seen:
+            continue
+        seen.add(menu_id)
+        result.append(menu)
+    return result
+
+
+def _attach_restaurant_names(
+    menus: list[dict],
+    restaurants: list[dict],
+) -> list[dict]:
+    restaurant_names = {
+        str(restaurant.get("id", "")): restaurant.get("name", "")
+        for restaurant in restaurants
+        if restaurant.get("id") and restaurant.get("name")
+    }
+    for menu in menus:
+        if not menu.get("restaurant_name"):
+            restaurant_name = restaurant_names.get(str(menu.get("restaurant_id", "")))
+            if restaurant_name:
+                menu["restaurant_name"] = restaurant_name
+    return menus
+
+
+def _restaurant_score_map(
+    query_norm: str,
+    restaurants: list[dict],
+) -> dict[str, int]:
+    scores: dict[str, int] = {}
+    for restaurant in restaurants:
+        restaurant_id = str(restaurant.get("id", "")).strip()
+        if not restaurant_id:
+            continue
+        score = _match_score(
+            query_norm,
+            restaurant.get("name", ""),
+            _SCORE["restaurant_exact"],
+            _SCORE["restaurant_prefix"],
+            _SCORE["restaurant_partial"],
+        )
+        if score > 0:
+            scores[restaurant_id] = score
+    return scores
+
+
 def _build_suggestions(
     query_norm: str,
     menus: list[dict],
@@ -619,7 +953,40 @@ def _build_suggestions(
         )
         if score > 0:
             scored_restaurants.append({"restaurant": restaurant, "score": score})
-    scored_restaurants.sort(key=lambda item: item["score"], reverse=True)
+
+    restaurant_suggestions_by_id: dict[str, dict] = {}
+    for item in scored_restaurants:
+        restaurant = item["restaurant"]
+        restaurant_id = str(restaurant.get("id", "")).strip()
+        if not restaurant_id:
+            continue
+        restaurant_suggestions_by_id[restaurant_id] = {
+            "id": restaurant_id,
+            "name": restaurant.get("name", ""),
+            "score": item["score"],
+        }
+
+    for item in scored_menus:
+        menu = item["menu"]
+        restaurant_id = str(menu.get("restaurant_id", "")).strip()
+        restaurant_name = str(menu.get("restaurant_name", "")).strip()
+        if not restaurant_id or not restaurant_name:
+            continue
+
+        score = max(item["score"] - 5, 1)
+        current = restaurant_suggestions_by_id.get(restaurant_id)
+        if current is None or score > current["score"]:
+            restaurant_suggestions_by_id[restaurant_id] = {
+                "id": restaurant_id,
+                "name": restaurant_name,
+                "score": score,
+            }
+
+    scored_restaurant_suggestions = sorted(
+        restaurant_suggestions_by_id.values(),
+        key=lambda item: item["score"],
+        reverse=True,
+    )
 
     return {
         "menus": [
@@ -631,14 +998,7 @@ def _build_suggestions(
             }
             for item in scored_menus[:_SUGGESTION_LIMIT]
         ],
-        "restaurants": [
-            {
-                "id": item["restaurant"].get("id", ""),
-                "name": item["restaurant"].get("name", ""),
-                "score": item["score"],
-            }
-            for item in scored_restaurants[:_SUGGESTION_LIMIT]
-        ],
+        "restaurants": scored_restaurant_suggestions[:_SUGGESTION_LIMIT],
     }
 
 
@@ -646,36 +1006,91 @@ def _build_quick_previews(
     query_norm: str,
     menus: list[dict],
     review_stats: dict[str, int],
+    restaurant_scores: dict[str, int] | None = None,
+    fallback_restaurant_scores: dict[str, int] | None = None,
+    allow_best_fallback: bool = False,
 ) -> list[dict]:
+    restaurant_scores = restaurant_scores or {}
+    fallback_restaurant_scores = fallback_restaurant_scores or {}
     scored = []
     for menu in menus:
-        score = _match_score(
+        menu_score = _match_score(
             query_norm,
             menu.get("name", ""),
             _SCORE["menu_exact"],
             _SCORE["menu_prefix"],
             _SCORE["menu_partial"],
         )
-        if score == 0:
+        restaurant_name_score = _match_score(
+            query_norm,
+            menu.get("restaurant_name", ""),
+            _SCORE["restaurant_exact"],
+            _SCORE["restaurant_prefix"],
+            _SCORE["restaurant_partial"],
+        )
+        restaurant_id = str(menu.get("restaurant_id", ""))
+        restaurant_score = restaurant_scores.get(restaurant_id, 0)
+        fallback_score = fallback_restaurant_scores.get(restaurant_id, 0)
+        is_best = bool(menu.get("is_best"))
+
+        if (
+            menu_score == 0
+            and restaurant_name_score == 0
+            and restaurant_score == 0
+            and fallback_score == 0
+            and not allow_best_fallback
+        ):
             continue
+
+        score = max(
+            menu_score,
+            restaurant_name_score,
+            restaurant_score,
+            fallback_score,
+        )
+        if score == 0 and allow_best_fallback:
+            score = 55
+        if is_best:
+            score += 8
         score += min(review_stats.get(menu.get("restaurant_id", ""), 0), _SCORE["review_keyword"])
-        scored.append({"menu": menu, "score": score})
+        scored.append(
+            {
+                "menu": menu,
+                "score": score,
+                "menuScore": menu_score,
+                "restaurantNameScore": restaurant_name_score,
+                "restaurantScore": restaurant_score,
+                "fallbackScore": fallback_score,
+                "usedBestFallback": (
+                    menu_score == 0
+                    and restaurant_name_score == 0
+                    and restaurant_score == 0
+                ),
+            }
+        )
     scored.sort(key=lambda item: item["score"], reverse=True)
 
-    best_by_restaurant: dict[str, dict] = {}
-    for item in scored:
-        restaurant_id = item["menu"].get("restaurant_id", "")
-        if (
-            restaurant_id not in best_by_restaurant
-            or item["score"] > best_by_restaurant[restaurant_id]["score"]
-        ):
-            best_by_restaurant[restaurant_id] = item
+    has_restaurant_name_match = any(
+        item["restaurantNameScore"] > 0 or item["restaurantScore"] > 0
+        for item in scored
+    )
+    if has_restaurant_name_match:
+        ranked = scored[:_PREVIEW_LIMIT]
+    else:
+        best_by_restaurant: dict[str, dict] = {}
+        for item in scored:
+            restaurant_id = item["menu"].get("restaurant_id", "")
+            if (
+                restaurant_id not in best_by_restaurant
+                or item["score"] > best_by_restaurant[restaurant_id]["score"]
+            ):
+                best_by_restaurant[restaurant_id] = item
 
-    ranked = sorted(
-        best_by_restaurant.values(),
-        key=lambda item: item["score"],
-        reverse=True,
-    )[:_PREVIEW_LIMIT]
+        ranked = sorted(
+            best_by_restaurant.values(),
+            key=lambda item: item["score"],
+            reverse=True,
+        )[:_PREVIEW_LIMIT]
 
     previews = []
     for item in ranked:
@@ -683,19 +1098,21 @@ def _build_quick_previews(
         score = item["score"]
         price = menu.get("price")
         menu_name = menu.get("name", "")
-        base_score = _match_score(
-            query_norm,
-            menu_name,
-            _SCORE["menu_exact"],
-            _SCORE["menu_prefix"],
-            _SCORE["menu_partial"],
-        )
+        base_score = item["menuScore"]
         if base_score == _SCORE["menu_exact"]:
             reason = "메뉴명 완전일치"
         elif base_score == _SCORE["menu_prefix"]:
             reason = "메뉴명 앞부분 일치"
-        else:
+        elif base_score > 0:
             reason = "메뉴명 부분일치"
+        elif item["restaurantNameScore"] > 0:
+            reason = "가게명 일치 메뉴"
+        elif item["restaurantScore"] > 0:
+            reason = "식당명 일치 베스트 메뉴"
+        elif item["fallbackScore"] > 0:
+            reason = "가까운 카페 베스트 메뉴"
+        else:
+            reason = "가까운 카페 베스트 메뉴"
 
         previews.append(
             {
@@ -789,7 +1206,6 @@ async def get_trending_chips(
     authorization: str | None = Header(default=None),
 ):
     _require_supabase()
-    await _get_auth_email_required(authorization)
 
     async with httpx.AsyncClient() as client:
         chips = await _fetch_trending_chips(client)
@@ -804,7 +1220,6 @@ async def get_search_preview(
     authorization: str | None = Header(default=None),
 ):
     _require_supabase()
-    await _get_auth_email_required(authorization)
 
     query_norm = _normalize(query)
     query_key = _match_key(query)
@@ -812,19 +1227,36 @@ async def get_search_preview(
     if len(query_key) < _MIN_QUERY_LENGTH:
         return {
             "query": query,
+            "relatedCategories": [],
             "issueChips": [],
             "suggestions": {"menus": [], "restaurants": []},
             "quickPreviews": [],
         }
 
     async with httpx.AsyncClient() as client:
-        issue_keywords, menus, restaurants, keyword_stats, trending = await asyncio.gather(
+        (
+            issue_keywords,
+            menus,
+            restaurants,
+            restaurant_name_menus,
+            keyword_stats,
+            trending,
+            related_keyword_rows,
+        ) = await asyncio.gather(
             _fetch_active_issue_keywords(client),
             _fetch_menus_by_query(client, query_norm),
             _fetch_restaurants_by_query(client, query_norm),
+            _fetch_menus_by_restaurant_name_query(client, query_norm),
             _fetch_keyword_stats(client, query_key),
             _fetch_trending_chips(client),
+            _fetch_related_keyword_rows(client),
         )
+
+        related_categories = _build_related_categories(
+            query_norm,
+            related_keyword_rows,
+        )
+        cafe_intent = _is_cafe_intent(related_categories)
 
         if keyword_stats:
             issue_chips = _chips_from_keyword_stats(keyword_stats, issue_keywords)
@@ -833,14 +1265,40 @@ async def get_search_preview(
                 issue_keywords,
                 query_norm,
             )
-            if not issue_chips:
+            if not issue_chips and not related_categories:
                 issue_chips = _chips_from_trending(trending)
             await _upsert_keyword_stats(client, query_key, matched_ids)
+
+        preview_restaurants = restaurants
+        fallback_restaurant_scores: dict[str, int] = {}
+        if cafe_intent:
+            cafe_restaurants = await _fetch_cafe_restaurants(client, lat, lng)
+            preview_restaurants = _dedupe_restaurants(restaurants + cafe_restaurants)
+            fallback_restaurant_scores = {
+                str(restaurant.get("id", "")): max(55, 75 - index)
+                for index, restaurant in enumerate(cafe_restaurants)
+                if restaurant.get("id")
+            }
+
+        restaurant_ids_for_preview = [
+            str(restaurant.get("id", ""))
+            for restaurant in preview_restaurants
+            if restaurant.get("id")
+        ]
+        restaurant_menus = await _fetch_menus_by_restaurant_ids(
+            client,
+            restaurant_ids_for_preview,
+            limit=max(30, _PREVIEW_LIMIT * 10),
+        )
+        preview_menus = _attach_restaurant_names(
+            _dedupe_menus(menus + restaurant_name_menus + restaurant_menus),
+            preview_restaurants,
+        )
 
         restaurant_ids = list(
             {
                 str(menu.get("restaurant_id", ""))
-                for menu in menus
+                for menu in preview_menus
                 if menu.get("restaurant_id")
             }
         )
@@ -855,6 +1313,7 @@ async def get_search_preview(
             issue_ids,
         )
 
+    restaurant_scores = _restaurant_score_map(query_norm, restaurants)
     review_stats: dict[str, int] = {}
     for row in stats_rows:
         restaurant_id = str(row.get("restaurant_id", ""))
@@ -864,9 +1323,17 @@ async def get_search_preview(
 
     return {
         "query": query,
+        "relatedCategories": related_categories,
         "issueChips": issue_chips,
         "suggestions": _build_suggestions(query_norm, menus, restaurants),
-        "quickPreviews": _build_quick_previews(query_norm, menus, review_stats),
+        "quickPreviews": _build_quick_previews(
+            query_norm,
+            preview_menus,
+            review_stats,
+            restaurant_scores=restaurant_scores,
+            fallback_restaurant_scores=fallback_restaurant_scores,
+            allow_best_fallback=cafe_intent,
+        ),
     }
 
 

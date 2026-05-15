@@ -11,11 +11,13 @@ import '../../../core/config/supabase_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../bookmarks/bookmark_metadata_picker.dart';
 import '../../bookmarks/bookmark_provider.dart';
 import '../models/restaurant_model.dart';
 import '../../recent_analysis/recent_analysis_provider.dart';
 import 'providers/blog_review.dart';
 import '../../../core/providers/analysis_mode_provider.dart';
+import '../utils/kakao_route_url.dart';
 import 'widgets/restaurant_header_widget.dart';
 import 'widgets/ai_analysis_card.dart';
 import 'widgets/word_cloud_card.dart';
@@ -456,9 +458,9 @@ class _RestaurantDetailScreenState
               label: '탐색',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bookmark_border_rounded),
-              activeIcon: Icon(Icons.bookmark_rounded),
-              label: '북마크',
+              icon: Icon(Icons.star_border_rounded),
+              activeIcon: Icon(Icons.star_rounded),
+              label: '즐겨찾기',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
@@ -466,8 +468,8 @@ class _RestaurantDetailScreenState
               label: '최근 분석',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.auto_awesome_outlined),
-              activeIcon: Icon(Icons.auto_awesome_rounded),
+              icon: Icon(Icons.assignment_outlined),
+              activeIcon: Icon(Icons.assignment_rounded),
               label: 'AI 추천',
             ),
             BottomNavigationBarItem(
@@ -546,33 +548,21 @@ class _RestaurantDetailScreenState
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final aiCard = AiAnalysisCard(
-                    truthScore: _shopInfo?.trustScore ?? _r.truthScore,
-                  );
-                  final wordCloud = WordCloudCard(wordFreqs: _wordFreqs);
-                  final isNarrow = constraints.maxWidth < 640;
-
-                  if (isNarrow) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [aiCard, const SizedBox(height: 12), wordCloud],
-                    );
-                  }
-
-                  return SizedBox(
-                    height: 220,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(flex: 4, child: aiCard),
-                        const SizedBox(width: 12),
-                        Expanded(flex: 6, child: wordCloud),
-                      ],
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AiAnalysisCard(
+                        truthScore: _shopInfo?.trustScore ?? _r.truthScore,
+                      ),
                     ),
-                  );
-                },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: WordCloudCard(wordFreqs: _wordFreqs),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -610,13 +600,31 @@ class _RestaurantDetailScreenState
     _showSnack('전화번호가 복사되었습니다');
   }
 
-  void _toggleBookmark() {
+  Future<void> _toggleBookmark() async {
     final previous = ref.read(bookmarkRestaurantsProvider);
     final alreadyBookmarked = previous.any(
       (item) => item.effectiveStoreId == _r.effectiveStoreId,
     );
-    ref.read(bookmarkRestaurantsProvider.notifier).toggle(_r);
-    _showSnack(alreadyBookmarked ? '북마크에서 해제되었습니다' : '북마크에 저장했습니다');
+    if (alreadyBookmarked) {
+      await ref.read(bookmarkRestaurantsProvider.notifier).remove(_r);
+      _showSnack('북마크에서 해제되었습니다');
+      return;
+    }
+
+    final selection = await showBookmarkMetadataPicker(
+      context: context,
+      restaurant: _r,
+      customTopics: ref.read(bookmarkCustomTopicsProvider),
+      hiddenTopicIds: ref.read(bookmarkHiddenTopicIdsProvider),
+    );
+    if (!mounted || selection == null) return;
+
+    await ref.read(bookmarkRestaurantsProvider.notifier).add(
+          _r,
+          topicIds: selection.topicIds,
+          colorKey: selection.colorKey,
+        );
+    _showSnack('북마크에 저장했습니다');
   }
 
   Future<void> _copyPlaceUrl() async {
@@ -630,7 +638,7 @@ class _RestaurantDetailScreenState
   }
 
   Future<void> _openPlaceUrl() async {
-    final link = _r.placeUrl?.trim();
+    final link = buildKakaoCarRouteUrl(_r);
     if (link == null || link.isEmpty) {
       _showSnack('길찾기 링크가 없습니다');
       return;
