@@ -20,10 +20,8 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background:
-    linear-gradient(115deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.98)),
-    var(--color-bg-default);
-  animation: intro-splash-exit 420ms ease 3400ms forwards;
+  background: #ffffff;
+  animation: intro-splash-background 2400ms ease-in-out forwards;
 }
 
 .intro-splash::before,
@@ -36,152 +34,310 @@ body {
 
 .intro-splash::before {
   background:
-    linear-gradient(90deg, transparent 0%, rgba(17, 24, 39, 0.06) 45%, transparent 72%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(17, 24, 39, 0.035) 0 1px,
-      transparent 1px 84px
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(246, 247, 250, 0.9) 34%,
+      rgba(238, 240, 245, 0.72) 62%,
+      rgba(255, 255, 255, 0.9) 100%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(37, 99, 235, 0.05),
+      transparent 46%,
+      rgba(76, 187, 135, 0.04)
     );
-  transform: translateX(18%);
-  animation: intro-grid-sweep 1800ms cubic-bezier(0.22, 0.9, 0.22, 1) forwards;
+  animation: intro-splash-tone 2400ms ease-in-out forwards;
 }
 
 .intro-splash::after {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.78),
-    transparent 28%,
-    transparent 70%,
-    rgba(255, 255, 255, 0.78)
-  );
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.95),
+      transparent 28%,
+      transparent 72%,
+      rgba(255, 255, 255, 0.95)
+    ),
+    repeating-linear-gradient(
+      118deg,
+      transparent 0 38px,
+      rgba(86, 80, 60, 0.018) 38px 39px,
+      transparent 39px 124px
+    );
+  animation: intro-splash-pattern 2400ms ease-in-out forwards;
 }
 
 .intro-splash-track {
   position: relative;
   z-index: 1;
-  display: grid;
-  width: 100vw;
-  height: 220px;
+  display: flex;
+  width: min(90vw, 720px);
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
   place-items: center;
 }
 
-.intro-splash-track::before {
-  position: absolute;
-  top: 50%;
-  left: 116%;
-  width: clamp(104px, 12vw, 156px);
-  aspect-ratio: 1;
-  box-sizing: border-box;
-  border: 1px solid rgba(86, 80, 60, 0.18);
-  border-radius: var(--radius-lg);
-  background:
-    url('/logo.png') center / 58% auto no-repeat,
-    rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 18px 38px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.86);
-  content: "";
-  filter: drop-shadow(0 12px 20px rgba(86, 80, 60, 0.12));
-  transform-origin: center;
-  animation: intro-logo-pass 3300ms cubic-bezier(0.2, 0.84, 0.12, 1) forwards;
+.intro-splash-runner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 18px);
+  animation: intro-runner-fade 2400ms ease-in-out forwards;
 }
 
-.intro-splash-glow {
+.intro-splash-runner::after {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: min(720px, 76vw);
-  height: 2px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(86, 80, 60, 0.14),
-    rgba(185, 28, 28, 0.22),
-    rgba(37, 99, 235, 0.16),
-    transparent
+  left: 8%;
+  right: 8%;
+  bottom: -22px;
+  height: 20px;
+  content: "";
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    ellipse,
+    rgba(86, 80, 60, 0.18) 0%,
+    rgba(86, 80, 60, 0.08) 42%,
+    transparent 74%
   );
-  transform: translate(-50%, -50%) scaleX(0.2);
-  animation: intro-light-trail 1900ms cubic-bezier(0.2, 0.8, 0.18, 1) forwards;
+  filter: blur(6px);
+  animation: intro-runner-shadow 2400ms ease-in-out forwards;
+}
+
+.intro-splash-car {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: clamp(54px, 10vw, 112px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  place-items: center;
+  filter: drop-shadow(0 12px 20px rgba(86, 80, 60, 0.12));
+  opacity: 1;
+  transform-origin: center;
+  animation: intro-piece-jump 680ms linear var(--intro-delay, 0ms) both;
+}
+
+.intro-splash-car::before,
+.intro-splash-car::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.intro-splash-car::before {
+  inset: -26%;
+  z-index: -1;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.95) 0%,
+    color-mix(in srgb, var(--color-status-info-bg) 44%, transparent) 38%,
+    transparent 72%
+  );
+  filter: blur(2px);
+  opacity: 0.56;
+  animation: intro-piece-glow 2400ms ease-in-out forwards;
+}
+
+.intro-splash-car::after {
+  left: 14%;
+  bottom: -20%;
+  z-index: -1;
+  width: 72%;
+  height: 16%;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    ellipse,
+    rgba(86, 80, 60, 0.18) 0%,
+    rgba(86, 80, 60, 0.08) 44%,
+    transparent 74%
+  );
+  filter: blur(4px);
+  opacity: 0.68;
+  animation: intro-piece-shadow 2400ms ease-in-out forwards;
+}
+
+.intro-splash-car:nth-child(1) {
+  --intro-delay: 280ms;
+  --jump-lift: -24px;
+}
+
+.intro-splash-car:nth-child(2) {
+  --intro-delay: 520ms;
+  --jump-lift: -22px;
+}
+
+.intro-splash-car:nth-child(3) {
+  --intro-delay: 720ms;
+  --jump-lift: -23px;
+}
+
+.intro-splash-car:nth-child(4) {
+  --intro-delay: 920ms;
+  --jump-lift: -21px;
+}
+
+.intro-splash-car:nth-child(5) {
+  --intro-delay: 1120ms;
+  --jump-lift: -22px;
+}
+
+.intro-splash-logo-car {
+  border: 1px solid rgba(86, 80, 60, 0.16);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 12px 24px rgba(86, 80, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.intro-splash-letter {
+  color: var(--color-logo-ink);
+  font-size: clamp(30px, 5vw, 62px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8),
+    0 14px 22px rgba(86, 80, 60, 0.12);
 }
 
 .intro-splash-logo {
-  display: none;
+  width: 56%;
+  height: auto;
 }
 
-@keyframes intro-logo-pass {
+@keyframes intro-splash-background {
   0% {
-    left: 116%;
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.78) rotate(-9deg);
+    background-color: #ffffff;
   }
 
-  10% {
-    left: 88%;
+  28%,
+  75% {
+    background-color: #f1f2f5;
+  }
+
+  100% {
+    background-color: #ffffff;
+  }
+}
+
+@keyframes intro-splash-tone {
+  0% {
+    opacity: 0;
+  }
+
+  22%,
+  75% {
     opacity: 1;
   }
 
-  44% {
-    left: 50%;
-    transform: translate(-50%, -50%) scale(1.08) rotate(0deg);
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-splash-pattern {
+  0%,
+  75% {
+    opacity: 0.78;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-runner-fade {
+  0%,
+  75% {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 0;
+    filter: blur(5px);
+  }
+}
+
+@keyframes intro-runner-shadow {
+  0%,
+  75% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scaleX(0.82);
+  }
+}
+
+@keyframes intro-piece-jump {
+  0% {
+    transform: translateY(0) scaleX(1) scaleY(1);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.68, 0);
+  }
+
+  12% {
+    transform: translateY(5px) scaleX(1.05) scaleY(0.94);
+    animation-timing-function: cubic-bezier(0.18, 0.72, 0.18, 1);
+  }
+
+  48% {
+    transform: translateY(var(--jump-lift, -22px)) scaleX(0.97) scaleY(1.04);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.88, 0.42);
   }
 
   76% {
-    left: 18%;
-    opacity: 1;
+    transform: translateY(0) scaleX(1.07) scaleY(0.92);
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  88% {
+    transform: translateY(-4px) scaleX(0.99) scaleY(1.02);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
   }
 
   100% {
-    left: -16%;
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.84) rotate(8deg);
+    transform: translateY(0) scaleX(1) scaleY(1);
   }
 }
 
-@keyframes intro-light-trail {
-  0% {
-    opacity: 0;
-    transform: translate(-28%, -50%) scaleX(0.08);
-  }
-
-  28% {
-    opacity: 1;
-  }
-
-  74% {
-    opacity: 0.9;
-    transform: translate(-50%, -50%) scaleX(1);
+@keyframes intro-piece-glow {
+  0%,
+  75% {
+    opacity: 0.56;
   }
 
   100% {
     opacity: 0;
-    transform: translate(-72%, -50%) scaleX(0.28);
   }
 }
 
-@keyframes intro-grid-sweep {
-  from {
-    transform: translateX(18%);
+@keyframes intro-piece-shadow {
+  0%,
+  75% {
+    opacity: 0.68;
+    transform: scaleX(1);
   }
 
-  to {
-    transform: translateX(-18%);
-  }
-}
-
-@keyframes intro-splash-exit {
-  to {
+  100% {
     opacity: 0;
-    visibility: hidden;
+    transform: scaleX(0.74);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .intro-splash,
   .intro-splash::before,
-  .intro-splash-track::before,
-  .intro-splash-glow,
-  .intro-splash-logo {
+  .intro-splash::after,
+  .intro-splash-runner,
+  .intro-splash-car {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
