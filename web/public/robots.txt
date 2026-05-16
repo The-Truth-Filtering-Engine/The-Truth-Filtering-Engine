@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://truth-filtering-engine-web.vercel.app/sitemap.xml
