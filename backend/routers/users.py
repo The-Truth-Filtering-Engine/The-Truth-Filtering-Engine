@@ -9,8 +9,11 @@ from services.supabase_service import (
     add_user_recent_visit,
     clear_user_activity,
     clear_user_recent_visits,
+    delete_user_account,
     ensure_user_profile,
     get_auth_email,
+    get_auth_user,
+    get_initial_bookmarks,
     get_user_activity_history,
     get_user_recent_analyses,
     get_user_bookmarks,
@@ -20,6 +23,7 @@ from services.supabase_service import (
     remove_user_bookmark,
     remove_user_activity,
     remove_user_recent_visit,
+    reset_user_account_data,
     set_user_premium,
     update_user_review_reaction,
 )
@@ -95,11 +99,61 @@ async def _require_email(authorization: str | None) -> str:
     return email
 
 
+async def _require_auth_user(authorization: str | None) -> dict:
+    token = _extract_bearer_token(authorization)
+
+    try:
+        user = await get_auth_user(token)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    email = user.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 인증 토큰입니다",
+        )
+
+    return user
+
+
 @router.get("/user/me")
 async def get_my_profile(authorization: str | None = Header(default=None)):
     email = await _require_email(authorization)
     try:
         return await ensure_user_profile(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/user/me/reset")
+async def reset_my_account_data(
+    authorization: str | None = Header(default=None),
+):
+    email = await _require_email(authorization)
+    try:
+        return await reset_user_account_data(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/user/me")
+async def delete_my_account(authorization: str | None = Header(default=None)):
+    user = await _require_auth_user(authorization)
+    try:
+        return await delete_user_account(
+            str(user.get("email", "")),
+            auth_user_id=str(user.get("id", "")),
+        )
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -148,6 +202,23 @@ async def get_my_bookmarks(authorization: str | None = Header(default=None)):
     email = await _require_email(authorization)
     try:
         return await get_user_bookmarks(email)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/bookmarks/initial")
+async def get_initial_bookmark_folders(
+    region: str | None = Query(None),
+    limit: int = Query(3, ge=0, le=5),
+):
+    try:
+        return await get_initial_bookmarks(
+            region=region,
+            limit_per_folder=limit,
+        )
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

@@ -57,7 +57,7 @@ class RestaurantHeaderWidget extends StatelessWidget {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withOpacity(0.3),
+                        Colors.black.withValues(alpha: 0.3),
                       ],
                     ),
                   ),
@@ -135,8 +135,9 @@ class RestaurantHeaderWidget extends StatelessWidget {
                     onTap: onCallTap,
                   ),
                   _ActionItem(
-                    icon:
-                        isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                    icon: isBookmarked
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
                     label: 'Save',
                     onTap: onBookmarkTap,
                   ),

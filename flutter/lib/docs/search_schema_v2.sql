@@ -27,10 +27,10 @@ create unique index if not exists trending_chips_label_unique_idx
 
 insert into trending_chips (label, sort_order)
 values
-  ('🔥 지금 뜨는 맛집', 1),
-  ('많이 찾는 맛집👍', 2),
-  ('✨ 신상 맛집 ✨', 3),
-  ('🕰️ 추억의 맛집', 4)
+  ('지금 뜨는 맛집', 1),
+  ('많이 찾는 맛집', 2),
+  ('신상 맛집', 3),
+  ('추억의 맛집', 4)
 on conflict (label) do update set
   sort_order = excluded.sort_order,
   is_active = true,
@@ -40,10 +40,10 @@ update trending_chips
 set is_active = false,
     updated_at = now()
 where label not in (
-  '🔥 지금 뜨는 맛집',
-  '많이 찾는 맛집👍',
-  '✨ 신상 맛집 ✨',
-  '🕰️ 추억의 맛집'
+  '지금 뜨는 맛집',
+  '많이 찾는 맛집',
+  '신상 맛집',
+  '추억의 맛집'
 );
 
 -- =========================================================

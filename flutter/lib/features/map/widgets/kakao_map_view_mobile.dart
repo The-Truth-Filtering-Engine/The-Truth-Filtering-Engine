@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../bookmarks/bookmark_options.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 
@@ -182,8 +183,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
         var markers = [];
         var currentLocationOverlay;
         var isRoadmap = true;
-        var ultraZoomEnabled = false;
-        var ULTRA_ZOOM_SCALE = 1.28;
+        var MAX_MAP_LEVEL = 12;
 
         kakao.maps.load(function() {
             var container = document.getElementById('map');
@@ -220,17 +220,11 @@ class KakaoMapViewState extends State<KakaoMapView> {
         function moveTo(lat, lng, level) {
             var loc = new kakao.maps.LatLng(lat, lng);
             if (level !== null && level !== undefined) {
-                var ultraZoom = level <= 0;
                 map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
                 isRoadmap = true;
                 applyLevelBounds();
-                if (ultraZoom) {
-                    map.setLevel(1);
-                    enableUltraZoom();
-                } else {
-                    disableUltraZoom();
-                    map.setLevel(level);
-                }
+                var targetLevel = Math.min(Math.max(level, 1), MAX_MAP_LEVEL);
+                map.setLevel(targetLevel);
             }
             map.panTo(loc);
         }
@@ -245,13 +239,15 @@ class KakaoMapViewState extends State<KakaoMapView> {
                 content.style.width = '28px';
                 content.style.height = '28px';
                 content.style.borderRadius = '50%';
-                content.style.border = '1.5px solid white';
+                content.style.border = r.border || '1.5px solid white';
                 content.style.backgroundColor = r.color;
                 content.style.boxShadow = '0 2px 6px rgba(0,0,0,.18)';
                 content.style.display = 'flex';
                 content.style.alignItems = 'center';
                 content.style.justifyContent = 'center';
                 content.style.fontSize = '16px';
+                content.style.fontWeight = r.fontWeight || '400';
+                content.style.color = r.textColor || '';
                 content.style.cursor = 'pointer';
                 content.innerText = r.emoji;
                 content.onclick = function() {
@@ -303,7 +299,6 @@ class KakaoMapViewState extends State<KakaoMapView> {
         }
 
         function setMapType(type) {
-            disableUltraZoom();
             if (type === 'HYBRID') {
                 map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
                 isRoadmap = false;
@@ -316,47 +311,17 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
         function applyLevelBounds() {
             if (!map) return;
-            map.setMinLevel(0);
-            map.setMaxLevel(14);
+            map.setMinLevel(isRoadmap ? 1 : 0);
+            map.setMaxLevel(MAX_MAP_LEVEL);
         }
 
         function zoomIn() {
-            var targetLevel = Math.max(map.getLevel() - 1, 0);
-            if (isRoadmap && targetLevel <= 1) {
-                map.setLevel(1);
-                enableUltraZoom();
-                return;
-            }
-            disableUltraZoom();
+            var minLevel = isRoadmap ? 1 : 0;
+            var targetLevel = Math.max(map.getLevel() - 1, minLevel);
             map.setLevel(targetLevel);
         }
         function zoomOut() {
-            if (ultraZoomEnabled) {
-                disableUltraZoom();
-                map.setLevel(1);
-                return;
-            }
-            map.setLevel(map.getLevel() + 1);
-        }
-
-        function enableUltraZoom() {
-            if (ultraZoomEnabled) return;
-
-            ultraZoomEnabled = true;
-            var mapElement = document.getElementById('map');
-            mapElement.style.transform = 'scale(' + ULTRA_ZOOM_SCALE + ')';
-            mapElement.style.transformOrigin = 'center center';
-            mapElement.style.transition = 'transform 0.18s ease-out';
-            mapElement.style.willChange = 'transform';
-        }
-
-        function disableUltraZoom() {
-            if (!ultraZoomEnabled) return;
-
-            ultraZoomEnabled = false;
-            var mapElement = document.getElementById('map');
-            mapElement.style.transform = 'scale(1)';
-            mapElement.style.willChange = 'auto';
+            map.setLevel(Math.min(map.getLevel() + 1, MAX_MAP_LEVEL));
         }
     </script>
 </body>
@@ -390,6 +355,9 @@ class KakaoMapViewState extends State<KakaoMapView> {
           'lng': r.longitude,
           'emoji': _markerEmoji(r),
           'color': _markerColor(r),
+          'textColor': _markerTextColor(r),
+          'border': _markerBorder(r),
+          'fontWeight': _isFavoriteMarker(r) ? '800' : '400',
         };
       }).toList(),
     );
@@ -434,6 +402,10 @@ class KakaoMapViewState extends State<KakaoMapView> {
   }
 
   String _markerEmoji(RestaurantModel restaurant) {
+    if (_isFavoriteMarker(restaurant)) {
+      return '★';
+    }
+
     final category = restaurant.category;
     final normalized = category.toLowerCase();
     if (category.contains('카페') ||
@@ -445,7 +417,25 @@ class KakaoMapViewState extends State<KakaoMapView> {
     return '🍽️';
   }
 
+  bool _isFavoriteMarker(RestaurantModel restaurant) {
+    return restaurant.isBookmarked ||
+        restaurant.bookmarkColorKey != null ||
+        restaurant.bookmarkTopicIds.isNotEmpty;
+  }
+
+  String _markerTextColor(RestaurantModel restaurant) {
+    return _isFavoriteMarker(restaurant) ? '#FFFFFF' : '';
+  }
+
+  String _markerBorder(RestaurantModel restaurant) {
+    return '1.5px solid #FFFFFF';
+  }
+
   String _markerColor(RestaurantModel restaurant) {
+    if (_isFavoriteMarker(restaurant)) {
+      return _bookmarkMarkerColor(restaurant);
+    }
+
     Color color;
     switch (restaurant.markerType) {
       case MarkerType.high:
@@ -456,6 +446,14 @@ class KakaoMapViewState extends State<KakaoMapView> {
     return '#${color.r.toInt().toRadixString(16).padLeft(2, '0')}'
         '${color.g.toInt().toRadixString(16).padLeft(2, '0')}'
         '${color.b.toInt().toRadixString(16).padLeft(2, '0')}';
+  }
+
+  String _bookmarkMarkerColor(RestaurantModel restaurant) {
+    final colorKey = BookmarkTopics.colorKeyForTopicIds(
+      restaurant.bookmarkTopicIds,
+      fallbackColorKey: restaurant.bookmarkColorKey,
+    );
+    return BookmarkColors.markerHex(colorKey);
   }
 
   @override

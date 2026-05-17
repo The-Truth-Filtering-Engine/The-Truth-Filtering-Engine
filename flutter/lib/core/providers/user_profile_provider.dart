@@ -50,6 +50,11 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       state = AsyncValue.data(profile);
       return profile;
     } catch (error, stackTrace) {
+      final fallbackProfile = _fallbackProfileFromSession();
+      if (fallbackProfile != null) {
+        state = AsyncValue.data(fallbackProfile);
+        return fallbackProfile;
+      }
       state = AsyncValue.error(error, stackTrace);
       return null;
     }
@@ -69,6 +74,40 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       path: '/user/me/coins',
       body: {'amount': amount},
     );
+  }
+
+  Future<UserProfile> resetAccountData() {
+    return _mutateProfile(
+      method: 'POST',
+      path: '/user/me/reset',
+    );
+  }
+
+  Future<void> deleteAccount() async {
+    final token = accessToken;
+    if (token == null) {
+      throw Exception('로그인 정보가 없습니다');
+    }
+
+    final response = await http.delete(
+      BackendConfig.apiUri('/user/me'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    final text = utf8.decode(response.bodyBytes);
+    final decoded = text.isEmpty ? null : jsonDecode(text);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map
+          ? decoded['detail']?.toString() ?? '요청 실패: ${response.statusCode}'
+          : '요청 실패: ${response.statusCode}';
+      throw Exception(message);
+    }
+
+    state = const AsyncValue.data(null);
   }
 
   Future<UserProfile> _mutateProfile({
@@ -133,6 +172,18 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
     return UserProfile.fromJson(decoded);
   }
+
+  UserProfile? _fallbackProfileFromSession() {
+    if (!SupabaseConfig.isConfigured) return null;
+
+    final auth = Supabase.instance.client.auth;
+    final email =
+        auth.currentUser?.email ?? auth.currentSession?.user.email ?? '';
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty) return null;
+
+    return UserProfile.fallback(email: normalizedEmail);
+  }
 }
 
 class UserProfile {
@@ -145,6 +196,7 @@ class UserProfile {
     required this.premiumcount,
     this.store,
     this.bookmark,
+    this.isRemoteBacked = true,
   });
 
   static const int analysisCoinCost = 100;
@@ -157,6 +209,7 @@ class UserProfile {
   final int premiumcount;
   final Object? store;
   final Object? bookmark;
+  final bool isRemoteBacked;
 
   bool get isPremium => premium == 1;
 
@@ -194,6 +247,18 @@ class UserProfile {
       premiumcount: _intFromJson(json['premiumcount']),
       store: json['store'],
       bookmark: json['bookmark'],
+    );
+  }
+
+  factory UserProfile.fallback({required String email}) {
+    return UserProfile(
+      id: 0,
+      email: email,
+      premium: 0,
+      coin: 0,
+      freecount: 0,
+      premiumcount: 0,
+      isRemoteBacked: false,
     );
   }
 

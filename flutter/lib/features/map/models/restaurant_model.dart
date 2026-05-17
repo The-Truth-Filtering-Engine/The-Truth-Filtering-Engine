@@ -27,6 +27,8 @@ class RestaurantModel {
   final DateTime? updatedAt;
   final DateTime? bookmarkedAt;
   final DateTime? visitedAt;
+  final List<String> bookmarkTopicIds;
+  final String? bookmarkColorKey;
 
   const RestaurantModel({
     required this.id,
@@ -57,6 +59,8 @@ class RestaurantModel {
     this.updatedAt,
     this.bookmarkedAt,
     this.visitedAt,
+    this.bookmarkTopicIds = const [],
+    this.bookmarkColorKey,
   });
 
   String get effectiveStoreId {
@@ -105,6 +109,8 @@ class RestaurantModel {
       'updatedAt': updatedAt?.toIso8601String(),
       'bookmarkedAt': bookmarkedAt?.toIso8601String(),
       'visitedAt': visitedAt?.toIso8601String(),
+      'bookmarkTopicIds': bookmarkTopicIds,
+      'bookmarkColorKey': bookmarkColorKey,
     };
   }
 
@@ -139,7 +145,8 @@ class RestaurantModel {
       addressName: (json['addressName'] ?? json['address_name'])?.toString(),
       roadAddressName:
           (json['roadAddressName'] ?? json['road_address_name'])?.toString(),
-      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
+      imageUrl: (json['imageUrl'] ?? json['image_url'] ?? json['thumbnailUrl'])
+          ?.toString(),
       latitude: _asDouble(json['latitude'] ?? json['lat'], fallback: 0),
       longitude: _asDouble(json['longitude'] ?? json['lng'], fallback: 0),
       isBookmarked:
@@ -149,6 +156,14 @@ class RestaurantModel {
       updatedAt: _parseDate(json['updatedAt'] ?? json['updated_at']),
       bookmarkedAt: _parseDate(json['bookmarkedAt'] ?? json['bookmarked_at']),
       visitedAt: _parseDate(json['visitedAt'] ?? json['visited_at']),
+      bookmarkTopicIds: _asStringList(
+        json['bookmarkTopicIds'] ??
+            json['bookmark_topic_ids'] ??
+            json['bookmarkTopics'] ??
+            json['bookmark_topics'],
+      ),
+      bookmarkColorKey:
+          (json['bookmarkColorKey'] ?? json['bookmark_color_key'])?.toString(),
     );
   }
 
@@ -171,6 +186,8 @@ class RestaurantModel {
     String? reviewUrl,
     String? reviewTitle,
     String? reviewDescription,
+    List<String>? bookmarkTopicIds,
+    String? bookmarkColorKey,
   }) {
     return RestaurantModel(
       id: id,
@@ -201,6 +218,17 @@ class RestaurantModel {
       updatedAt: updatedAt ?? this.updatedAt,
       bookmarkedAt: bookmarkedAt ?? this.bookmarkedAt,
       visitedAt: visitedAt ?? this.visitedAt,
+      bookmarkTopicIds: bookmarkTopicIds ?? this.bookmarkTopicIds,
+      bookmarkColorKey: bookmarkColorKey ?? this.bookmarkColorKey,
+    );
+  }
+
+  RestaurantModel applyBookmarkMetadataFrom(RestaurantModel bookmark) {
+    return copyWith(
+      isBookmarked: true,
+      bookmarkedAt: bookmark.bookmarkedAt ?? bookmarkedAt,
+      bookmarkTopicIds: bookmark.bookmarkTopicIds,
+      bookmarkColorKey: bookmark.bookmarkColorKey,
     );
   }
 
@@ -221,6 +249,23 @@ class RestaurantModel {
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
+  }
+
+  static List<String> _asStringList(Object? value) {
+    if (value is List) {
+      return value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return value
+          .split(',')
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return const [];
   }
 
   MarkerType get markerType {

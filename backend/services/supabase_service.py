@@ -25,6 +25,62 @@ KST = timezone(timedelta(hours=9))
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
 KAKAO_LOCAL_KEYWORD_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
+INITIAL_BOOKMARK_SELECT = (
+    "name,store_id,category_name,category_group_code,category_group_name,"
+    "phone,address_name,road_address_name,place_url,created_at"
+)
+INITIAL_BOOKMARK_TOPICS = [
+    {
+        "category": "favorite",
+        "label": "즐겨찾기",
+        "keywords": ("맛집", "인기", "추천"),
+    },
+    {
+        "category": "date_place",
+        "label": "데이트 장소",
+        "keywords": ("데이트", "파스타", "와인", "브런치", "카페"),
+    },
+    {
+        "category": "sns_like",
+        "label": "SNS 좋아요",
+        "keywords": ("인스타", "핫플", "카페", "디저트", "베이커리"),
+    },
+    {
+        "category": "nature_trip",
+        "label": "산수유람 맛집",
+        "keywords": ("산", "뷰", "강", "호수", "계곡", "자연"),
+    },
+    {
+        "category": "pretty_cafe",
+        "label": "예쁜 카페",
+        "keywords": ("카페", "디저트", "베이커리", "커피"),
+    },
+    {
+        "category": "unique_place",
+        "label": "이색 맛집",
+        "keywords": ("이색", "퓨전", "세계", "오마카세", "특색"),
+    },
+    {
+        "category": "local_traditional_food",
+        "label": "지역 전통 음식",
+        "keywords": ("한식", "국밥", "전통", "향토", "백반"),
+    },
+    {
+        "category": "premium_restaurant",
+        "label": "격식있는 모임",
+        "keywords": ("고급", "파인다이닝", "오마카세", "스테이크", "코스"),
+    },
+    {
+        "category": "tv_featured_place",
+        "label": "TV 출연 화제의 식당",
+        "keywords": ("TV", "방송", "출연"),
+    },
+    {
+        "category": "old_local_place",
+        "label": "동네 오래된 맛집",
+        "keywords": ("노포", "오래", "전통", "동네"),
+    },
+]
 
 
 class AnalysisUsageError(RuntimeError):
@@ -191,10 +247,16 @@ def _normalize_user_profile(row: dict) -> dict:
 
 async def get_auth_email(access_token: str) -> str | None:
     """Supabase access token으로 인증된 사용자의 email을 조회."""
+    user = await get_auth_user(access_token)
+    return _text_or_none(user.get("email"))
+
+
+async def get_auth_user(access_token: str) -> dict:
+    """Supabase access token으로 인증된 사용자 정보를 조회."""
     _require_supabase_config()
     token = _text_or_none(access_token)
     if not token:
-        return None
+        return {}
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -207,10 +269,9 @@ async def get_auth_email(access_token: str) -> str | None:
         )
 
     if resp.status_code != 200:
-        return None
+        return {}
 
-    data = resp.json() or {}
-    return _text_or_none(data.get("email"))
+    return resp.json() or {}
 
 
 async def ensure_user_profile(email: str) -> dict:
@@ -273,6 +334,50 @@ async def add_user_coins(email: str, amount: int) -> dict:
     profile = await ensure_user_profile(normalized_email)
     next_coin = _int_or_zero(profile.get("coin")) + int(amount)
     return await _patch_user_profile(normalized_email, {"coin": next_coin})
+
+
+async def reset_user_account_data(email: str) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+
+    profile = await ensure_user_profile(normalized_email)
+    user_id = _int_or_zero(profile.get("id"))
+
+    async with httpx.AsyncClient() as client:
+        await _delete_user_search_histories(client, normalized_email)
+        if user_id > 0:
+            await _clear_review_row_reactions_for_user(client, user_id)
+
+    return await _patch_user_profile(
+        normalized_email,
+        {
+            "store": {},
+            "bookmark": {},
+            "recent_visits": {},
+            "review_likes": {},
+            "review_dislikes": {},
+        },
+    )
+
+
+async def delete_user_account(email: str, auth_user_id: str | None = None) -> dict:
+    normalized_email = _text_or_none(email)
+    if not normalized_email:
+        raise RuntimeError("사용자 이메일이 없습니다")
+
+    profile = await ensure_user_profile(normalized_email)
+    user_id = _int_or_zero(profile.get("id"))
+
+    async with httpx.AsyncClient() as client:
+        await _delete_user_search_histories(client, normalized_email)
+        if user_id > 0:
+            await _clear_review_row_reactions_for_user(client, user_id)
+        await _delete_user_profile_row(client, normalized_email)
+        if auth_user_id:
+            await _delete_auth_user(client, auth_user_id)
+
+    return {"deleted": True}
 
 
 async def has_analysis_usage(email: str, store_id: str | None = None) -> bool:
@@ -364,6 +469,43 @@ async def consume_analysis_usage(email: str, store_id: str | None = None) -> dic
 async def get_user_bookmarks(email: str) -> dict:
     profile = await ensure_user_profile(email)
     return _normalize_user_bookmarks(profile)
+
+
+async def get_initial_bookmarks(
+    region: str | None = None,
+    limit_per_folder: int = 3,
+) -> dict:
+    safe_limit = max(0, min(int(limit_per_folder or 3), 5))
+    folders = [
+        {
+            "category": topic["category"],
+            "label": topic["label"],
+            "isDefault": True,
+            "restaurants": [],
+        }
+        for topic in INITIAL_BOOKMARK_TOPICS
+    ]
+    if safe_limit <= 0 or not SUPABASE_URL or not SUPABASE_KEY:
+        return {"folders": folders}
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        rows = await _fetch_initial_bookmark_candidates(client, region)
+        if not rows and _text_or_none(region):
+            rows = await _fetch_initial_bookmark_candidates(client, None)
+
+    candidates = _unique_initial_bookmark_candidates(rows)
+    for folder, topic in zip(folders, INITIAL_BOOKMARK_TOPICS):
+        selected = _select_initial_bookmark_candidates(
+            candidates,
+            topic["keywords"],
+            safe_limit,
+        )
+        folder["restaurants"] = [
+            _initial_bookmark_restaurant(row, topic["category"])
+            for row in selected
+        ]
+
+    return {"folders": folders}
 
 
 async def get_user_recent_visits(email: str) -> dict:
@@ -611,6 +753,138 @@ def _recent_analysis_restaurant(
         "lng": lng,
         "latitude": lat,
         "longitude": lng,
+    }
+
+
+async def _fetch_initial_bookmark_candidates(
+    client: httpx.AsyncClient,
+    region: str | None,
+) -> list[dict]:
+    params: dict[str, str] = {
+        "select": INITIAL_BOOKMARK_SELECT,
+        "order": "created_at.desc",
+        "limit": "300",
+    }
+    normalized_region = _text_or_none(region)
+    if normalized_region:
+        params["or"] = (
+            f"(address_name.ilike.*{normalized_region}*,"
+            f"road_address_name.ilike.*{normalized_region}*)"
+        )
+
+    response = await client.get(
+        f"{SUPABASE_URL}/rest/v1/reviews",
+        headers=_h(),
+        params=params,
+    )
+    if response.status_code != 200:
+        return []
+
+    rows = response.json() if response.text else []
+    return rows if isinstance(rows, list) else []
+
+
+def _unique_initial_bookmark_candidates(rows: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    candidates: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        store_id = _text_or_none(row.get("store_id"))
+        name = _text_or_none(row.get("name"))
+        address = _text_or_none(row.get("road_address_name")) or _text_or_none(
+            row.get("address_name")
+        )
+        key = store_id or f"{name or ''}|{address or ''}"
+        if not key.strip() or key in seen:
+            continue
+        seen.add(key)
+        candidates.append(row)
+    return candidates
+
+
+def _select_initial_bookmark_candidates(
+    candidates: list[dict],
+    keywords: tuple[str, ...],
+    limit: int,
+) -> list[dict]:
+    matched = [
+        row
+        for row in candidates
+        if _initial_bookmark_matches_keywords(row, keywords)
+    ]
+    if len(matched) >= limit:
+        return matched[:limit]
+
+    selected = list(matched)
+    selected_keys = {_initial_bookmark_candidate_key(row) for row in selected}
+    for row in candidates:
+        key = _initial_bookmark_candidate_key(row)
+        if key in selected_keys:
+            continue
+        selected.append(row)
+        selected_keys.add(key)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def _initial_bookmark_matches_keywords(
+    row: dict,
+    keywords: tuple[str, ...],
+) -> bool:
+    text = " ".join(
+        [
+            _text_or_none(row.get("name")) or "",
+            _text_or_none(row.get("category_name")) or "",
+            _text_or_none(row.get("category_group_name")) or "",
+            _text_or_none(row.get("address_name")) or "",
+            _text_or_none(row.get("road_address_name")) or "",
+        ]
+    ).casefold()
+    return any(keyword.casefold() in text for keyword in keywords)
+
+
+def _initial_bookmark_candidate_key(row: dict) -> str:
+    return (
+        _text_or_none(row.get("store_id"))
+        or _text_or_none(row.get("name"))
+        or _text_or_none(row.get("place_url"))
+        or ""
+    )
+
+
+def _initial_bookmark_restaurant(row: dict, topic_id: str) -> dict:
+    name = _text_or_none(row.get("name")) or "이름 없는 식당"
+    store_id = _text_or_none(row.get("store_id")) or _initial_bookmark_candidate_key(row)
+    address_name = _text_or_none(row.get("address_name")) or ""
+    road_address_name = _text_or_none(row.get("road_address_name")) or ""
+    category_name = _text_or_none(row.get("category_name")) or "음식점"
+    category_group_code = _text_or_none(row.get("category_group_code")) or ""
+    category_group_name = _text_or_none(row.get("category_group_name")) or ""
+    place_url = _text_or_none(row.get("place_url")) or ""
+
+    return {
+        "id": store_id,
+        "storeId": store_id,
+        "name": name,
+        "address": road_address_name or address_name,
+        "category": category_name,
+        "categoryName": category_name,
+        "categoryGroupCode": category_group_code,
+        "categoryGroupName": category_group_name,
+        "phone": _text_or_none(row.get("phone")) or "",
+        "placeUrl": place_url,
+        "link": place_url,
+        "addressName": address_name,
+        "roadAddressName": road_address_name,
+        "truthScore": 0,
+        "distance": 0,
+        "reviewSummary": "",
+        "latitude": 0,
+        "longitude": 0,
+        "isBookmarked": True,
+        "bookmarkTopicIds": [topic_id],
     }
 
 
@@ -1181,6 +1455,135 @@ def _build_analysis_usage_not_charged(profile: dict | None = None) -> dict:
         "chargedBy": None,
         "profile": profile,
     }
+
+
+async def _delete_user_search_histories(
+    client: httpx.AsyncClient,
+    email: str,
+) -> None:
+    resp = await client.delete(
+        f"{SUPABASE_URL}/rest/v1/user_search_histories",
+        headers=_h(),
+        params={"user_email": f"eq.{email}"},
+        timeout=10,
+    )
+
+    if resp.status_code not in (200, 204, 404):
+        raise RuntimeError(
+            f"검색 기록을 삭제하지 못했습니다: {resp.status_code} {resp.text[:240]}"
+        )
+
+
+async def _delete_user_profile_row(
+    client: httpx.AsyncClient,
+    email: str,
+) -> None:
+    resp = await client.delete(
+        f"{SUPABASE_URL}/rest/v1/users",
+        headers=_h(),
+        params={"email": f"eq.{email}"},
+        timeout=10,
+    )
+
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(
+            f"사용자 프로필을 삭제하지 못했습니다: {resp.status_code} {resp.text[:240]}"
+        )
+
+
+async def _delete_auth_user(
+    client: httpx.AsyncClient,
+    auth_user_id: str,
+) -> None:
+    normalized_user_id = _text_or_none(auth_user_id)
+    if not normalized_user_id:
+        return
+
+    resp = await client.delete(
+        f"{SUPABASE_URL}/auth/v1/admin/users/{normalized_user_id}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code not in (200, 204, 404):
+        raise RuntimeError(
+            "인증 계정을 삭제하지 못했습니다. "
+            f"{resp.status_code} {resp.text[:240]}"
+        )
+
+
+async def _clear_review_row_reactions_for_user(
+    client: httpx.AsyncClient,
+    user_id: int,
+) -> None:
+    resp = await client.get(
+        f"{SUPABASE_URL}/rest/v1/reviews",
+        headers=_h(),
+        params={
+            "select": "id,likes,dislikes",
+            "limit": "1000",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"리뷰 반응을 조회하지 못했습니다: {resp.status_code} {resp.text[:240]}"
+        )
+
+    rows = resp.json() if resp.text else []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+
+        review_id = _text_or_none(row.get("id"))
+        if not review_id:
+            continue
+
+        likes, likes_changed = _remove_user_id_entries(row.get("likes"), user_id)
+        dislikes, dislikes_changed = _remove_user_id_entries(
+            row.get("dislikes"),
+            user_id,
+        )
+        if not likes_changed and not dislikes_changed:
+            continue
+
+        patch_data = {}
+        if likes_changed:
+            patch_data["likes"] = likes
+        if dislikes_changed:
+            patch_data["dislikes"] = dislikes
+
+        patch_resp = await client.patch(
+            f"{SUPABASE_URL}/rest/v1/reviews",
+            headers=_h(),
+            params={"id": f"eq.{review_id}"},
+            json=patch_data,
+            timeout=10,
+        )
+        if patch_resp.status_code not in (200, 204):
+            raise RuntimeError(
+                "리뷰 반응을 삭제하지 못했습니다: "
+                f"{patch_resp.status_code} {patch_resp.text[:240]}"
+            )
+
+
+def _remove_user_id_entries(value, user_id: int) -> tuple[list, bool]:
+    if not isinstance(value, list):
+        return [], False
+
+    next_items = []
+    removed = False
+    for item in value:
+        if isinstance(item, dict) and _int_or_zero(item.get("user_id")) == user_id:
+            removed = True
+            continue
+        next_items.append(item)
+
+    return next_items, removed
 
 
 async def _fetch_user_profile_by_email(

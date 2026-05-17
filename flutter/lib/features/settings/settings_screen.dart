@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/config/supabase_config.dart';
+import '../../core/providers/current_user_provider.dart';
 import '../../core/providers/liked_reviews_provider.dart';
 import '../../core/providers/recent_visit_provider.dart';
 import '../../core/providers/user_profile_provider.dart';
+import '../bookmarks/bookmark_provider.dart';
 import '../map/models/restaurant_model.dart';
 import '../map/restaurant_detail/blog_review_url.dart';
 import '../map/restaurant_detail/providers/review_like_provider.dart';
@@ -29,6 +34,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _errorMessage;
   bool _isSaving = false;
+  bool _isLoadingLinkedProviders = false;
+  bool _isLoginAccountsExpanded = false;
+  String? _linkingProvider;
+  Set<String> _linkedProviders = const {};
 
   String? get _accessToken {
     if (!SupabaseConfig.isConfigured) return null;
@@ -43,6 +52,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_hasGoogleSession) {
         ref.read(userProfileProvider.notifier).loadIfPossible(force: true);
+        _loadLinkedProviders();
       }
     });
   }
@@ -64,15 +74,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           _accountSection(),
-          const SizedBox(height: 12),
-          _logoutButton(),
-          const SizedBox(height: 24),
-          const Text(
-            '리뷰',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
-          _ReviewButtonsSection(onSelectTab: widget.onSelectTab),
         ],
       ),
     );

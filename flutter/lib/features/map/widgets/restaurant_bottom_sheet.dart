@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/design_system/app_tokens.dart';
 import '../../../core/design_system/widgets/widgets.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../bookmarks/bookmark_options.dart';
 import '../models/restaurant_model.dart';
 
 class RestaurantBottomSheet extends StatelessWidget {
@@ -29,6 +30,12 @@ class RestaurantBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bookmarkColorKey = BookmarkTopics.colorKeyForTopicIds(
+      restaurant.bookmarkTopicIds,
+      fallbackColorKey: restaurant.bookmarkColorKey,
+    );
+    final bookmarkColor = BookmarkColors.byKey(bookmarkColorKey);
+
     return DsBottomSheet(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -108,9 +115,17 @@ class RestaurantBottomSheet extends StatelessWidget {
                   onTap: onCallTap,
                 ),
                 _ActionItem(
-                  icon: isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                  icon: isBookmarked
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
                   label: 'Save',
                   onTap: onBookmarkTap,
+                  color: isBookmarked
+                      ? bookmarkColor.foreground
+                      : AppColors.primary500,
+                  backgroundColor: isBookmarked
+                      ? bookmarkColor.background
+                      : AppColors.primary50,
                 ),
                 _ActionItem(
                   icon: Icons.near_me_outlined,
@@ -142,8 +157,16 @@ class _ActionItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final Color color;
+  final Color backgroundColor;
 
-  const _ActionItem({required this.icon, required this.label, this.onTap});
+  const _ActionItem({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.color = AppColors.primary500,
+    this.backgroundColor = AppColors.primary50,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -158,10 +181,10 @@ class _ActionItem extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.primary50,
+                color: backgroundColor,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
-              child: Icon(icon, size: 20, color: AppColors.primary500),
+              child: Icon(icon, size: 20, color: color),
             ),
             const SizedBox(height: AppSpacing.x1),
             Text(

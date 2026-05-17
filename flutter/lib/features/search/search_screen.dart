@@ -85,6 +85,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         initialLatitude: widget.initialLatitude,
         initialLongitude: widget.initialLongitude,
         onRestaurantSelected: widget.onViewPlace!,
+        onTrendingRankSelected: _saveTrendingRankHistory,
       );
     }
 
@@ -159,8 +160,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             preview: state.preview,
             isLoading: state.isLoadingPreview,
             error: state.previewError,
-            onRelatedCategoryTapped: _selectRelatedCategory,
-            onIssueTapped: _selectIssue,
+            onRelatedSearchTapped: _selectRelatedSearch,
             onMenuTapped: _selectMenu,
             onRestaurantTapped: _selectRestaurant,
             onPreviewCardTapped: _selectPreviewCard,
@@ -173,6 +173,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           initialLatitude: widget.initialLatitude,
           initialLongitude: widget.initialLongitude,
           onRestaurantSelected: widget.onViewPlace!,
+          onTrendingRankSelected: _saveTrendingRankHistory,
         );
     }
   }
@@ -216,7 +217,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _selectTrendingCategory(SearchTrendingChip chip) {
-    _submitSearch(_trendingSearchQuery(chip.label));
+    _submitSearch(_trendingSearchQuery(chip.label), saveToRecent: false);
   }
 
   String _trendingSearchQuery(String label) {
@@ -236,6 +237,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       initialLatitude: widget.initialLatitude,
       initialLongitude: widget.initialLongitude,
     );
+    _saveTrendingRankHistory(item, restaurant);
     widget.onViewPlace?.call(restaurant);
 
     Navigator.of(context).pushReplacement(
@@ -283,23 +285,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _focusNode.unfocus();
   }
 
-  Future<void> _selectIssue(SearchIssueChip chip) async {
-    final query = chip.keyword.trim().isEmpty ? chip.label : chip.keyword;
-    await ref.read(searchControllerProvider.notifier).onResultSelected(
-          SearchRecentHistoryRequest(
-            query: stateQuery,
-            clickedType: SearchClickType.issue,
-            clickedId: chip.id,
-            clickedLabel: chip.label,
-          ),
-        );
-    _applyQuery(query);
-  }
-
-  void _selectRelatedCategory(SearchRelatedCategory category) {
-    final query =
-        category.keyword.trim().isEmpty ? category.label : category.keyword;
-    _applyQuery(query);
+  void _selectRelatedSearch(String query) {
+    _submitSearch(query, saveToRecent: false);
   }
 
   Future<void> _selectMenu(SearchMenuSuggestion menu) async {
@@ -348,6 +335,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         );
     _submitSearch(query, saveToRecent: false);
+  }
+
+  void _saveTrendingRankHistory(
+    _TrendingRankItem item,
+    RestaurantModel restaurant,
+  ) {
+    final title = item.title.trim();
+    if (title.length < _minimumSubmitLength) return;
+
+    unawaited(
+      ref.read(searchControllerProvider.notifier).onResultSelected(
+            SearchRecentHistoryRequest(
+              query: title,
+              clickedType: SearchClickType.restaurant,
+              clickedId: restaurant.id,
+              clickedLabel: title,
+              restaurantId: restaurant.id,
+            ),
+          ),
+    );
   }
 
   String get stateQuery {
@@ -700,48 +707,14 @@ class _TrendingChipRow extends StatelessWidget {
     required this.onTapped,
   });
 
-  static const _styles = <_TrendingChipStyle>[
-    _TrendingChipStyle(
-      background: Color(0xFFFFF4F7),
-      border: Color(0xFFFFC8D7),
-      foreground: Color(0xFF8A1F3F),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFFFF5EA),
-      border: Color(0xFFFFD3A3),
-      foreground: Color(0xFF7A3F00),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFFFFBE1),
-      border: Color(0xFFFFECA0),
-      foreground: Color(0xFF604800),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFF4FBEA),
-      border: Color(0xFFD8F1AA),
-      foreground: Color(0xFF315F00),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFF0FAFF),
-      border: Color(0xFFBEE8FF),
-      foreground: Color(0xFF105C7C),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFF7F2FF),
-      border: Color(0xFFDCCAFF),
-      foreground: Color(0xFF4C2C9A),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFF0FCF7),
-      border: Color(0xFFC3F0DE),
-      foreground: Color(0xFF126548),
-    ),
-    _TrendingChipStyle(
-      background: Color(0xFFFCF2FF),
-      border: Color(0xFFECC8FF),
-      foreground: Color(0xFF6B248E),
-    ),
-  ];
+  static const _nostalgiaStyle = _TrendingChipStyle(
+    background: Color(0xFFF4FBEA),
+    border: Color(0xFFD8F1AA),
+    foreground: Color(0xFF315F00),
+    selectedBackground: Color(0xFFE4F5C8),
+    selectedBorder: Color(0xFF9DCE58),
+    selectedForeground: Color(0xFF254D00),
+  );
 
   final List<SearchTrendingChip> chips;
   final String? selectedLabel;
@@ -751,35 +724,24 @@ class _TrendingChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (chips.isEmpty) return const SizedBox.shrink();
 
+    final visibleChips = chips.take(4).toList();
+
     return SizedBox(
       height: 34,
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            PointerDeviceKind.touch,
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.stylus,
-            PointerDeviceKind.invertedStylus,
-          },
-        ),
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          primary: false,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          itemCount: chips.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final chip = chips[index];
-            return _KeywordChip(
-              label: chip.label,
-              style: _styles[index % _styles.length],
-              selected: chip.label == selectedLabel,
-              onTap: () => onTapped(chip),
-            );
-          },
-        ),
+      child: Row(
+        children: [
+          for (var index = 0; index < visibleChips.length; index++) ...[
+            Expanded(
+              child: _KeywordChip(
+                label: visibleChips[index].label,
+                style: _nostalgiaStyle,
+                selected: visibleChips[index].label == selectedLabel,
+                onTap: () => onTapped(visibleChips[index]),
+              ),
+            ),
+            if (index < visibleChips.length - 1) const SizedBox(width: 6),
+          ],
+        ],
       ),
     );
   }
@@ -790,11 +752,17 @@ class _TrendingChipStyle {
     required this.background,
     required this.border,
     required this.foreground,
+    required this.selectedBackground,
+    required this.selectedBorder,
+    required this.selectedForeground,
   });
 
   final Color background;
   final Color border;
   final Color foreground;
+  final Color selectedBackground;
+  final Color selectedBorder;
+  final Color selectedForeground;
 }
 
 class _RecentSearchList extends StatelessWidget {
@@ -860,7 +828,7 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
   @override
   void initState() {
     super.initState();
-    _page = _loopStartPage(widget.rankings.length);
+    _page = _middlePage(widget.rankings.length);
     _controller = PageController(
       initialPage: _page,
       viewportFraction: 0.44,
@@ -872,7 +840,7 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
   void didUpdateWidget(covariant _TrendingRankCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.rankings != widget.rankings) {
-      _page = _loopStartPage(widget.rankings.length);
+      _page = _middlePage(widget.rankings.length);
       if (_controller.hasClients) {
         _controller.jumpToPage(_page);
       }
@@ -893,7 +861,8 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
 
     _timer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted || !_controller.hasClients) return;
-      _page += 1;
+      final nextPage = _page + 1;
+      _page = nextPage;
       _controller.animateToPage(
         _page,
         duration: const Duration(milliseconds: 420),
@@ -902,9 +871,24 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
     });
   }
 
-  int _loopStartPage(int itemCount) {
-    if (itemCount <= 0) return 0;
-    return itemCount * 1000;
+  int _middlePage(int itemCount) {
+    return itemCount <= 1 ? 0 : itemCount;
+  }
+
+  void _handlePageChanged(int index) {
+    _page = index;
+
+    final itemCount = widget.rankings.length;
+    if (itemCount <= 1) return;
+
+    if (index == 0 || index == itemCount * 2) {
+      final normalizedPage = itemCount + (index % itemCount);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_controller.hasClients) return;
+        _page = normalizedPage;
+        _controller.jumpToPage(normalizedPage);
+      });
+    }
   }
 
   @override
@@ -912,7 +896,7 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
     if (widget.rankings.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: 38,
+      height: 34,
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(
           dragDevices: {
@@ -928,7 +912,7 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
           physics: const PageScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-          onPageChanged: (index) => _page = index,
+          onPageChanged: _handlePageChanged,
           itemBuilder: (context, index) {
             final item = widget.rankings[index % widget.rankings.length];
             return Padding(
@@ -963,8 +947,8 @@ class _TrendingRankCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 7),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
@@ -972,8 +956,8 @@ class _TrendingRankCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                height: 22,
-                constraints: const BoxConstraints(minWidth: 28),
+                height: 20,
+                constraints: const BoxConstraints(minWidth: 26),
                 padding: const EdgeInsets.symmetric(horizontal: 5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF4F7EC),
@@ -983,7 +967,7 @@ class _TrendingRankCard extends StatelessWidget {
                 child: Text(
                   '${item.rank}위',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF5F8E2F),
                   ),
@@ -996,7 +980,7 @@ class _TrendingRankCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
@@ -1005,7 +989,7 @@ class _TrendingRankCard extends StatelessWidget {
               const SizedBox(width: 6),
               const Icon(
                 Icons.chevron_right_rounded,
-                size: 17,
+                size: 16,
                 color: Color(0xFF8DAF54),
               ),
             ],
@@ -1039,24 +1023,28 @@ class _KeywordChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
-            color: style.background,
+            color: selected ? style.selectedBackground : style.background,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? style.foreground : style.border,
-              width: selected ? 1.2 : 0.8,
+              color: selected ? style.selectedBorder : style.border,
+              width: selected ? 1.4 : 0.8,
             ),
           ),
           child: Center(
             child: Text(
               label,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w800,
-              ).copyWith(color: style.foreground),
+                height: 0.95,
+              ).copyWith(
+                color: selected ? style.selectedForeground : style.foreground,
+              ),
             ),
           ),
         ),
@@ -1139,12 +1127,15 @@ class _SubmittedBody extends StatelessWidget {
     required this.initialLatitude,
     required this.initialLongitude,
     required this.onRestaurantSelected,
+    required this.onTrendingRankSelected,
   });
 
   final String query;
   final double? initialLatitude;
   final double? initialLongitude;
   final ValueChanged<RestaurantModel> onRestaurantSelected;
+  final void Function(_TrendingRankItem item, RestaurantModel restaurant)
+      onTrendingRankSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1156,6 +1147,7 @@ class _SubmittedBody extends StatelessWidget {
         initialLatitude: initialLatitude,
         initialLongitude: initialLongitude,
         onRestaurantSelected: onRestaurantSelected,
+        onTrendingRankSelected: onTrendingRankSelected,
       );
     }
 
@@ -1175,6 +1167,7 @@ class _TrendingSubmittedResultsBody extends StatefulWidget {
     required this.initialLatitude,
     required this.initialLongitude,
     required this.onRestaurantSelected,
+    required this.onTrendingRankSelected,
   });
 
   final String query;
@@ -1182,6 +1175,8 @@ class _TrendingSubmittedResultsBody extends StatefulWidget {
   final double? initialLatitude;
   final double? initialLongitude;
   final ValueChanged<RestaurantModel> onRestaurantSelected;
+  final void Function(_TrendingRankItem item, RestaurantModel restaurant)
+      onTrendingRankSelected;
 
   @override
   State<_TrendingSubmittedResultsBody> createState() =>
@@ -1250,9 +1245,9 @@ class _TrendingSubmittedResultsBodyState
         ),
       ),
       body: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
         itemCount: widget.rankings.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 5),
         itemBuilder: (context, index) {
           final item = widget.rankings[index];
           return _TrendingSubmittedRankTile(
@@ -1275,6 +1270,7 @@ class _TrendingSubmittedResultsBodyState
           initialLatitude: widget.initialLatitude,
           initialLongitude: widget.initialLongitude,
           onRestaurantSelected: widget.onRestaurantSelected,
+          onTrendingRankSelected: widget.onTrendingRankSelected,
         ),
       ),
     );
@@ -1286,6 +1282,7 @@ class _TrendingSubmittedResultsBodyState
       initialLatitude: widget.initialLatitude,
       initialLongitude: widget.initialLongitude,
     );
+    widget.onTrendingRankSelected(item, restaurant);
     widget.onRestaurantSelected(restaurant);
 
     Navigator.of(context).push(
@@ -1400,7 +1397,7 @@ class _TrendingSubmittedRankTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Container(
           constraints: const BoxConstraints(minHeight: 58),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border),
@@ -1408,9 +1405,9 @@ class _TrendingSubmittedRankTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                height: 30,
-                constraints: const BoxConstraints(minWidth: 42),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                height: 24,
+                constraints: const BoxConstraints(minWidth: 36),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 decoration: BoxDecoration(
                   color: badgeColor,
                   borderRadius: BorderRadius.circular(999),
@@ -1419,29 +1416,58 @@ class _TrendingSubmittedRankTile extends StatelessWidget {
                 child: Text(
                   '${item.rank}위',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w900,
                     color: badgeTextColor,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _InlineMetaPill(label: item.category),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            item.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _RecommendedMenuStrip(item: item),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               const Icon(
                 Icons.chevron_right_rounded,
-                size: 22,
+                size: 20,
                 color: AppColors.textHint,
               ),
             ],
@@ -1450,6 +1476,119 @@ class _TrendingSubmittedRankTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InlineMetaPill extends StatelessWidget {
+  const _InlineMetaPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 72),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4FBEA),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFD8F1AA), width: 0.7),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF315F00),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendedMenuStrip extends StatelessWidget {
+  const _RecommendedMenuStrip({required this.item});
+
+  final _TrendingRankItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final menus = item.recommendedMenus;
+
+    return SizedBox(
+      height: 24,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final chipWidth = (constraints.maxWidth - 18) / 4;
+          final visibleChipWidth = chipWidth.clamp(54.0, 120.0).toDouble();
+
+          return ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.stylus,
+                PointerDeviceKind.invertedStylus,
+              },
+            ),
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              itemCount: menus.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                return SizedBox(
+                  width: visibleChipWidth,
+                  child: _RecommendedMenuChip(menu: menus[index]),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RecommendedMenuChip extends StatelessWidget {
+  const _RecommendedMenuChip({required this.menu});
+
+  final _RecommendedMenuItem menu;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F8),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '${menu.label} ${menu.priceLabel}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendedMenuItem {
+  const _RecommendedMenuItem({
+    required this.label,
+    required this.priceLabel,
+  });
+
+  final String label;
+  final String priceLabel;
 }
 
 class _RecentChipData {
@@ -1515,6 +1654,186 @@ class _TrendingRankItem {
   final String title;
   final String subtitle;
 
+  String get region {
+    if (title.contains('수원') || title.contains('남문') || title.contains('팔달문')) {
+      return '수원';
+    }
+    if (title.contains('영통') || title.contains('권선')) {
+      return title.contains('권선') ? '권선' : '영통';
+    }
+    return '광교';
+  }
+
+  String get category {
+    if (title.contains('스타벅스') ||
+        title.contains('커피빈') ||
+        title.contains('블루보틀') ||
+        title.contains('폴바셋') ||
+        title.contains('투썸') ||
+        title.contains('카페') ||
+        title.contains('다방')) {
+      return '카페';
+    }
+    if (title.contains('베이커리') ||
+        title.contains('르빵') ||
+        title.contains('빵집')) {
+      return '베이커리';
+    }
+    if (title.contains('스시') ||
+        title.contains('오마카세') ||
+        title.contains('라멘') ||
+        title.contains('소바') ||
+        title.contains('정돈')) {
+      return '일식';
+    }
+    if (title.contains('마라') ||
+        title.contains('홍콩반점') ||
+        title.contains('손짜장')) {
+      return '중식';
+    }
+    if (title.contains('다운타우너') ||
+        title.contains('쉐이크쉑') ||
+        title.contains('아웃백') ||
+        title.contains('브런치')) {
+      return '양식';
+    }
+    if (title.contains('분식') || title.contains('떡볶이')) {
+      return '분식';
+    }
+    if (title.contains('포케')) {
+      return '건강식';
+    }
+    if (title.contains('바')) {
+      return '바';
+    }
+    if (title.contains('통닭') ||
+        title.contains('갈비') ||
+        title.contains('국밥') ||
+        title.contains('냉면') ||
+        title.contains('기사식당')) {
+      return '한식';
+    }
+    return '음식점';
+  }
+
+  String get representativeKeyword {
+    if (title.contains('스타벅스')) return '돌체라떼';
+    if (title.contains('커피빈')) return '아메리카노';
+    if (title.contains('블루보틀')) return '콜드브루';
+    if (title.contains('폴바셋')) return '라떼';
+    if (title.contains('투썸')) return '케이크';
+    if (title.contains('돌체')) return '돌체 케이크';
+    if (title.contains('뉴올리언스')) return '브런치';
+    if (title.contains('온기정')) return '텐동';
+    if (title.contains('정돈')) return '돈카츠';
+    if (title.contains('다운타우너') || title.contains('쉐이크쉑')) return '버거';
+    if (title.contains('카페거리')) return '호수공원 카페';
+    if (title.contains('스시') || title.contains('오마카세')) return '오마카세';
+    if (title.contains('갈비')) return '갈비';
+    if (title.contains('마라')) return '마라탕';
+    if (title.contains('홍콩반점') || title.contains('손짜장')) return '짜장면';
+    if (title.contains('분식') || title.contains('떡볶이')) return '떡볶이';
+    if (title.contains('국밥')) return '국밥';
+    if (title.contains('통닭')) return '통닭';
+    if (title.contains('냉면')) return '냉면';
+    if (title.contains('빵집') || title.contains('르빵')) return '소금빵';
+    if (title.contains('포케')) return '포케';
+    if (title.contains('다방')) return '쌍화차';
+    if (title.contains('기사식당')) return '제육백반';
+    if (title.contains('바')) return '칵테일';
+    return category;
+  }
+
+  String get representativePriceLabel {
+    final menu = representativeKeyword;
+    return switch (menu) {
+      '돌체라떼' => '5,900원',
+      '아메리카노' => '4,500원',
+      '콜드브루' => '5,800원',
+      '라떼' => '5,500원',
+      '케이크' => '6,800원',
+      '돌체 케이크' => '7,200원',
+      '브런치' => '15,000원',
+      '텐동' => '12,000원',
+      '돈카츠' => '14,000원',
+      '버거' => '9,800원',
+      '호수공원 카페' => '6,000원',
+      '오마카세' => '변동가',
+      '갈비' => '19,000원',
+      '마라탕' => '11,000원',
+      '짜장면' => '7,000원',
+      '떡볶이' => '5,500원',
+      '국밥' => '9,000원',
+      '통닭' => '18,000원',
+      '냉면' => '10,000원',
+      '소금빵' => '3,800원',
+      '포케' => '12,500원',
+      '쌍화차' => '7,000원',
+      '제육백반' => '9,000원',
+      '칵테일' => '14,000원',
+      _ => '가격 문의',
+    };
+  }
+
+  List<_RecommendedMenuItem> get recommendedMenus {
+    final categoryLabel = category;
+    return <_RecommendedMenuItem>[
+      _RecommendedMenuItem(
+        label: representativeKeyword,
+        priceLabel: _normalizedPriceLabel(representativePriceLabel),
+      ),
+      _RecommendedMenuItem(label: '$categoryLabel 시그니처', priceLabel: '가격 문의'),
+      _RecommendedMenuItem(label: '$categoryLabel 세트', priceLabel: '가격 문의'),
+      _RecommendedMenuItem(label: '$categoryLabel 사이드', priceLabel: '가격 문의'),
+    ];
+  }
+
+  String _normalizedPriceLabel(String priceLabel) {
+    final trimmed = priceLabel.trim();
+    if (trimmed.isEmpty) return '가격 문의';
+    if (trimmed.contains('문의') ||
+        trimmed.contains('가게') ||
+        trimmed.contains('변동') ||
+        trimmed.contains('臾몄쓽') ||
+        trimmed.contains('蹂')) {
+      return '가격 문의';
+    }
+    return trimmed;
+  }
+
+  IconData get representativeIcon {
+    final menu = representativeKeyword;
+    if (category == '카페' || menu.contains('라떼') || menu.contains('커피')) {
+      return Icons.local_cafe_rounded;
+    }
+    if (category == '베이커리' || menu.contains('케이크') || menu.contains('빵')) {
+      return Icons.bakery_dining_rounded;
+    }
+    if (menu.contains('버거')) return Icons.lunch_dining_rounded;
+    if (menu.contains('갈비') || menu.contains('통닭')) {
+      return Icons.outdoor_grill_rounded;
+    }
+    if (menu.contains('칵테일')) return Icons.local_bar_rounded;
+    if (menu.contains('포케')) return Icons.eco_rounded;
+    if (category == '일식') return Icons.ramen_dining_rounded;
+    return Icons.restaurant_rounded;
+  }
+
+  Color get representativeImageColor {
+    return switch (category) {
+      '카페' => const Color(0xFF8B6A4F),
+      '베이커리' => const Color(0xFFD28A4C),
+      '일식' => const Color(0xFF5577AA),
+      '중식' => const Color(0xFFC65B4A),
+      '양식' => const Color(0xFF6B8E5A),
+      '분식' => const Color(0xFFE07A91),
+      '건강식' => const Color(0xFF55A878),
+      '바' => const Color(0xFF6750A4),
+      '한식' => const Color(0xFFB87931),
+      _ => const Color(0xFF8890A6),
+    };
+  }
+
   RestaurantModel toRestaurantModel({
     double? latitude,
     double? longitude,
@@ -1528,8 +1847,8 @@ class _TrendingRankItem {
       id: id,
       storeId: id,
       name: title,
-      address: '광교',
-      category: '음식점',
+      address: region,
+      category: category,
       truthScore: 0,
       reviewSummary: subtitle,
       latitude: latitude ?? 37.2864,

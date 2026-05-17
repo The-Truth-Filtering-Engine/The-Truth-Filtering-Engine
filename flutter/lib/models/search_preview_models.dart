@@ -1,12 +1,14 @@
 class SearchPreviewResponse {
   const SearchPreviewResponse({
     required this.query,
+    required this.relatedCategories,
     required this.issueChips,
     required this.suggestions,
     required this.quickPreviews,
   });
 
   final String query;
+  final List<SearchRelatedCategory> relatedCategories;
   final List<SearchIssueChip> issueChips;
   final SearchSuggestions suggestions;
   final List<SearchQuickPreview> quickPreviews;
@@ -14,6 +16,10 @@ class SearchPreviewResponse {
   factory SearchPreviewResponse.fromJson(Map<String, dynamic> json) {
     return SearchPreviewResponse(
       query: json['query']?.toString() ?? '',
+      relatedCategories: _parseList(
+        json['relatedCategories'],
+        SearchRelatedCategory.fromJson,
+      ),
       issueChips: _parseList(
         json['issueChips'],
         SearchIssueChip.fromJson,
@@ -27,6 +33,29 @@ class SearchPreviewResponse {
         json['quickPreviews'],
         SearchQuickPreview.fromJson,
       ),
+    );
+  }
+}
+
+class SearchRelatedCategory {
+  const SearchRelatedCategory({
+    required this.id,
+    required this.label,
+    required this.keyword,
+    required this.score,
+  });
+
+  final String id;
+  final String label;
+  final String keyword;
+  final int score;
+
+  factory SearchRelatedCategory.fromJson(Map<String, dynamic> json) {
+    return SearchRelatedCategory(
+      id: json['id']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      keyword: json['keyword']?.toString() ?? '',
+      score: _asInt(json['score']),
     );
   }
 }

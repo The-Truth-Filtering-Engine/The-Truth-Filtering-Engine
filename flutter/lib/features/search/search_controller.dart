@@ -21,10 +21,10 @@ class SearchTrendingChip {
 }
 
 const _defaultTrendingChips = <SearchTrendingChip>[
-  SearchTrendingChip(label: '🔥 지금 뜨는 맛집'),
-  SearchTrendingChip(label: '많이 찾는 맛집👍'),
-  SearchTrendingChip(label: '✨ 신상 맛집 ✨'),
-  SearchTrendingChip(label: '🕰️ 추억의 맛집'),
+  SearchTrendingChip(label: '지금 뜨는 맛집'),
+  SearchTrendingChip(label: '많이 찾는 맛집'),
+  SearchTrendingChip(label: '신상 맛집'),
+  SearchTrendingChip(label: '추억의 맛집'),
 ];
 
 const _removedTrendingChipLabels = {
@@ -37,7 +37,9 @@ const _removedTrendingChipLabels = {
   '이색 맛집',
   '지역 전통 음식',
   '고급 식당',
+  '격식있는 모임',
   'TV 출연 가게',
+  'TV 출연 화제의 식당',
   '동네 오래된 맛집',
 };
 
@@ -244,10 +246,15 @@ class SearchController extends StateNotifier<SearchState> {
 
   String _normalizeTrendingChipLabel(String label) {
     return switch (label) {
-      '실시간 검색 맛집' => '🔥 지금 뜨는 맛집',
-      '지금 뜨는 맛집' => '🔥 지금 뜨는 맛집',
-      '신상 맛집' => '✨ 신상 맛집 ✨',
-      '추억의 맛집' => '🕰️ 추억의 맛집',
+      '실시간 검색 맛집' => '지금 뜨는 맛집',
+      '🔥 지금 뜨는 맛집' => '지금 뜨는 맛집',
+      '지금 뜨는 맛집' => '지금 뜨는 맛집',
+      '많이 찾는 맛집👍' => '많이 찾는 맛집',
+      '많이 찾는 맛집' => '많이 찾는 맛집',
+      '✨ 신상 맛집 ✨' => '신상 맛집',
+      '신상 맛집' => '신상 맛집',
+      '🕰️ 추억의 맛집' => '추억의 맛집',
+      '추억의 맛집' => '추억의 맛집',
       _ => label,
     };
   }

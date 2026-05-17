@@ -10,12 +10,65 @@ router = APIRouter(tags=["ai-recommendations"])
 
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
 KAKAO_KEYWORD_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
+KAKAO_ADDRESS_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/address.json"
 KAKAO_COORD_TO_REGION_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json"
 KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
 AI_RECOMMEND_SCAN_PAGE_LIMIT = 8
 AI_RECOMMEND_REGION_QUERY_PAGE_SIZE = 50
 
 RegionScope = Literal["dong", "gu", "si"]
+FoodFeature = Literal[
+    "user_taste",
+    "korean",
+    "western",
+    "world",
+    "new_menu",
+    "popular_menu",
+    "cafe_dessert",
+]
+PriceRange = Literal[
+    "any",
+    "value",
+    "under_10000",
+    "10000_20000",
+    "20000_40000",
+    "special_day",
+]
+PartySize = Literal["any", "solo", "two", "small_group", "group", "parents", "family"]
+TransportMode = Literal["any", "walk", "transit", "parking", "public_parking"]
+
+FOOD_FEATURE_TERMS = {
+    "korean": ["한식", "백반", "국밥", "찌개", "전골", "냉면", "가정식"],
+    "western": ["양식", "파스타", "스테이크", "피자", "햄버거", "브런치"],
+    "world": ["세계", "쌀국수", "커리", "멕시칸", "인도", "태국", "베트남", "터키"],
+    "new_menu": ["신상", "신메뉴", "새로운", "시즌", "한정", "이색"],
+    "popular_menu": ["인기", "대표", "시그니처", "추천", "베스트", "유명"],
+    "cafe_dessert": ["카페", "커피", "라떼", "베이커리", "디저트", "케이크", "후식"],
+}
+
+PRICE_RANGE_TERMS = {
+    "value": ["가성비", "저렴", "착한 가격", "합리적"],
+    "under_10000": ["만원", "1만원", "저렴", "가성비", "분식", "백반"],
+    "10000_20000": ["1만원", "2만원", "한 끼", "든든"],
+    "20000_40000": ["2만원", "3만원", "4만원", "고기", "회식"],
+    "special_day": ["특별한 날", "기념일", "고급", "파인다이닝", "오마카세", "코스"],
+}
+
+PARTY_SIZE_TERMS = {
+    "solo": ["혼밥", "혼자", "1인", "바 자리"],
+    "two": ["데이트", "둘이", "2인", "커플"],
+    "small_group": ["친구", "모임", "3명", "4명"],
+    "group": ["단체", "회식", "예약", "룸", "넓"],
+    "parents": ["부모님", "어버이", "부모", "가족 식사", "조용", "룸", "한정식"],
+    "family": ["가족", "아이", "부모님", "유아", "넓"],
+}
+
+TRANSPORT_MODE_TERMS = {
+    "walk": ["도보", "가까", "역 근처", "근처", "골목"],
+    "transit": ["역", "버스", "지하철", "대중교통", "정류장"],
+    "parking": ["주차", "주차장", "발렛", "무료주차"],
+    "public_parking": ["공영주차장", "공영 주차장", "공영주차", "공영 주차", "공영"],
+}
 
 
 @router.get("/ai-recommendations")
@@ -25,17 +78,32 @@ async def ai_recommendations(
     page_size: int = Query(10, alias="pageSize", ge=1, le=10),
     lat: float | None = Query(None),
     lng: float | None = Query(None),
+    location_query: str | None = Query(None, alias="locationQuery"),
     region_scope: RegionScope = Query("dong", alias="regionScope"),
+    food_feature: FoodFeature = Query("user_taste", alias="foodFeature"),
+    price_range: PriceRange = Query("any", alias="priceRange"),
+    party_size: PartySize = Query("any", alias="partySize"),
+    transport_mode: TransportMode = Query("any", alias="transportMode"),
 ):
-    region = await _get_region(lat, lng) if lat is not None and lng is not None else None
+    region = await _resolve_requested_region(lat, lng, location_query)
+    has_recommendation_filters = _has_recommendation_filters(
+        food_feature=food_feature,
+        price_range=price_range,
+        party_size=party_size,
+        transport_mode=transport_mode,
+    )
 
-    if region:
-        items, has_next = await _load_region_filtered_items(
+    if region or has_recommendation_filters:
+        items, has_next = await _load_filtered_items(
             threshold=threshold,
             page=page,
             page_size=page_size,
             region=region,
             region_scope=region_scope,
+            food_feature=food_feature,
+            price_range=price_range,
+            party_size=party_size,
+            transport_mode=transport_mode,
         )
     else:
         result = await get_ai_recommendation_reviews(
@@ -63,6 +131,11 @@ async def ai_recommendations(
         "page": page,
         "pageSize": page_size,
         "regionScope": region_scope,
+        "foodFeature": food_feature,
+        "priceRange": price_range,
+        "partySize": party_size,
+        "transportMode": transport_mode,
+        "locationQuery": location_query or "",
         "regionLabel": region_label,
         "currentRegion": _serialize_region(region) if region else None,
         "isRegionFiltered": bool(region),
@@ -72,21 +145,22 @@ async def ai_recommendations(
     }
 
 
-async def _load_region_filtered_items(
+async def _load_filtered_items(
     threshold: float,
     page: int,
     page_size: int,
-    region: dict[str, str],
+    region: dict[str, str] | None,
     region_scope: RegionScope,
+    food_feature: FoodFeature,
+    price_range: PriceRange,
+    party_size: PartySize,
+    transport_mode: TransportMode,
 ) -> tuple[list[dict], bool]:
     target_count = page * page_size + 1
     filtered_items: list[dict] = []
     source_has_next = True
     scan_page = 1
-    address_terms = _address_search_terms(region, region_scope)
-
-    if not address_terms:
-        return [], False
+    address_terms = _address_search_terms(region, region_scope) if region else None
 
     while (
         source_has_next
@@ -106,7 +180,16 @@ async def _load_region_filtered_items(
 
         for review in reviews:
             place = places_by_name.get((review.get("name") or "").strip())
-            if not _review_matches_region(review, place, region, region_scope):
+            if region and not _review_matches_region(review, place, region, region_scope):
+                continue
+            if not _review_matches_recommendation_filters(
+                review=review,
+                place=place,
+                food_feature=food_feature,
+                price_range=price_range,
+                party_size=party_size,
+                transport_mode=transport_mode,
+            ):
                 continue
 
             filtered_items.append(_build_response_item(review, place))
@@ -120,6 +203,71 @@ async def _load_region_filtered_items(
     end_index = page * page_size
 
     return filtered_items[start_index:end_index], len(filtered_items) > end_index
+
+
+def _has_recommendation_filters(
+    food_feature: FoodFeature,
+    price_range: PriceRange,
+    party_size: PartySize,
+    transport_mode: TransportMode,
+) -> bool:
+    return (
+        food_feature != "user_taste"
+        or price_range != "any"
+        or party_size != "any"
+        or transport_mode != "any"
+    )
+
+
+def _review_matches_recommendation_filters(
+    review: dict,
+    place: dict | None,
+    food_feature: FoodFeature,
+    price_range: PriceRange,
+    party_size: PartySize,
+    transport_mode: TransportMode,
+) -> bool:
+    text = _recommendation_filter_text(review, place)
+    return all(
+        [
+            _matches_filter_terms(text, FOOD_FEATURE_TERMS.get(food_feature, [])),
+            _matches_filter_terms(text, PRICE_RANGE_TERMS.get(price_range, [])),
+            _matches_filter_terms(text, PARTY_SIZE_TERMS.get(party_size, [])),
+            _matches_filter_terms(text, TRANSPORT_MODE_TERMS.get(transport_mode, [])),
+        ]
+    )
+
+
+def _recommendation_filter_text(review: dict, place: dict | None) -> str:
+    parts = [
+        review.get("name") or "",
+        review.get("review_title") or "",
+        review.get("review_description") or "",
+        review.get("category_name") or "",
+        review.get("category_group_name") or "",
+        review.get("address_name") or "",
+        review.get("road_address_name") or "",
+    ]
+    if place:
+        parts.extend(
+            [
+                place.get("place_name") or "",
+                place.get("category_name") or "",
+                place.get("address_name") or "",
+                place.get("road_address_name") or "",
+            ]
+        )
+    return _normalize_filter_text(" ".join(parts))
+
+
+def _matches_filter_terms(text: str, terms: list[str]) -> bool:
+    if not terms:
+        return True
+    return any(_normalize_filter_text(term) in text for term in terms if term)
+
+
+def _normalize_filter_text(value: str) -> str:
+    return value.replace(" ", "").casefold().strip()
 
 
 def _build_response_item(review: dict, place: dict | None) -> dict:
@@ -204,6 +352,63 @@ async def _find_places_by_names(names: list) -> dict[str, dict]:
                 places[name] = place
 
     return places
+
+
+async def _resolve_requested_region(
+    lat: float | None,
+    lng: float | None,
+    location_query: str | None,
+) -> dict[str, str] | None:
+    if lat is not None and lng is not None:
+        return await _get_region(lat, lng)
+
+    query = (location_query or "").strip()
+    if query:
+        return await _get_region_by_location_query(query)
+
+    return None
+
+
+async def _get_region_by_location_query(query: str) -> dict[str, str] | None:
+    if not KAKAO_REST_API_KEY:
+        return None
+
+    headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                KAKAO_ADDRESS_SEARCH_URL,
+                headers=headers,
+                params={"query": query, "size": 1},
+            )
+            documents = response.json().get("documents", []) if response.status_code == 200 else []
+
+            if not documents:
+                response = await client.get(
+                    KAKAO_KEYWORD_SEARCH_URL,
+                    headers=headers,
+                    params={"query": query, "size": 1},
+                )
+                documents = (
+                    response.json().get("documents", [])
+                    if response.status_code == 200
+                    else []
+                )
+    except Exception as exc:
+        print(f"카카오 위치 검색 에러: {exc}")
+        return None
+
+    if not documents:
+        return None
+
+    document = documents[0]
+    lat = _safe_float(document.get("y"))
+    lng = _safe_float(document.get("x"))
+    if lat is None or lng is None:
+        return None
+
+    return await _get_region(lat, lng)
 
 
 async def _get_region(lat: float, lng: float) -> dict[str, str] | None:

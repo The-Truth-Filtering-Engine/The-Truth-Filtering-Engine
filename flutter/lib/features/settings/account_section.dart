@@ -28,14 +28,11 @@ extension _SettingsAccountSection on _SettingsScreenState {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: const [
-                      OutlinedButton(
+                    children: [
+                      OutlinedButton.icon(
                         onPressed: null,
-                        child: Text('프리미엄 설정'),
-                      ),
-                      OutlinedButton(
-                        onPressed: null,
-                        child: Text('1,000 코인 충전'),
+                        icon: const Icon(Icons.account_balance_wallet_outlined),
+                        label: const Text('결제'),
                       ),
                     ],
                   ),
@@ -44,11 +41,9 @@ extension _SettingsAccountSection on _SettingsScreenState {
             ),
           ),
           const SizedBox(height: 12),
-          _premiumCard(null),
+          _accountBelowActions(),
           const SizedBox(height: 12),
-          _coinChargeCard(),
-          const SizedBox(height: 12),
-          _accountManagementCard(),
+          _billingCard(null),
           if (_errorMessage != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -56,6 +51,8 @@ extension _SettingsAccountSection on _SettingsScreenState {
               style: const TextStyle(color: Colors.red),
             ),
           ],
+          const SizedBox(height: 12),
+          _accountManagementCard(),
         ],
       );
     }
@@ -70,13 +67,13 @@ extension _SettingsAccountSection on _SettingsScreenState {
             ),
           ),
           const SizedBox(height: 12),
+          _accountBelowActions(),
+          const SizedBox(height: 12),
           _linkedLoginAccountsCard(),
           const SizedBox(height: 12),
+          _billingCard(null),
+          const SizedBox(height: 12),
           _accountManagementCard(),
-          const SizedBox(height: 12),
-          _premiumCard(null),
-          const SizedBox(height: 12),
-          _coinChargeCard(),
         ],
       );
     }
@@ -111,9 +108,9 @@ extension _SettingsAccountSection on _SettingsScreenState {
             ),
           ),
           const SizedBox(height: 12),
-          _premiumCard(null),
+          _accountBelowActions(),
           const SizedBox(height: 12),
-          _coinChargeCard(),
+          _billingCard(null),
           const SizedBox(height: 12),
           _accountManagementCard(),
         ],
@@ -130,9 +127,9 @@ extension _SettingsAccountSection on _SettingsScreenState {
             ),
           ),
           const SizedBox(height: 12),
-          _premiumCard(null),
+          _accountBelowActions(),
           const SizedBox(height: 12),
-          _coinChargeCard(),
+          _billingCard(null),
           const SizedBox(height: 12),
           _accountManagementCard(),
         ],
@@ -148,6 +145,31 @@ extension _SettingsAccountSection on _SettingsScreenState {
                 leading: const Icon(Icons.person_outline),
                 title: Text(profile.email),
                 subtitle: Text(profile.isPremium ? '프리미엄 사용자' : '일반 사용자'),
+                trailing: Icon(
+                  _isLoginAccountsExpanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                ),
+                onTap: _toggleLoginAccountsExpanded,
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox(width: double.infinity),
+                secondChild: Column(
+                  children: [
+                    const Divider(height: 0),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      child: _linkedLoginAccountsContent(),
+                    ),
+                  ],
+                ),
+                crossFadeState: _isLoginAccountsExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 180),
+                firstCurve: Curves.easeOut,
+                secondCurve: Curves.easeOut,
+                sizeCurve: Curves.easeOut,
               ),
               const Divider(height: 0),
               Padding(
@@ -164,13 +186,9 @@ extension _SettingsAccountSection on _SettingsScreenState {
           ),
         ),
         const SizedBox(height: 12),
-        _linkedLoginAccountsCard(),
+        _accountBelowActions(),
         const SizedBox(height: 12),
-        _accountManagementCard(),
-        const SizedBox(height: 12),
-        _premiumCard(profile),
-        const SizedBox(height: 12),
-        _coinChargeCard(),
+        _billingCard(profile),
         if (_errorMessage != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -178,50 +196,33 @@ extension _SettingsAccountSection on _SettingsScreenState {
             style: const TextStyle(color: Colors.red),
           ),
         ],
+        const SizedBox(height: 12),
+        _accountManagementCard(),
       ],
     );
   }
 
-  Widget _premiumCard(UserProfile? profile) {
-    final canEdit = _hasGoogleSession && profile != null && !_isSaving;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '프리미엄',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              profile == null
-                  ? '소셜 로그인 계정에서 사용할 수 있습니다.'
-                  : '현재 계정의 premium 값을 ${profile.isPremium ? 0 : 1}로 저장합니다.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: canEdit ? _togglePremium : null,
-              icon: Icon(
-                profile?.isPremium == true
-                    ? Icons.workspace_premium
-                    : Icons.workspace_premium_outlined,
-              ),
-              label: Text(
-                profile?.isPremium == true ? '프리미엄 해제' : '프리미엄 설정',
-              ),
-            ),
-          ],
+  Widget _accountBelowActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _logoutButton(),
+        const SizedBox(height: 16),
+        const Text(
+          '리뷰',
+          style: TextStyle(fontSize: 13, color: Colors.grey),
         ),
-      ),
+        const SizedBox(height: 8),
+        _ReviewButtonsSection(onSelectTab: widget.onSelectTab),
+      ],
     );
   }
 
-  Widget _coinChargeCard() {
-    final canCharge = _hasGoogleSession && !_isSaving;
+  Widget _billingCard(UserProfile? profile) {
+    final hasRemoteProfile = profile?.isRemoteBacked == true;
+    final canEditPremium = _hasGoogleSession && hasRemoteProfile && !_isSaving;
+    final canCharge = _hasGoogleSession && hasRemoteProfile && !_isSaving;
+    final isPremium = profile?.isPremium == true;
 
     return Card(
       child: Padding(
@@ -229,16 +230,83 @@ extension _SettingsAccountSection on _SettingsScreenState {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              '코인 충전',
-              style: Theme.of(context).textTheme.titleMedium,
+            Row(
+              children: [
+                const Icon(Icons.account_balance_wallet_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '결제',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(
-              canCharge ? '테스트용 충전 버튼입니다.' : '소셜 로그인 계정에서 사용할 수 있습니다.',
+              _hasGoogleSession
+                  ? '프리미엄 상태와 코인 충전을 한 곳에서 관리합니다.'
+                  : '소셜 로그인 계정에서 사용할 수 있습니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  isPremium
+                      ? Icons.workspace_premium
+                      : Icons.workspace_premium_outlined,
+                  color: isPremium
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isPremium ? '프리미엄 사용 중' : '일반 사용자',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        profile == null
+                            ? '계정 정보를 불러온 뒤 설정할 수 있습니다.'
+                            : !profile.isRemoteBacked
+                                ? '계정 정보를 확인한 뒤 설정할 수 있습니다.'
+                                : '현재 계정의 premium 값을 ${isPremium ? 0 : 1}로 저장합니다.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: canEditPremium ? _togglePremium : null,
+              icon: Icon(
+                isPremium
+                    ? Icons.workspace_premium
+                    : Icons.workspace_premium_outlined,
+              ),
+              label: Text(isPremium ? '프리미엄 해제' : '프리미엄 설정'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '코인 충전',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              canCharge ? '테스트용 충전 버튼입니다.' : '계정 정보를 확인한 뒤 사용할 수 있습니다.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -247,7 +315,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
                     (amount) => OutlinedButton.icon(
                       onPressed: canCharge ? () => _chargeCoins(amount) : null,
                       icon: const Icon(Icons.monetization_on_outlined),
-                      label: Text(amount.toString()),
+                      label: Text('$amount 코인'),
                     ),
                   )
                   .toList(),
@@ -259,7 +327,11 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Widget _accountManagementCard() {
+    final profile = ref.watch(userProfileProvider).asData?.value;
+    final hasRemoteProfile = profile?.isRemoteBacked == true;
     final disabled = _isSaving;
+    final canDeleteAccount =
+        !disabled && (!_hasGoogleSession || hasRemoteProfile);
 
     return Card(
       child: Padding(
@@ -274,7 +346,7 @@ extension _SettingsAccountSection on _SettingsScreenState {
             const SizedBox(height: 8),
             Text(
               _hasGoogleSession
-                  ? '이용 정보 리셋 또는 소셜 연동 전체 해제 및 계정 삭제를 진행할 수 있습니다.'
+                  ? '이용 정보 리셋 또는 계정 삭제를 진행할 수 있습니다.'
                   : '이 기기의 사용 기록을 비우거나, 임시 세션을 종료할 수 있습니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -289,9 +361,9 @@ extension _SettingsAccountSection on _SettingsScreenState {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: disabled ? null : _confirmDeleteAccount,
+              onPressed: canDeleteAccount ? _confirmDeleteAccount : null,
               icon: const Icon(Icons.person_remove_alt_1_outlined),
-              label: const Text('계정 삭제 — 소셜 연동 전체 해제'),
+              label: const Text('계정 삭제'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.redAccent),
@@ -305,6 +377,18 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Widget _linkedLoginAccountsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: _linkedLoginAccountsContent(),
+      ),
+    );
+  }
+
+  Widget _linkedLoginAccountsContent({
+    Future<void> Function()? onRefresh,
+    Future<void> Function(_LoginProviderOption option)? onLink,
+  }) {
     final providers = const [
       _LoginProviderOption(
         id: 'kakao',
@@ -324,62 +408,66 @@ extension _SettingsAccountSection on _SettingsScreenState {
       ),
       _LoginProviderOption(
         id: 'google',
-        label: 'Google',
+        label: '구글',
         provider: OAuthProvider.google,
         color: Colors.white,
         foreground: Color(0xFF333333),
         mark: 'G',
       ),
     ];
+    final refresh = onRefresh ?? _loadLinkedProviders;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Text(
-                  '로그인 계정',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const Spacer(),
-                IconButton(
-                  tooltip: '연동 상태 새로고침',
-                  onPressed:
-                      _isLoadingLinkedProviders ? null : _loadLinkedProviders,
-                  icon: _isLoadingLinkedProviders
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh, size: 20),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
             Text(
-              '처음 한 번만 연동하면 이후에는 같은 계정으로 바로 로그인할 수 있어요.',
-              style: Theme.of(context).textTheme.bodySmall,
+              '로그인 계정',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 12),
-            ...providers.map(
-              (provider) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _linkedLoginAccountTile(provider),
-              ),
+            const Spacer(),
+            IconButton(
+              tooltip: '연동 상태 새로고침',
+              onPressed: _isLoadingLinkedProviders
+                  ? null
+                  : () async {
+                      await refresh();
+                    },
+              icon: _isLoadingLinkedProviders
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 4),
+        Text(
+          '처음 한 번만 연동하면 이후에는 같은 계정으로 바로 로그인할 수 있어요.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        ...providers.map(
+          (provider) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _linkedLoginAccountTile(provider, onLink: onLink),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _linkedLoginAccountTile(_LoginProviderOption option) {
+  Widget _linkedLoginAccountTile(
+    _LoginProviderOption option, {
+    Future<void> Function(_LoginProviderOption option)? onLink,
+  }) {
     final linked = _linkedProviders.contains(option.id);
     final loading = _linkingProvider == option.id;
+    final link = onLink ?? _linkLoginProvider;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -431,7 +519,16 @@ extension _SettingsAccountSection on _SettingsScreenState {
             const Icon(Icons.check_circle, color: Colors.green)
           else
             OutlinedButton(
-              onPressed: loading ? null : () => _linkLoginProvider(option),
+              onPressed: loading
+                  ? null
+                  : () async {
+                      await link(option);
+                    },
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(56, 34),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               child: loading
                   ? const SizedBox(
                       width: 16,
@@ -443,6 +540,16 @@ extension _SettingsAccountSection on _SettingsScreenState {
         ],
       ),
     );
+  }
+
+  void _toggleLoginAccountsExpanded() {
+    _updateSettingsState(() {
+      _isLoginAccountsExpanded = !_isLoginAccountsExpanded;
+    });
+
+    if (_isLoginAccountsExpanded) {
+      _loadLinkedProviders();
+    }
   }
 
   Widget _statTile(String label, String value) {
@@ -585,9 +692,11 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Future<void> _confirmResetAccountData() async {
+    final profile = ref.read(userProfileProvider).asData?.value;
+    final hasRemoteProfile = profile?.isRemoteBacked == true;
     final confirmed = await _showDestructiveConfirmDialog(
       title: '이용 정보를 리셋할까요?',
-      message: _hasGoogleSession
+      message: _hasGoogleSession && hasRemoteProfile
           ? '북마크, 최근 본 리뷰, 리뷰 좋아요/싫어요, 검색 기록이 삭제됩니다. 로그인 계정과 코인/프리미엄 정보는 유지됩니다.'
           : '이 기기에 저장된 북마크와 최근 기록이 삭제됩니다.',
       confirmLabel: '리셋',
@@ -598,6 +707,14 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Future<void> _confirmDeleteAccount() async {
+    final profile = ref.read(userProfileProvider).asData?.value;
+    if (_hasGoogleSession && profile?.isRemoteBacked != true) {
+      _updateSettingsState(() {
+        _errorMessage = '계정 정보를 확인한 뒤 계정 삭제를 사용할 수 있습니다.';
+      });
+      return;
+    }
+
     final confirmed = await _showDestructiveConfirmDialog(
       title: _hasGoogleSession ? '계정을 삭제할까요?' : '임시 세션을 종료할까요?',
       message: _hasGoogleSession
@@ -640,7 +757,11 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Future<void> _resetAccountData() async {
-    if (!_hasGoogleSession) {
+    final profile = ref.read(userProfileProvider).asData?.value;
+    final shouldResetRemote =
+        _hasGoogleSession && profile?.isRemoteBacked == true;
+
+    if (!shouldResetRemote) {
       _updateSettingsState(() {
         _isSaving = true;
         _errorMessage = null;
@@ -672,6 +793,14 @@ extension _SettingsAccountSection on _SettingsScreenState {
   }
 
   Future<void> _deleteAccount() async {
+    final profile = ref.read(userProfileProvider).asData?.value;
+    if (_hasGoogleSession && profile?.isRemoteBacked != true) {
+      _updateSettingsState(() {
+        _errorMessage = '계정 정보를 확인한 뒤 계정 삭제를 사용할 수 있습니다.';
+      });
+      return;
+    }
+
     _updateSettingsState(() {
       _isSaving = true;
       _errorMessage = null;

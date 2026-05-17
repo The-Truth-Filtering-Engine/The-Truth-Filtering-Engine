@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/backend_config.dart';
+import '../map/models/map_point.dart';
 import '../map/map_provider.dart';
 import 'ai_recommend_item.dart';
 
@@ -16,6 +17,48 @@ enum AiRegionScope {
   final String fallbackLabel;
 
   const AiRegionScope(this.queryValue, this.fallbackLabel);
+}
+
+enum AiPriceRange {
+  any('any', '가격대 전체'),
+  value('value', '가성비'),
+  under10000('under_10000', '1만원 이하'),
+  between10000And20000('10000_20000', '1~2만원'),
+  between20000And40000('20000_40000', '2~4만원'),
+  specialDay('special_day', '특별한 날');
+
+  final String queryValue;
+  final String label;
+
+  const AiPriceRange(this.queryValue, this.label);
+}
+
+enum AiPartySize {
+  any('any', '인원 구성 전체'),
+  solo('solo', '혼자'),
+  two('two', '2명'),
+  smallGroup('small_group', '3~4명'),
+  group('group', '단체'),
+  parents('parents', '부모님'),
+  family('family', '아이/가족');
+
+  final String queryValue;
+  final String label;
+
+  const AiPartySize(this.queryValue, this.label);
+}
+
+enum AiTransportMode {
+  any('any', '이동 수단 전체'),
+  walk('walk', '도보'),
+  transit('transit', '대중교통'),
+  parking('parking', '주차 가능'),
+  publicParking('public_parking', '공영주차장 주변');
+
+  final String queryValue;
+  final String label;
+
+  const AiTransportMode(this.queryValue, this.label);
 }
 
 class AiRecommendState {
@@ -31,6 +74,12 @@ class AiRecommendState {
   final String currentRegionDong;
   final String currentRegionLabel;
   final bool isRegionFiltered;
+  final AiPriceRange priceRange;
+  final AiPartySize partySize;
+  final AiTransportMode transportMode;
+  final MapPoint? planningLocation;
+  final String planningLocationQuery;
+  final String planningLocationLabel;
 
   const AiRecommendState({
     this.items = const [],
@@ -45,7 +94,16 @@ class AiRecommendState {
     this.currentRegionDong = '',
     this.currentRegionLabel = '',
     this.isRegionFiltered = false,
+    this.priceRange = AiPriceRange.any,
+    this.partySize = AiPartySize.any,
+    this.transportMode = AiTransportMode.any,
+    this.planningLocation,
+    this.planningLocationQuery = '',
+    this.planningLocationLabel = '',
   });
+
+  bool get hasPlanningLocation =>
+      planningLocation != null || planningLocationQuery.trim().isNotEmpty;
 
   AiRecommendState copyWith({
     List<AiRecommendItem>? items,
@@ -60,6 +118,14 @@ class AiRecommendState {
     String? currentRegionDong,
     String? currentRegionLabel,
     bool? isRegionFiltered,
+    AiPriceRange? priceRange,
+    AiPartySize? partySize,
+    AiTransportMode? transportMode,
+    MapPoint? planningLocation,
+    String? planningLocationQuery,
+    String? planningLocationLabel,
+    bool clearPlanningCoordinates = false,
+    bool clearPlanningLocation = false,
     bool clearError = false,
   }) {
     return AiRecommendState(
@@ -75,6 +141,18 @@ class AiRecommendState {
       currentRegionDong: currentRegionDong ?? this.currentRegionDong,
       currentRegionLabel: currentRegionLabel ?? this.currentRegionLabel,
       isRegionFiltered: isRegionFiltered ?? this.isRegionFiltered,
+      priceRange: priceRange ?? this.priceRange,
+      partySize: partySize ?? this.partySize,
+      transportMode: transportMode ?? this.transportMode,
+      planningLocation: clearPlanningLocation || clearPlanningCoordinates
+          ? null
+          : planningLocation ?? this.planningLocation,
+      planningLocationQuery: clearPlanningLocation
+          ? ''
+          : planningLocationQuery ?? this.planningLocationQuery,
+      planningLocationLabel: clearPlanningLocation
+          ? ''
+          : planningLocationLabel ?? this.planningLocationLabel,
     );
   }
 }
@@ -84,6 +162,8 @@ final aiRecommendProvider =
         (ref) {
   return AiRecommendNotifier(ref)..loadPage(1);
 });
+
+final aiRecommendMapPickModeProvider = StateProvider<bool>((ref) => false);
 
 class AiRecommendNotifier extends StateNotifier<AiRecommendState> {
   final Ref _ref;
@@ -96,10 +176,49 @@ class AiRecommendNotifier extends StateNotifier<AiRecommendState> {
 
   Future<void> refresh() => loadPage(1);
 
-  Future<void> reloadForCurrentLocation() => loadPage(1);
+  Future<void> reloadForCurrentLocation() {
+    if (state.hasPlanningLocation) return Future.value();
+    return loadPage(1);
+  }
 
   Future<void> changeRegionScope(AiRegionScope regionScope) {
     return loadPage(1, regionScope: regionScope);
+  }
+
+  Future<void> changePriceRange(AiPriceRange priceRange) {
+    return loadPage(1, priceRange: priceRange);
+  }
+
+  Future<void> changePartySize(AiPartySize partySize) {
+    return loadPage(1, partySize: partySize);
+  }
+
+  Future<void> changeTransportMode(AiTransportMode transportMode) {
+    return loadPage(1, transportMode: transportMode);
+  }
+
+  Future<void> changePlanningLocationQuery(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return useCurrentLocation();
+    return loadPage(
+      1,
+      planningLocationQuery: trimmed,
+      planningLocationLabel: trimmed,
+      clearPlanningCoordinates: true,
+    );
+  }
+
+  Future<void> changePlanningLocationFromMap(MapPoint location) {
+    return loadPage(
+      1,
+      planningLocation: location,
+      planningLocationQuery: '',
+      planningLocationLabel: '지도에서 선택한 위치',
+    );
+  }
+
+  Future<void> useCurrentLocation() {
+    return loadPage(1, clearPlanningLocation: true);
   }
 
   Future<void> loadNextPage() {
@@ -112,18 +231,58 @@ class AiRecommendNotifier extends StateNotifier<AiRecommendState> {
     return loadPage(state.page - 1);
   }
 
-  Future<void> loadPage(int page, {AiRegionScope? regionScope}) async {
+  Future<void> loadPage(
+    int page, {
+    AiRegionScope? regionScope,
+    AiPriceRange? priceRange,
+    AiPartySize? partySize,
+    AiTransportMode? transportMode,
+    MapPoint? planningLocation,
+    String? planningLocationQuery,
+    String? planningLocationLabel,
+    bool clearPlanningCoordinates = false,
+    bool clearPlanningLocation = false,
+  }) async {
     final nextRegionScope = regionScope ?? state.regionScope;
+    final nextPriceRange = priceRange ?? state.priceRange;
+    final nextPartySize = partySize ?? state.partySize;
+    final nextTransportMode = transportMode ?? state.transportMode;
+    final nextPlanningLocation =
+        clearPlanningLocation || clearPlanningCoordinates
+            ? null
+            : planningLocation ?? state.planningLocation;
+    final nextPlanningLocationQuery = clearPlanningLocation
+        ? ''
+        : planningLocationQuery ?? state.planningLocationQuery;
+    final nextPlanningLocationLabel = clearPlanningLocation
+        ? ''
+        : planningLocationLabel ?? state.planningLocationLabel;
     final requestId = ++_requestId;
     state = state.copyWith(
       page: page,
       regionScope: nextRegionScope,
+      priceRange: nextPriceRange,
+      partySize: nextPartySize,
+      transportMode: nextTransportMode,
+      planningLocation: nextPlanningLocation,
+      planningLocationQuery: nextPlanningLocationQuery,
+      planningLocationLabel: nextPlanningLocationLabel,
+      clearPlanningCoordinates: clearPlanningCoordinates,
+      clearPlanningLocation: clearPlanningLocation,
       isLoading: true,
       clearError: true,
     );
 
     try {
-      final result = await _fetchPage(page, nextRegionScope);
+      final result = await _fetchPage(
+        page,
+        nextRegionScope,
+        priceRange: nextPriceRange,
+        partySize: nextPartySize,
+        transportMode: nextTransportMode,
+        planningLocation: nextPlanningLocation,
+        planningLocationQuery: nextPlanningLocationQuery,
+      );
       if (requestId != _requestId) return;
 
       state = state.copyWith(
@@ -138,6 +297,12 @@ class AiRecommendNotifier extends StateNotifier<AiRecommendState> {
         currentRegionDong: result.currentRegionDong,
         currentRegionLabel: result.currentRegionLabel,
         isRegionFiltered: result.isRegionFiltered,
+        priceRange: nextPriceRange,
+        partySize: nextPartySize,
+        transportMode: nextTransportMode,
+        planningLocation: nextPlanningLocation,
+        planningLocationQuery: nextPlanningLocationQuery,
+        planningLocationLabel: nextPlanningLocationLabel,
         clearError: true,
       );
     } catch (error) {
@@ -152,18 +317,29 @@ class AiRecommendNotifier extends StateNotifier<AiRecommendState> {
 
   Future<_AiRecommendPage> _fetchPage(
     int page,
-    AiRegionScope regionScope,
-  ) async {
+    AiRegionScope regionScope, {
+    required AiPriceRange priceRange,
+    required AiPartySize partySize,
+    required AiTransportMode transportMode,
+    required MapPoint? planningLocation,
+    required String planningLocationQuery,
+  }) async {
     final currentLocation = _ref.read(currentLocationProvider);
+    final requestLocation = planningLocation ?? currentLocation;
     final queryParameters = {
       'threshold': '0.1',
       'page': page.toString(),
       'pageSize': _pageSize.toString(),
       'regionScope': regionScope.queryValue,
+      'priceRange': priceRange.queryValue,
+      'partySize': partySize.queryValue,
+      'transportMode': transportMode.queryValue,
     };
-    if (currentLocation != null) {
-      queryParameters['lat'] = currentLocation.latitude.toString();
-      queryParameters['lng'] = currentLocation.longitude.toString();
+    if (requestLocation != null) {
+      queryParameters['lat'] = requestLocation.latitude.toString();
+      queryParameters['lng'] = requestLocation.longitude.toString();
+    } else if (planningLocationQuery.trim().isNotEmpty) {
+      queryParameters['locationQuery'] = planningLocationQuery.trim();
     }
 
     final uri = BackendConfig.apiUri(

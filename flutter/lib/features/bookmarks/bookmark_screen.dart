@@ -393,12 +393,23 @@ class _BookmarkTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = BookmarkColors.byKey(restaurant.bookmarkColorKey);
+    final colorKey = BookmarkTopics.colorKeyForTopicIds(
+      restaurant.bookmarkTopicIds,
+      customTopics: customTopics,
+      hiddenTopicIds: hiddenTopicIds,
+      fallbackColorKey: restaurant.bookmarkColorKey,
+    );
+    final color = BookmarkColors.byKey(colorKey);
     final topics = BookmarkTopics.labelsFor(
       restaurant.bookmarkTopicIds,
       customTopics: customTopics,
       hiddenTopicIds: hiddenTopicIds,
     );
+    final bookmarkLabel = topics.isEmpty
+        ? '즐겨찾기'
+        : topics.length == 1
+            ? topics.first
+            : '${topics.first} +${topics.length - 1}';
 
     return Material(
       color: AppColors.surface,
@@ -415,18 +426,31 @@ class _BookmarkTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.foreground,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.surface, width: 1.5),
-                ),
-                child: Icon(
-                  Icons.star_rounded,
-                  color: AppColors.surface,
-                  size: 22,
+              Tooltip(
+                message: '즐겨찾기에서 삭제',
+                child: Semantics(
+                  button: true,
+                  label: '즐겨찾기에서 삭제',
+                  child: GestureDetector(
+                    onTap: onRemove,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: color.foreground,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.star_rounded,
+                        color: AppColors.surface,
+                        size: 22,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -434,19 +458,47 @@ class _BookmarkTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      restaurant.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 96),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.background.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            bookmarkLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: color.foreground,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            restaurant.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${restaurant.category} · ${restaurant.address}',
+                      restaurant.category,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -454,40 +506,18 @@ class _BookmarkTile extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: topics.map((topic) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: color.background.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            topic,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: color.foreground,
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                    const SizedBox(height: 2),
+                    Text(
+                      restaurant.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: '북마크 삭제',
-                icon: const Icon(Icons.close_rounded, size: 18),
-                color: AppColors.textHint,
-                onPressed: onRemove,
               ),
             ],
           ),

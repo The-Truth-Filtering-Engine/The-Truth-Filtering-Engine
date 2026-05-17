@@ -49,8 +49,12 @@ class BookmarkTopics {
       '지역 전통 음식',
       colorKey: 'olive',
     ),
-    BookmarkTopicOption('premium_restaurant', '고급 식당', colorKey: 'graphite'),
-    BookmarkTopicOption('tv_featured_place', 'TV 출연 가게', colorKey: 'ocean'),
+    BookmarkTopicOption('premium_restaurant', '격식있는 모임', colorKey: 'graphite'),
+    BookmarkTopicOption(
+      'tv_featured_place',
+      'TV 출연 화제의 식당',
+      colorKey: 'ocean',
+    ),
     BookmarkTopicOption('old_local_place', '동네 오래된 맛집', colorKey: 'yellow'),
   ];
 
@@ -90,6 +94,28 @@ class BookmarkTopics {
     }
 
     return labels;
+  }
+
+  static String colorKeyForTopicIds(
+    List<String> ids, {
+    List<BookmarkTopicOption> customTopics = const [],
+    Set<String> hiddenTopicIds = const {},
+    String? fallbackColorKey,
+  }) {
+    final source = ids.isEmpty ? const [defaultTopicId] : ids;
+    final hiddenIds = hiddenTopicIds.map(_visibleTopicId).toSet();
+    final topicOptions = all(customTopics, hiddenIds);
+
+    for (final rawId in source.toList().reversed) {
+      final id = _visibleTopicId(rawId);
+      if (hiddenIds.contains(id)) continue;
+      final matches = topicOptions.where((topic) => topic.id == id);
+      if (matches.isNotEmpty) {
+        return BookmarkColors.byKey(matches.first.colorKey).key;
+      }
+    }
+
+    return BookmarkColors.byKey(fallbackColorKey).key;
   }
 
   static String visibleTopicId(String id) => _visibleTopicId(id);

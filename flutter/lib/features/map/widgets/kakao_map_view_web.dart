@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/backend_config.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../bookmarks/bookmark_options.dart';
 import '../models/map_point.dart';
 import '../models/restaurant_model.dart';
 
@@ -37,7 +38,7 @@ class KakaoMapView extends StatefulWidget {
 
 class KakaoMapViewState extends State<KakaoMapView> {
   static Completer<void>? _sdkLoader;
-  static const double _ultraZoomScale = 1.28;
+  static const int _maxMapLevel = 12;
 
   late final String _viewType;
   late final html.DivElement _clipContainer;
@@ -46,7 +47,6 @@ class KakaoMapViewState extends State<KakaoMapView> {
   js.JsObject? _map;
   bool _mapReady = false;
   bool _roadmapType = true;
-  bool _ultraZoomEnabled = false;
   String? _loadError;
   final List<js.JsObject> _restaurantOverlays = [];
   js.JsObject? _currentLocationOverlay;
@@ -70,7 +70,6 @@ class KakaoMapViewState extends State<KakaoMapView> {
     _container.style.setProperty('backface-visibility', 'hidden');
 
     _clipContainer.append(_container);
-    _clipContainer.onWheel.listen(_handleWheel);
 
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
@@ -240,13 +239,15 @@ class KakaoMapViewState extends State<KakaoMapView> {
       ..style.height = '28px'
       ..style.padding = '0'
       ..style.borderRadius = '50%'
-      ..style.border = '1.5px solid white'
+      ..style.border = _markerBorder(restaurant)
       ..style.backgroundColor = _markerColor(restaurant)
       ..style.boxShadow = '0 2px 6px rgba(0,0,0,.18)'
       ..style.cursor = 'pointer'
       ..style.fontSize = '16px'
+      ..style.fontWeight = _isFavoriteMarker(restaurant) ? '800' : '400'
       ..style.lineHeight = '25px'
-      ..style.textAlign = 'center';
+      ..style.textAlign = 'center'
+      ..style.color = _markerTextColor(restaurant);
 
     button.onClick.listen((event) {
       event.stopPropagation();
@@ -325,17 +326,11 @@ class KakaoMapViewState extends State<KakaoMapView> {
   void moveTo(MapPoint point, {int? level}) {
     if (_map == null) return;
     if (level != null) {
-      final isUltraZoom = level <= 0;
       _map!.callMethod('setMapTypeId', [_maps['MapTypeId']['ROADMAP']]);
       _roadmapType = true;
       _applyLevelBounds();
-      if (isUltraZoom) {
-        _map!.callMethod('setLevel', [1]);
-        _enableUltraZoom();
-      } else {
-        _disableUltraZoom();
-        _map!.callMethod('setLevel', [level]);
-      }
+      final targetLevel = level.clamp(1, _maxMapLevel).toInt();
+      _map!.callMethod('setLevel', [targetLevel]);
     }
     _map!.callMethod('panTo', [_latLng(point)]);
     _emitCameraIdle();
@@ -343,37 +338,28 @@ class KakaoMapViewState extends State<KakaoMapView> {
 
   void _applyLevelBounds() {
     if (_map == null) return;
-    _map!.callMethod('setMinLevel', [0]);
-    _map!.callMethod('setMaxLevel', [14]);
+    _map!.callMethod('setMinLevel', [_roadmapType ? 1 : 0]);
+    _map!.callMethod('setMaxLevel', [_maxMapLevel]);
   }
 
   void zoomIn() {
     if (_map == null) return;
     final level = (_map!.callMethod('getLevel') as num).toInt();
-    final targetLevel = level > 0 ? level - 1 : 0;
-    if (_roadmapType && targetLevel <= 1) {
-      _map!.callMethod('setLevel', [1]);
-      _enableUltraZoom();
-      return;
-    }
-    _disableUltraZoom();
+    final minLevel = _roadmapType ? 1 : 0;
+    final targetLevel = (level - 1).clamp(minLevel, _maxMapLevel).toInt();
     _map!.callMethod('setLevel', [targetLevel]);
   }
 
   void zoomOut() {
     if (_map == null) return;
-    if (_ultraZoomEnabled) {
-      _disableUltraZoom();
-      _map!.callMethod('setLevel', [1]);
-      return;
-    }
     final level = (_map!.callMethod('getLevel') as num).toInt();
-    _map!.callMethod('setLevel', [level + 1]);
+    final targetLevel =
+        (level + 1).clamp(_roadmapType ? 1 : 0, _maxMapLevel).toInt();
+    _map!.callMethod('setLevel', [targetLevel]);
   }
 
   void toggleMapType() {
     if (_map == null) return;
-    _disableUltraZoom();
     final mapTypeId = _roadmapType
         ? _maps['MapTypeId']['HYBRID']
         : _maps['MapTypeId']['ROADMAP'];
@@ -382,45 +368,11 @@ class KakaoMapViewState extends State<KakaoMapView> {
     _applyLevelBounds();
   }
 
-  void _handleWheel(html.WheelEvent event) {
-    if (_map == null || !_roadmapType) return;
-
-    final level = (_map!.callMethod('getLevel') as num).toInt();
-    if (event.deltaY < 0 && level <= 1) {
-      event.preventDefault();
-      event.stopPropagation();
-      _map!.callMethod('setLevel', [1]);
-      _enableUltraZoom();
-      return;
-    }
-
-    if (event.deltaY > 0 && _ultraZoomEnabled) {
-      event.preventDefault();
-      event.stopPropagation();
-      _disableUltraZoom();
-      _map!.callMethod('setLevel', [1]);
-    }
-  }
-
-  void _enableUltraZoom() {
-    if (_ultraZoomEnabled) return;
-
-    _ultraZoomEnabled = true;
-    _container.style.transform = 'scale($_ultraZoomScale)';
-    _container.style.transformOrigin = 'center center';
-    _container.style.transition = 'transform 0.18s ease-out';
-    _container.style.setProperty('will-change', 'transform');
-  }
-
-  void _disableUltraZoom() {
-    if (!_ultraZoomEnabled) return;
-
-    _ultraZoomEnabled = false;
-    _container.style.transform = 'scale(1)';
-    _container.style.setProperty('will-change', 'auto');
-  }
-
   String _markerEmoji(RestaurantModel restaurant) {
+    if (_isFavoriteMarker(restaurant)) {
+      return '★';
+    }
+
     final category = restaurant.category;
     final normalized = category.toLowerCase();
     if (category.contains('카페') ||
@@ -432,7 +384,25 @@ class KakaoMapViewState extends State<KakaoMapView> {
     return '🍽️';
   }
 
+  bool _isFavoriteMarker(RestaurantModel restaurant) {
+    return restaurant.isBookmarked ||
+        restaurant.bookmarkColorKey != null ||
+        restaurant.bookmarkTopicIds.isNotEmpty;
+  }
+
+  String _markerTextColor(RestaurantModel restaurant) {
+    return _isFavoriteMarker(restaurant) ? '#FFFFFF' : '';
+  }
+
+  String _markerBorder(RestaurantModel restaurant) {
+    return '1.5px solid #FFFFFF';
+  }
+
   String _markerColor(RestaurantModel restaurant) {
+    if (_isFavoriteMarker(restaurant)) {
+      return _bookmarkMarkerColor(restaurant);
+    }
+
     Color color;
     switch (restaurant.markerType) {
       case MarkerType.high:
@@ -440,7 +410,17 @@ class KakaoMapViewState extends State<KakaoMapView> {
       case MarkerType.low:
         color = AppColors.markerHigh;
     }
-    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+    return '#${color.r.toInt().toRadixString(16).padLeft(2, '0')}'
+        '${color.g.toInt().toRadixString(16).padLeft(2, '0')}'
+        '${color.b.toInt().toRadixString(16).padLeft(2, '0')}';
+  }
+
+  String _bookmarkMarkerColor(RestaurantModel restaurant) {
+    final colorKey = BookmarkTopics.colorKeyForTopicIds(
+      restaurant.bookmarkTopicIds,
+      fallbackColorKey: restaurant.bookmarkColorKey,
+    );
+    return BookmarkColors.markerHex(colorKey);
   }
 
   @override

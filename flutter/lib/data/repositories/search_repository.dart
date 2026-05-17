@@ -9,9 +9,17 @@ import '../../models/search_preview_models.dart';
 
 final searchRepositoryProvider = Provider<SearchRepository>((ref) {
   ref.watch(appAuthProvider);
-  final token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+  final token = _currentAccessToken();
   return SearchRepository(accessToken: token);
 });
+
+String _currentAccessToken() {
+  try {
+    return Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+  } catch (_) {
+    return '';
+  }
+}
 
 class SearchRepository {
   SearchRepository({required String accessToken})

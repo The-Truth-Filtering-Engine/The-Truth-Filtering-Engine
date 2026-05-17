@@ -3,18 +3,10 @@ import '../../../core/theme/app_colors.dart';
 
 class MapControlButtons extends StatelessWidget {
   final VoidCallback? onLocationTap;
-  final VoidCallback? onLayerTap;
-  final VoidCallback? onZoomIn;
-  final VoidCallback? onZoomOut;
-  final bool isLayerToggled;
 
   const MapControlButtons({
     super.key,
     this.onLocationTap,
-    this.onLayerTap,
-    this.onZoomIn,
-    this.onZoomOut,
-    this.isLayerToggled = false,
   });
 
   @override
@@ -26,24 +18,6 @@ class MapControlButtons extends StatelessWidget {
           icon: Icons.my_location,
           tooltip: '내 위치',
           onTap: onLocationTap,
-        ),
-        const SizedBox(height: 8),
-        _ControlButton(
-          icon: isLayerToggled ? Icons.layers : Icons.layers_outlined,
-          tooltip: '지도 전환',
-          onTap: onLayerTap,
-        ),
-        const SizedBox(height: 8),
-        _ControlButton(
-          icon: Icons.add,
-          tooltip: '확대',
-          onTap: onZoomIn,
-        ),
-        const SizedBox(height: 8),
-        _ControlButton(
-          icon: Icons.remove,
-          tooltip: '축소',
-          onTap: onZoomOut,
         ),
       ],
     );
@@ -77,7 +51,7 @@ class _ControlButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
+                  color: Colors.black.withValues(alpha: 0.10),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
                 ),

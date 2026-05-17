@@ -199,6 +199,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           (item) =>
               item.effectiveStoreId == selectedRestaurant.effectiveStoreId,
         );
+    RestaurantModel? selectedBookmark;
+    if (selectedRestaurant != null) {
+      for (final item in bookmarkedRestaurants) {
+        if (item.effectiveStoreId == selectedRestaurant.effectiveStoreId) {
+          selectedBookmark = item;
+          break;
+        }
+      }
+    }
+    final selectedRestaurantForSheet =
+        selectedBookmark == null || selectedRestaurant == null
+            ? selectedRestaurant
+            : selectedRestaurant.applyBookmarkMetadataFrom(selectedBookmark);
 
     return Scaffold(
       backgroundColor: AppColors.mapTeal,
@@ -345,7 +358,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutCubic,
                 child: RestaurantBottomSheet(
-                  restaurant: selectedRestaurant,
+                  restaurant: selectedRestaurantForSheet!,
                   isBookmarked: isSelectedBookmarked,
                   onDetailTap: () {
                     Navigator.push(

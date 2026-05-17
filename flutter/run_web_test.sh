@@ -36,6 +36,12 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# ── Naver OAuth ─────────────────────────────────────────────────
+NAVER_CLIENT_ID="MUUADsIYWROs07ZDyToI"
+NAVER_CLIENT_SECRET="anh11zkJgj"
+
 flutter run -d chrome --web-port 8080 \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+  --dart-define=NAVER_CLIENT_ID="$NAVER_CLIENT_ID" \
+  --dart-define=NAVER_CLIENT_SECRET="$NAVER_CLIENT_SECRET"

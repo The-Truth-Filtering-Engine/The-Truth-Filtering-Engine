@@ -92,7 +92,12 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
           BookmarkScreen(onViewPlace: _showRestaurantOnMap),
           RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
-          AiRecommendScreen(onViewPlace: _showRestaurantOnMap),
+          AiRecommendScreen(
+            onViewPlace: _showRestaurantOnMap,
+            onSelectTab: (index) {
+              ref.read(mainTabIndexProvider.notifier).state = index;
+            },
+          ),
           SettingsScreen(
             onSelectTab: (index) {
               ref.read(mainTabIndexProvider.notifier).state = index;
@@ -121,9 +126,9 @@ class _MainShellState extends ConsumerState<MainShell> {
               label: '탐색',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bookmark_border_rounded),
-              activeIcon: Icon(Icons.bookmark_rounded),
-              label: '북마크',
+              icon: Icon(Icons.star_border_rounded),
+              activeIcon: Icon(Icons.star_rounded),
+              label: '즐겨찾기',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
@@ -131,8 +136,8 @@ class _MainShellState extends ConsumerState<MainShell> {
               label: '최근 분석',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.auto_awesome_outlined),
-              activeIcon: Icon(Icons.auto_awesome_rounded),
+              icon: Icon(Icons.assignment_outlined),
+              activeIcon: Icon(Icons.assignment_rounded),
               label: 'AI 추천',
             ),
             BottomNavigationBarItem(

@@ -29,6 +29,7 @@ dependencies:
   
   # UI Components
   url_launcher: ^6.3.1
+  web: ^1.1.1
   webview_flutter: ^4.10.0
   percent_indicator: ^4.2.3
   google_fonts: ^6.2.1

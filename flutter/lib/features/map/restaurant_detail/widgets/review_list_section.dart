@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/blog_review.dart';
 import '../blog_review_url.dart';
+import '../blog_source_page.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/review_item.dart';
 
@@ -212,11 +212,15 @@ class _ReviewListSectionState extends State<ReviewListSection>
     final uri = mobileBlogReviewUri(blog.url);
     if (uri == null) return;
 
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint('Could not launch ${blog.url}: $e');
-    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlogSourcePage(
+          blogUri: uri,
+          title: '원문 보기',
+        ),
+      ),
+    );
   }
 
   List<BlogReview> get _currentBlogs => switch (_tabController.index) {

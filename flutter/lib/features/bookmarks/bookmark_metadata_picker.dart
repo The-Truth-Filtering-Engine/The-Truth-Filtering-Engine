@@ -142,10 +142,10 @@ Future<BookmarkMetadataSelection?> showBookmarkMetadataPicker({
                               context,
                               BookmarkMetadataSelection(
                                 topicIds: topicIds,
-                                colorKey: _colorKeyForSelectedTopics(
-                                  topics,
-                                  selectedTopics,
-                                  restaurant.bookmarkColorKey,
+                                colorKey: BookmarkTopics.colorKeyForTopicIds(
+                                  topicIds,
+                                  customTopics: customTopics,
+                                  fallbackColorKey: restaurant.bookmarkColorKey,
                                 ),
                               ),
                             );
@@ -163,19 +163,4 @@ Future<BookmarkMetadataSelection?> showBookmarkMetadataPicker({
       );
     },
   );
-}
-
-String _colorKeyForSelectedTopics(
-  List<BookmarkTopicOption> topics,
-  Set<String> selectedTopicIds,
-  String? fallbackColorKey,
-) {
-  for (final topicId in selectedTopicIds.toList().reversed) {
-    final visibleTopicId = BookmarkTopics.visibleTopicId(topicId);
-    final matches = topics.where((topic) => topic.id == visibleTopicId);
-    if (matches.isNotEmpty) {
-      return BookmarkColors.byKey(matches.first.colorKey).key;
-    }
-  }
-  return BookmarkColors.byKey(fallbackColorKey).key;
 }

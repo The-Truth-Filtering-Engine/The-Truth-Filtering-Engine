@@ -60,17 +60,22 @@ _MIN_QUERY_LENGTH = 2
 _VALID_CLICKED_TYPES = {"menu", "restaurant", "issue", "quick_preview"}
 
 _DEFAULT_TRENDING_CHIPS = [
-    {"id": "realtime", "label": "🔥 지금 뜨는 맛집"},
-    {"id": "popular", "label": "많이 찾는 맛집👍"},
-    {"id": "new", "label": "✨ 신상 맛집 ✨"},
-    {"id": "nostalgia", "label": "🕰️ 추억의 맛집"},
+    {"id": "realtime", "label": "지금 뜨는 맛집"},
+    {"id": "popular", "label": "많이 찾는 맛집"},
+    {"id": "new", "label": "신상 맛집"},
+    {"id": "nostalgia", "label": "추억의 맛집"},
 ]
 
 _TRENDING_LABEL_ALIASES = {
-    "실시간 검색 맛집": "🔥 지금 뜨는 맛집",
-    "지금 뜨는 맛집": "🔥 지금 뜨는 맛집",
-    "신상 맛집": "✨ 신상 맛집 ✨",
-    "추억의 맛집": "🕰️ 추억의 맛집",
+    "실시간 검색 맛집": "지금 뜨는 맛집",
+    "🔥 지금 뜨는 맛집": "지금 뜨는 맛집",
+    "지금 뜨는 맛집": "지금 뜨는 맛집",
+    "많이 찾는 맛집👍": "많이 찾는 맛집",
+    "많이 찾는 맛집": "많이 찾는 맛집",
+    "✨ 신상 맛집 ✨": "신상 맛집",
+    "신상 맛집": "신상 맛집",
+    "🕰️ 추억의 맛집": "추억의 맛집",
+    "추억의 맛집": "추억의 맛집",
 }
 
 _REMOVED_TRENDING_LABELS = {
@@ -83,7 +88,9 @@ _REMOVED_TRENDING_LABELS = {
     "이색 맛집",
     "지역 전통 음식",
     "고급 식당",
+    "격식있는 모임",
     "TV 출연 가게",
+    "TV 출연 화제의 식당",
     "동네 오래된 맛집",
 }
 
