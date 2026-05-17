@@ -23,8 +23,8 @@ import '../widgets/kakao_map_view.dart';
 import '../widgets/map_control_buttons.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/restaurant_bottom_sheet.dart';
-import '../../../screens/restaurant_list_screen.dart';
 import '../../ai_recommend/ai_recommend_provider.dart';
+import '../../search/semantic_search_keywords.dart';
 import '../restaurant_detail/restaurant_detail_screen.dart';
 import '../../search/search_screen.dart';
 
@@ -46,6 +46,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _viewportSearchReqId = 0;
 
   static const int _maxMapRestaurants = 10;
+  static const int _searchResultMapLevel = 3;
+  static const Offset _searchResultMarkerScreenOffset = Offset(0, -120);
   static const Duration _viewportDebounce = Duration(milliseconds: 600);
   static const int _refreshDistanceMeters = 150;
 
@@ -135,6 +137,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   MapPoint? _lastSearchedCenter;
   int? _lastSearchedLevel;
   String? _lastSearchedCategoryLabel;
+  String? _lastSearchedQuery;
+  String? _activeMapSearchQuery;
   KakaoMapCamera? _latestCamera;
   _MapCategoryChipData? _selectedMapCategory;
   int _latestMapLevel = _initialLevel;
@@ -271,6 +275,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         initialLatitude: currentLocation?.latitude,
                         initialLongitude: currentLocation?.longitude,
                         onSelectTab: widget.onSelectTab,
+                        onSearchSubmitted: _showSearchQueryOnMap,
                         onViewPlace: _showRestaurantFromSearchResult,
                       ),
                     ),
@@ -288,18 +293,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     return;
                   }
 
-                  final currentLocation = ref.read(currentLocationProvider);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RestaurantListScreen(
-                        query: query,
-                        initialLatitude: currentLocation?.latitude,
-                        initialLongitude: currentLocation?.longitude,
-                        onViewPlace: _showRestaurantFromSearchResult,
-                      ),
-                    ),
-                  );
+                  _showSearchQueryOnMap(query);
                 },
               ),
             ),
@@ -357,81 +351,84 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 offset: Offset.zero,
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutCubic,
-                child: RestaurantBottomSheet(
-                  restaurant: selectedRestaurantForSheet!,
-                  isBookmarked: isSelectedBookmarked,
-                  onDetailTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RestaurantDetailScreen(
-                          restaurant: selectedRestaurant,
+                child: PointerInterceptor(
+                  child: RestaurantBottomSheet(
+                    restaurant: selectedRestaurantForSheet!,
+                    isBookmarked: isSelectedBookmarked,
+                    onDetailTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RestaurantDetailScreen(
+                            restaurant: selectedRestaurant,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  onBookmarkTap: () async {
-                    final previous = ref.read(bookmarkRestaurantsProvider);
-                    final alreadyBookmarked = previous.any(
-                      (item) =>
-                          item.effectiveStoreId ==
-                          selectedRestaurant.effectiveStoreId,
-                    );
-                    if (alreadyBookmarked) {
-                      await ref
-                          .read(bookmarkRestaurantsProvider.notifier)
-                          .remove(selectedRestaurant);
+                      );
+                    },
+                    onBookmarkTap: () async {
+                      final previous = ref.read(bookmarkRestaurantsProvider);
+                      final alreadyBookmarked = previous.any(
+                        (item) =>
+                            item.effectiveStoreId ==
+                            selectedRestaurant.effectiveStoreId,
+                      );
+                      if (alreadyBookmarked) {
+                        await ref
+                            .read(bookmarkRestaurantsProvider.notifier)
+                            .remove(selectedRestaurant);
+
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('북마크에서 해제되었습니다'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final selection = await showBookmarkMetadataPicker(
+                        context: context,
+                        restaurant: selectedRestaurant,
+                        customTopics: ref.read(bookmarkCustomTopicsProvider),
+                        hiddenTopicIds:
+                            ref.read(bookmarkHiddenTopicIdsProvider),
+                      );
+                      if (!context.mounted || selection == null) return;
+
+                      await ref.read(bookmarkRestaurantsProvider.notifier).add(
+                            selectedRestaurant,
+                            topicIds: selection.topicIds,
+                            colorKey: selection.colorKey,
+                          );
 
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('북마크에서 해제되었습니다'),
+                          content: Text('북마크에 저장했습니다'),
                           duration: Duration(seconds: 1),
                         ),
                       );
-                      return;
-                    }
-
-                    final selection = await showBookmarkMetadataPicker(
-                      context: context,
-                      restaurant: selectedRestaurant,
-                      customTopics: ref.read(bookmarkCustomTopicsProvider),
-                      hiddenTopicIds: ref.read(bookmarkHiddenTopicIdsProvider),
-                    );
-                    if (!context.mounted || selection == null) return;
-
-                    await ref.read(bookmarkRestaurantsProvider.notifier).add(
-                          selectedRestaurant,
-                          topicIds: selection.topicIds,
-                          colorKey: selection.colorKey,
+                    },
+                    onShareTap: () {
+                      _shareRestaurant(selectedRestaurant, context);
+                    },
+                    onCallTap: () {
+                      _copyRestaurantPhone(selectedRestaurant, context);
+                    },
+                    onRouteTap: () async {
+                      final link = buildKakaoCarRouteUrl(selectedRestaurant);
+                      if (link != null && link.isNotEmpty) {
+                        final uri = Uri.parse(link);
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('길찾기 링크가 없습니다')),
                         );
-
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('북마크에 저장했습니다'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  onShareTap: () {
-                    _shareRestaurant(selectedRestaurant, context);
-                  },
-                  onCallTap: () {
-                    _copyRestaurantPhone(selectedRestaurant, context);
-                  },
-                  onRouteTap: () async {
-                    final link = buildKakaoCarRouteUrl(selectedRestaurant);
-                    if (link != null && link.isNotEmpty) {
-                      final uri = Uri.parse(link);
-                      await launchUrl(uri,
-                          mode: LaunchMode.externalApplication);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('길찾기 링크가 없습니다')),
-                      );
-                    }
-                  },
+                      }
+                    },
+                  ),
                 ),
               ),
             ),
@@ -453,18 +450,48 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.read(selectedRestaurantProvider.notifier).state = restaurant;
   }
 
-  void _openMapCategory(_MapCategoryChipData category) {
-    final shouldClear = _selectedMapCategory?.label == category.label;
-    final nextCategory = shouldClear ? null : category;
+  void _showSearchQueryOnMap(String query) {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) return;
 
     _viewportSearchTimer?.cancel();
+    _searchController.text = trimmed;
+    _searchController.selection = TextSelection.collapsed(
+      offset: _searchController.text.length,
+    );
+
     setState(() {
-      _selectedMapCategory = nextCategory;
+      _selectedMapCategory = null;
+      _activeMapSearchQuery = trimmed;
       _viewportRestaurants = const [];
       _viewportSearchError = null;
       _lastSearchedCenter = null;
       _lastSearchedLevel = null;
       _lastSearchedCategoryLabel = null;
+      _lastSearchedQuery = null;
+    });
+
+    ref.read(selectedRestaurantProvider.notifier).state = null;
+    ref.read(mapFocusRestaurantProvider.notifier).state = null;
+
+    _refreshRestaurantsForCurrentViewport(searchQuery: trimmed);
+  }
+
+  void _openMapCategory(_MapCategoryChipData category) {
+    final shouldClear = _selectedMapCategory?.label == category.label;
+    final nextCategory = shouldClear ? null : category;
+
+    _viewportSearchTimer?.cancel();
+    _searchController.clear();
+    setState(() {
+      _selectedMapCategory = nextCategory;
+      _activeMapSearchQuery = null;
+      _viewportRestaurants = const [];
+      _viewportSearchError = null;
+      _lastSearchedCenter = null;
+      _lastSearchedLevel = null;
+      _lastSearchedCategoryLabel = null;
+      _lastSearchedQuery = null;
     });
 
     ref.read(selectedRestaurantProvider.notifier).state = null;
@@ -474,8 +501,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onCameraIdle(KakaoMapCamera camera) {
-    _latestCamera = camera;
-    _latestMapLevel = camera.level;
+    setState(() {
+      _latestCamera = camera;
+      _latestMapLevel = camera.level;
+    });
     _onViewportChanged(camera);
   }
 
@@ -548,6 +577,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         level: camera.level,
         radiusMeters: radiusMeters,
         category: _selectedMapCategory,
+        searchQuery: _activeMapSearchQuery,
       );
     });
   }
@@ -559,8 +589,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final levelChanged = level != _lastSearchedLevel;
     final categoryChanged =
         _selectedMapCategory?.label != _lastSearchedCategoryLabel;
+    final queryChanged =
+        (_activeMapSearchQuery ?? '') != (_lastSearchedQuery ?? '');
 
     return categoryChanged ||
+        queryChanged ||
         movedMeters >= _refreshDistanceMeters ||
         levelChanged;
   }
@@ -598,6 +631,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     required int level,
     required int radiusMeters,
     _MapCategoryChipData? category,
+    String? searchQuery,
   }) async {
     final requestId = ++_viewportSearchReqId;
     if (!mounted) return;
@@ -605,7 +639,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() => _viewportSearchError = null);
 
     try {
-      final uri = category == null
+      final normalizedSearchQuery = searchQuery?.trim();
+      final effectiveSearchQuery =
+          normalizedSearchQuery == null || normalizedSearchQuery.isEmpty
+              ? null
+              : normalizedSearchQuery;
+      final semanticSearchKeywords = effectiveSearchQuery == null
+          ? const <String>[]
+          : await semanticRestaurantQueriesFor(effectiveSearchQuery);
+      final primarySearchQuery = category?.searchQuery ??
+          (semanticSearchKeywords.isEmpty
+              ? effectiveSearchQuery
+              : semanticSearchKeywords.first);
+      final uri = category == null && effectiveSearchQuery == null
           ? BackendConfig.uri('/places/nearby-restaurants', queryParameters: {
               'lat': center.latitude.toString(),
               'lng': center.longitude.toString(),
@@ -613,7 +659,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               'display': '10',
             })
           : BackendConfig.uri('/places/search-restaurants', queryParameters: {
-              'query': category.searchQuery,
+              'query': primarySearchQuery!,
               'lat': center.latitude.toString(),
               'lng': center.longitude.toString(),
               'radius': radiusMeters.toString(),
@@ -630,13 +676,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       final data = jsonDecode(response.body);
       final List items = data['restaurants'] ?? [];
-      if (category != null && category.keywords.length > 1) {
+      final additionalKeywords = category != null
+          ? category.keywords.skip(1)
+          : semanticSearchKeywords.skip(1);
+      if (additionalKeywords.isNotEmpty) {
         final seenIds = {
           for (final item in items)
             if (item is Map && item['id'] != null) item['id'].toString(),
         };
 
-        for (final keyword in category.keywords.skip(1)) {
+        for (final keyword in additionalKeywords) {
           final keywordUri =
               BackendConfig.uri('/places/search-restaurants', queryParameters: {
             'query': keyword,
@@ -688,8 +737,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       if (!mounted || requestId != _viewportSearchReqId) return;
 
-      final focusedRestaurant =
-          category == null ? ref.read(mapFocusRestaurantProvider) : null;
+      final focusedRestaurant = category == null && effectiveSearchQuery == null
+          ? ref.read(mapFocusRestaurantProvider)
+          : null;
       final mergedRestaurants = _appendRestaurantIfMissing(
             visibleRestaurants,
             focusedRestaurant,
@@ -709,15 +759,39 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _lastSearchedCenter = center;
         _lastSearchedLevel = level;
         _lastSearchedCategoryLabel = category?.label;
+        _lastSearchedQuery = effectiveSearchQuery;
+        if (mergedRestaurants.isEmpty &&
+            category == null &&
+            effectiveSearchQuery != null) {
+          _viewportSearchError = '"$effectiveSearchQuery" 주변 결과가 없습니다';
+        }
       });
-    } catch (_) {
+
+      if (effectiveSearchQuery != null && mergedRestaurants.isNotEmpty) {
+        final firstRestaurant = mergedRestaurants.first;
+        ref.read(selectedRestaurantProvider.notifier).state = firstRestaurant;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _mapViewKey.currentState?.moveTo(
+            MapPoint(
+              latitude: firstRestaurant.latitude,
+              longitude: firstRestaurant.longitude,
+            ),
+            level: _searchResultMapLevel,
+            screenOffset: _searchResultMarkerScreenOffset,
+          );
+        });
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Map restaurant search failed: $error\n$stackTrace');
       if (!mounted || requestId != _viewportSearchReqId) return;
-      setState(() => _viewportSearchError = '네트워크 에러가 발생했습니다');
+      setState(() => _viewportSearchError = '검색 결과를 불러오지 못했습니다');
     }
   }
 
   void _refreshRestaurantsForCurrentViewport({
     _MapCategoryChipData? category,
+    String? searchQuery,
   }) {
     final camera = _latestCamera;
     final center =
@@ -734,6 +808,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       level: level,
       radiusMeters: radiusMeters,
       category: category,
+      searchQuery: searchQuery,
     );
   }
 

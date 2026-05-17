@@ -21,6 +21,7 @@ class AiRecommendItem {
   final double? longitude;
   final String placeUrl;
   final String phone;
+  final AiRecommendEntities entities;
 
   const AiRecommendItem({
     required this.id,
@@ -43,6 +44,7 @@ class AiRecommendItem {
     required this.longitude,
     required this.placeUrl,
     required this.phone,
+    required this.entities,
   });
 
   factory AiRecommendItem.fromJson(Map<String, dynamic> json) {
@@ -67,6 +69,7 @@ class AiRecommendItem {
       longitude: _asNullableDouble(json['lng']),
       placeUrl: json['placeUrl']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
+      entities: AiRecommendEntities.fromJson(json['entities']),
     );
   }
 
@@ -118,4 +121,108 @@ class AiRecommendItem {
     if (value is String) return double.tryParse(value);
     return null;
   }
+}
+
+class AiRecommendEntities {
+  final List<String> persons;
+  final List<String> stores;
+  final List<String> locations;
+  final List<String> menus;
+  final List<String> brands;
+  final List<AiRecommendRawEntity> raw;
+
+  const AiRecommendEntities({
+    required this.persons,
+    required this.stores,
+    required this.locations,
+    required this.menus,
+    required this.brands,
+    required this.raw,
+  });
+
+  const AiRecommendEntities.empty()
+      : persons = const [],
+        stores = const [],
+        locations = const [],
+        menus = const [],
+        brands = const [],
+        raw = const [];
+
+  factory AiRecommendEntities.fromJson(Object? json) {
+    if (json is! Map) return const AiRecommendEntities.empty();
+
+    final data = Map<String, dynamic>.from(json);
+    return AiRecommendEntities(
+      persons: _asStringList(data['persons']),
+      stores: _asStringList(data['stores']),
+      locations: _asStringList(data['locations']),
+      menus: _asStringList(data['menus']),
+      brands: _asStringList(data['brands']),
+      raw: _asRawEntities(data['raw']),
+    );
+  }
+
+  List<String> get recommendationTags {
+    return _dedupeStrings([
+      ...menus,
+      ...stores,
+      ...brands,
+      ...locations,
+    ]).take(6).toList();
+  }
+
+  static List<String> _asStringList(Object? value) {
+    if (value is! List) return const [];
+
+    return value
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  static List<AiRecommendRawEntity> _asRawEntities(Object? value) {
+    if (value is! List) return const [];
+
+    return value
+        .map(AiRecommendRawEntity.fromJson)
+        .where((item) => item.text.isNotEmpty && item.type.isNotEmpty)
+        .toList();
+  }
+}
+
+class AiRecommendRawEntity {
+  final String text;
+  final String type;
+
+  const AiRecommendRawEntity({
+    required this.text,
+    required this.type,
+  });
+
+  factory AiRecommendRawEntity.fromJson(Object? json) {
+    if (json is! Map) {
+      return const AiRecommendRawEntity(text: '', type: '');
+    }
+
+    final data = Map<String, dynamic>.from(json);
+    return AiRecommendRawEntity(
+      text: data['text']?.toString().trim() ?? '',
+      type: data['type']?.toString().trim() ?? '',
+    );
+  }
+}
+
+List<String> _dedupeStrings(List<String> values) {
+  final seen = <String>{};
+  final result = <String>[];
+
+  for (final value in values) {
+    final text = value.trim();
+    if (text.isEmpty || seen.contains(text)) continue;
+
+    seen.add(text);
+    result.add(text);
+  }
+
+  return result;
 }

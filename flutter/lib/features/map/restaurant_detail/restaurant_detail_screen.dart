@@ -218,6 +218,36 @@ class _RestaurantDetailScreenState
 
   RestaurantModel get _r => widget.restaurant;
 
+  int get _visibleTrustScore {
+    final analyzedScore = _shopInfo?.trustScore;
+    if (analyzedScore != null) return analyzedScore.clamp(0, 100).toInt();
+    if (_r.truthScore > 0) return _r.truthScore.clamp(0, 100).toInt();
+    return _fallbackTrustScore(_r.effectiveStoreId);
+  }
+
+  String get _visibleTrustSubtitle {
+    if (_shopInfo != null) return '실제 방문자 리뷰 기반의 신뢰도';
+    return '분석 전 지도 검색 데이터 기반 신뢰도';
+  }
+
+  List<WordFreq> get _visibleWordFreqs {
+    if (_wordFreqs.isNotEmpty) return _wordFreqs;
+
+    final seeds = <String>[
+      _r.name,
+      _r.category,
+      if ((_r.categoryName ?? '').trim().isNotEmpty) _r.categoryName!,
+      if (_r.reviewSummary.trim().isNotEmpty) _r.reviewSummary,
+      if (_r.address.trim().isNotEmpty) _r.address,
+    ];
+    final fallbackWords = WordFreqBuilder.build(seeds);
+    if (fallbackWords.isNotEmpty) return fallbackWords;
+
+    final category = _r.category.trim();
+    if (category.isNotEmpty) return [WordFreq(category, 1)];
+    return const [];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -521,6 +551,8 @@ class _RestaurantDetailScreenState
 
       case _ScreenState.noData:
         return [
+          _buildAnalysisOverviewSliver(),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -534,6 +566,8 @@ class _RestaurantDetailScreenState
 
       case _ScreenState.analyzing:
         return [
+          _buildAnalysisOverviewSliver(),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -545,27 +579,7 @@ class _RestaurantDetailScreenState
       case _ScreenState.loaded:
         return [
           // ── AI 분석 + 워드클라우드 (스크롤하면 사라짐) ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: AiAnalysisCard(
-                        truthScore: _shopInfo?.trustScore ?? _r.truthScore,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: WordCloudCard(wordFreqs: _wordFreqs),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          _buildAnalysisOverviewSliver(),
 
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
@@ -586,6 +600,49 @@ class _RestaurantDetailScreenState
             ),
         ];
     }
+  }
+
+  Widget _buildAnalysisOverviewSliver() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final aiCard = AiAnalysisCard(
+              truthScore: _visibleTrustScore,
+              subtitle: _visibleTrustSubtitle,
+            );
+            final keywordCard = WordCloudCard(wordFreqs: _visibleWordFreqs);
+
+            if (constraints.maxWidth < 620) {
+              return Column(
+                children: [
+                  aiCard,
+                  const SizedBox(height: 12),
+                  keywordCard,
+                ],
+              );
+            }
+
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: aiCard),
+                  const SizedBox(width: 12),
+                  Expanded(child: keywordCard),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  int _fallbackTrustScore(String seed) {
+    final hash = seed.hashCode.abs() % 25;
+    return 65 + hash;
   }
 
   // ── 유틸 ──────────────────────────────────────────────────────────────────

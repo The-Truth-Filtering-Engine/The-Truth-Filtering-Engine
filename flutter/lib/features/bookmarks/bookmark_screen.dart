@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
@@ -13,10 +14,12 @@ const _allTopicId = 'all';
 
 class BookmarkScreen extends ConsumerStatefulWidget {
   final ValueChanged<RestaurantModel> onViewPlace;
+  final bool isActive;
 
   const BookmarkScreen({
     super.key,
     required this.onViewPlace,
+    this.isActive = true,
   });
 
   @override
@@ -25,6 +28,21 @@ class BookmarkScreen extends ConsumerStatefulWidget {
 
 class _BookmarkScreenState extends ConsumerState<BookmarkScreen> {
   String _selectedTopicId = _allTopicId;
+  final Map<String, RestaurantModel> _pendingRemovalRestaurants = {};
+
+  @override
+  void didUpdateWidget(covariant BookmarkScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      _flushPendingRemovals();
+    }
+  }
+
+  @override
+  void dispose() {
+    _flushPendingRemovals();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,17 +81,46 @@ class _BookmarkScreenState extends ConsumerState<BookmarkScreen> {
         }
 
         final restaurant = filteredBookmarks[index - 1];
+        final pendingRemovalKey = _bookmarkRemovalKey(restaurant);
         return _BookmarkTile(
           restaurant: restaurant,
           customTopics: customTopics,
           hiddenTopicIds: hiddenTopicIds,
+          isPendingRemoval:
+              _pendingRemovalRestaurants.containsKey(pendingRemovalKey),
           onViewPlace: widget.onViewPlace,
-          onRemove: () {
-            ref.read(bookmarkRestaurantsProvider.notifier).remove(restaurant);
-          },
+          onRemove: () => _togglePendingRemoval(restaurant),
         );
       },
     );
+  }
+
+  void _togglePendingRemoval(RestaurantModel restaurant) {
+    final key = _bookmarkRemovalKey(restaurant);
+    setState(() {
+      if (_pendingRemovalRestaurants.containsKey(key)) {
+        _pendingRemovalRestaurants.remove(key);
+      } else {
+        _pendingRemovalRestaurants[key] = restaurant;
+      }
+    });
+  }
+
+  void _flushPendingRemovals() {
+    if (_pendingRemovalRestaurants.isEmpty) return;
+    final restaurants = List<RestaurantModel>.of(
+      _pendingRemovalRestaurants.values,
+    );
+    _pendingRemovalRestaurants.clear();
+
+    final notifier = ref.read(bookmarkRestaurantsProvider.notifier);
+    for (final restaurant in restaurants) {
+      unawaited(notifier.remove(restaurant));
+    }
+  }
+
+  String _bookmarkRemovalKey(RestaurantModel restaurant) {
+    return restaurant.effectiveStoreId;
   }
 
   List<RestaurantModel> _filterBookmarks(List<RestaurantModel> bookmarks) {
@@ -380,6 +427,7 @@ class _BookmarkTile extends StatelessWidget {
   final RestaurantModel restaurant;
   final List<BookmarkTopicOption> customTopics;
   final Set<String> hiddenTopicIds;
+  final bool isPendingRemoval;
   final ValueChanged<RestaurantModel> onViewPlace;
   final VoidCallback onRemove;
 
@@ -387,6 +435,7 @@ class _BookmarkTile extends StatelessWidget {
     required this.restaurant,
     required this.customTopics,
     required this.hiddenTopicIds,
+    required this.isPendingRemoval,
     required this.onViewPlace,
     required this.onRemove,
   });
@@ -424,29 +473,35 @@ class _BookmarkTile extends StatelessWidget {
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Tooltip(
-                message: '즐겨찾기에서 삭제',
+                message: isPendingRemoval ? '삭제 예정 취소' : '즐겨찾기에서 삭제',
                 child: Semantics(
                   button: true,
-                  label: '즐겨찾기에서 삭제',
+                  label: isPendingRemoval ? '삭제 예정 취소' : '즐겨찾기에서 삭제',
                   child: GestureDetector(
                     onTap: onRemove,
                     child: Container(
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: color.foreground,
+                        color: isPendingRemoval
+                            ? color.background.withValues(alpha: 0.45)
+                            : color.foreground,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppColors.surface,
+                          color: isPendingRemoval
+                              ? color.border
+                              : AppColors.surface,
                           width: 1.5,
                         ),
                       ),
                       child: Icon(
                         Icons.star_rounded,
-                        color: AppColors.surface,
+                        color: isPendingRemoval
+                            ? color.foreground.withValues(alpha: 0.35)
+                            : AppColors.surface,
                         size: 22,
                       ),
                     ),

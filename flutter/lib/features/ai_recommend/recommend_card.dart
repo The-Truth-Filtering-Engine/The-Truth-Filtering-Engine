@@ -17,6 +17,8 @@ class RecommendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final entityTags = item.entities.recommendationTags;
+
     return DsCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -58,6 +60,21 @@ class RecommendCard extends StatelessWidget {
               style: AppText.body().copyWith(color: AppColors.textSecondary),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (entityTags.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: entityTags
+                  .map(
+                    (tag) => ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 132),
+                      child: DsBadge(label: tag, tone: DsTone.info),
+                    ),
+                  )
+                  .toList(),
             ),
           ],
           const SizedBox(height: 12),

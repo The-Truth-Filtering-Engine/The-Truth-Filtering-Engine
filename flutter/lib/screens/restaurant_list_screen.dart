@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/backend_config.dart';
 import '../core/theme/app_theme.dart';
 import '../features/map/models/restaurant_model.dart';
+import '../features/search/semantic_search_keywords.dart';
 
 class RestaurantListScreen extends StatefulWidget {
   const RestaurantListScreen({
@@ -88,37 +89,45 @@ class _RestaurantListScreenState extends State<RestaurantListScreen> {
       }
 
       final (lat, lng) = await _resolveLocation();
-      final params = <String, String>{'query': trimmed};
-      if (lat != null) params['lat'] = lat.toString();
-      if (lng != null) params['lng'] = lng.toString();
+      final queries = await semanticRestaurantQueriesFor(trimmed);
+      final restaurantsById = <String, RestaurantModel>{};
 
-      final response = await http.get(
-        BackendConfig.apiUri('/search/results', queryParameters: params),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      for (final query in queries) {
+        final params = <String, String>{'query': query};
+        if (lat != null) params['lat'] = lat.toString();
+        if (lng != null) params['lng'] = lng.toString();
 
-      final decoded = _decodeBody(response);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final detail = decoded is Map ? decoded['detail']?.toString() : null;
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = detail ?? '검색 API 오류 (${response.statusCode})';
-          _isLoading = false;
-        });
-        return;
+        final response = await http.get(
+          BackendConfig.apiUri('/search/results', queryParameters: params),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+
+        final decoded = _decodeBody(response);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          final detail = decoded is Map ? decoded['detail']?.toString() : null;
+          if (!mounted) return;
+          setState(() {
+            _errorMessage = detail ?? '검색 API 오류 (${response.statusCode})';
+            _isLoading = false;
+          });
+          return;
+        }
+
+        final rows = decoded is Map ? decoded['results'] : null;
+        final restaurants = rows is List
+            ? rows
+                .whereType<Map>()
+                .map((item) => _restaurantFromResult(item))
+                .toList()
+            : <RestaurantModel>[];
+        for (final restaurant in restaurants) {
+          restaurantsById[restaurant.effectiveStoreId] = restaurant;
+        }
       }
-
-      final rows = decoded is Map ? decoded['results'] : null;
-      final restaurants = rows is List
-          ? rows
-              .whereType<Map>()
-              .map((item) => _restaurantFromResult(item))
-              .toList()
-          : <RestaurantModel>[];
 
       if (!mounted) return;
       setState(() {
-        _results = restaurants;
+        _results = restaurantsById.values.toList();
         _isLoading = false;
       });
     } catch (_) {

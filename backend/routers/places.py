@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
 import httpx
 import os
+import re
 from math import radians, cos, sin, asin, sqrt
 
 router = APIRouter(prefix="/places", tags=["places"])
@@ -15,6 +16,61 @@ KAKAO_LOCAL_CATEGORY_URL = "https://dapi.kakao.com/v2/local/search/category.json
 KAKAO_LOCAL_KEYWORD_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
 KAKAO_CATEGORY_PAGE_SIZE_LIMIT = 15
+QUERY_SPLIT_SUFFIXES = (
+    "볶음밥",
+    "비빔밥",
+    "덮밥",
+    "국밥",
+    "김밥",
+    "떡볶이",
+    "라면",
+    "냉면",
+    "칼국수",
+    "파스타",
+    "피자",
+    "치킨",
+    "돈까스",
+    "돈가스",
+    "짜장면",
+    "짬뽕",
+    "마라탕",
+    "샤브샤브",
+    "햄버거",
+    "버거",
+    "샐러드",
+    "베이커리",
+    "카페",
+    "커피",
+    "라떼",
+    "케이크",
+    "맛집",
+)
+
+
+def query_variants(query: str) -> list[str]:
+    normalized = re.sub(r"\s+", " ", query.strip())
+    compact = re.sub(r"\s+", "", normalized)
+    variants: list[str] = []
+
+    def add(value: str) -> None:
+        value = value.strip()
+        if value and value not in variants:
+            variants.append(value)
+
+    add(normalized)
+    add(compact)
+
+    for suffix in QUERY_SPLIT_SUFFIXES:
+        if compact.endswith(suffix) and len(compact) > len(suffix):
+            prefix = compact[: -len(suffix)]
+            add(f"{prefix} {suffix}")
+
+            for prefix_suffix in QUERY_SPLIT_SUFFIXES:
+                if prefix.endswith(prefix_suffix) and len(prefix) > len(prefix_suffix):
+                    stem = prefix[: -len(prefix_suffix)]
+                    add(f"{stem} {prefix_suffix} {suffix}")
+
+    return variants
 
 def haversine(lat1, lng1, lat2, lng2):
     R = 6371000
@@ -135,9 +191,15 @@ async def search_restaurants(
     radius = max(1, min(radius, 20000))
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
 
-    async def fetch_keyword(client: httpx.AsyncClient, category_code: str):
+    search_queries = query_variants(query)
+
+    async def fetch_keyword(
+        client: httpx.AsyncClient,
+        category_code: str,
+        query_text: str,
+    ):
         params = {
-            "query": query,
+            "query": query_text,
             "category_group_code": category_code,
             "size": min(display, KAKAO_CATEGORY_PAGE_SIZE_LIMIT),
             "sort": "distance" if has_location else "accuracy",
@@ -170,8 +232,11 @@ async def search_restaurants(
 
     async with httpx.AsyncClient(timeout=5.0) as client:
         documents = []
-        for category_code in KAKAO_PLACE_CATEGORY_CODES:
-            documents.extend(await fetch_keyword(client, category_code))
+        for query_text in search_queries:
+            for category_code in KAKAO_PLACE_CATEGORY_CODES:
+                documents.extend(
+                    await fetch_keyword(client, category_code, query_text)
+                )
 
     restaurants = _restaurants_from_kakao_documents(
         documents,

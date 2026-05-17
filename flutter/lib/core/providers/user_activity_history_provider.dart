@@ -7,6 +7,7 @@ import '../config/backend_config.dart';
 
 class UserActivityHistoryClient {
   static const reviewOpenedType = 'review_opened';
+  static const analysisViewedType = 'analysis_viewed';
 
   const UserActivityHistoryClient._();
 
@@ -58,6 +59,22 @@ class UserActivityHistoryClient {
     );
 
     _throwIfFailed(response, fallbackError: 'activity history remove');
+  }
+
+  static Future<void> removeAnalysisViewed({
+    required String? accessToken,
+    required String storeId,
+  }) async {
+    if (accessToken == null) return;
+
+    final response = await http.delete(
+      BackendConfig.apiUri(
+        '/user/me/activity-history/$analysisViewedType/${Uri.encodeComponent(storeId)}',
+      ),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    _throwIfFailed(response, fallbackError: 'recent analysis remove');
   }
 
   static Future<void> clearReviewOpened(String? accessToken) async {

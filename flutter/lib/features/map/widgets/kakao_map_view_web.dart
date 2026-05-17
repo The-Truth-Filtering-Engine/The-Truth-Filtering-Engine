@@ -39,6 +39,9 @@ class KakaoMapView extends StatefulWidget {
 class KakaoMapViewState extends State<KakaoMapView> {
   static Completer<void>? _sdkLoader;
   static const int _maxMapLevel = 12;
+  static const String _definedKakaoJsKey = String.fromEnvironment(
+    'KAKAO_JS_KEY',
+  );
 
   late final String _viewType;
   late final html.DivElement _clipContainer;
@@ -153,11 +156,18 @@ class KakaoMapViewState extends State<KakaoMapView> {
   }
 
   static Future<String> _fetchKakaoJsKey() async {
-    final response = await html.HttpRequest.getString(
-      BackendConfig.uri('/config').toString(),
-    );
-    final decoded = jsonDecode(response) as Map<String, dynamic>;
-    return decoded['kakaoJsKey']?.toString().trim() ?? '';
+    final definedKey = _definedKakaoJsKey.trim();
+    if (definedKey.isNotEmpty) return definedKey;
+
+    try {
+      final response = await html.HttpRequest.getString(
+        BackendConfig.uri('/config').toString(),
+      );
+      final decoded = jsonDecode(response) as Map<String, dynamic>;
+      return decoded['kakaoJsKey']?.toString().trim() ?? '';
+    } catch (_) {
+      return '';
+    }
   }
 
   static Future<void> _loadKakaoSdk(String kakaoJsKey) {
@@ -231,23 +241,42 @@ class KakaoMapViewState extends State<KakaoMapView> {
   }
 
   html.Element _buildRestaurantMarker(RestaurantModel restaurant) {
+    final isFavorite = _isFavoriteMarker(restaurant);
+    final markerTextColor = _markerTextColor(restaurant);
+    final icon = html.SpanElement()
+      ..text = _markerEmoji(restaurant)
+      ..style.display = 'block'
+      ..style.lineHeight = '1'
+      ..style.pointerEvents = 'none'
+      ..style.color = markerTextColor
+      ..style.fontSize = isFavorite ? '19px' : '16px'
+      ..style.fontWeight = isFavorite ? '900' : '600';
+
     final button = html.ButtonElement()
       ..type = 'button'
       ..title = restaurant.name
-      ..text = _markerEmoji(restaurant)
       ..style.width = '28px'
       ..style.height = '28px'
       ..style.padding = '0'
+      ..style.boxSizing = 'border-box'
       ..style.borderRadius = '50%'
       ..style.border = _markerBorder(restaurant)
       ..style.backgroundColor = _markerColor(restaurant)
       ..style.boxShadow = '0 2px 6px rgba(0,0,0,.18)'
       ..style.cursor = 'pointer'
-      ..style.fontSize = '16px'
-      ..style.fontWeight = _isFavoriteMarker(restaurant) ? '800' : '400'
-      ..style.lineHeight = '25px'
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.justifyContent = 'center'
+      ..style.fontFamily = 'Arial, sans-serif'
+      ..style.fontSize = isFavorite ? '19px' : '16px'
+      ..style.fontWeight = isFavorite ? '900' : '600'
+      ..style.lineHeight = '1'
       ..style.textAlign = 'center'
-      ..style.color = _markerTextColor(restaurant);
+      ..style.color = markerTextColor;
+
+    button.style.setProperty('appearance', 'none');
+    button.style.setProperty('-webkit-appearance', 'none');
+    button.append(icon);
 
     button.onClick.listen((event) {
       event.stopPropagation();
@@ -323,7 +352,11 @@ class KakaoMapViewState extends State<KakaoMapView> {
     );
   }
 
-  void moveTo(MapPoint point, {int? level}) {
+  void moveTo(
+    MapPoint point, {
+    int? level,
+    Offset screenOffset = Offset.zero,
+  }) {
     if (_map == null) return;
     if (level != null) {
       _map!.callMethod('setMapTypeId', [_maps['MapTypeId']['ROADMAP']]);
@@ -332,7 +365,33 @@ class KakaoMapViewState extends State<KakaoMapView> {
       final targetLevel = level.clamp(1, _maxMapLevel).toInt();
       _map!.callMethod('setLevel', [targetLevel]);
     }
-    _map!.callMethod('panTo', [_latLng(point)]);
+
+    final target = _latLng(point);
+    if (screenOffset == Offset.zero) {
+      _map!.callMethod('panTo', [target]);
+      _emitCameraIdle();
+      return;
+    }
+
+    try {
+      _map!.callMethod('setCenter', [target]);
+      final projection = _map!.callMethod('getProjection') as js.JsObject;
+      final targetPoint = projection.callMethod(
+        'containerPointFromCoords',
+        [target],
+      ) as js.JsObject;
+      final targetCenterPoint = js.JsObject(_maps['Point'], [
+        (targetPoint['x'] as num).toDouble() - screenOffset.dx,
+        (targetPoint['y'] as num).toDouble() - screenOffset.dy,
+      ]);
+      final targetCenter = projection.callMethod(
+        'coordsFromContainerPoint',
+        [targetCenterPoint],
+      );
+      _map!.callMethod('panTo', [targetCenter]);
+    } catch (_) {
+      _map!.callMethod('panTo', [target]);
+    }
     _emitCameraIdle();
   }
 
@@ -391,16 +450,21 @@ class KakaoMapViewState extends State<KakaoMapView> {
   }
 
   String _markerTextColor(RestaurantModel restaurant) {
-    return _isFavoriteMarker(restaurant) ? '#FFFFFF' : '';
+    return _isFavoriteMarker(restaurant)
+        ? _bookmarkMarkerColor(restaurant)
+        : '';
   }
 
   String _markerBorder(RestaurantModel restaurant) {
+    if (_isFavoriteMarker(restaurant)) {
+      return '1.5px solid ${_bookmarkMarkerColor(restaurant)}';
+    }
     return '1.5px solid #FFFFFF';
   }
 
   String _markerColor(RestaurantModel restaurant) {
     if (_isFavoriteMarker(restaurant)) {
-      return _bookmarkMarkerColor(restaurant);
+      return _bookmarkMarkerBackgroundColor(restaurant);
     }
 
     Color color;
@@ -410,9 +474,12 @@ class KakaoMapViewState extends State<KakaoMapView> {
       case MarkerType.low:
         color = AppColors.markerHigh;
     }
-    return '#${color.r.toInt().toRadixString(16).padLeft(2, '0')}'
-        '${color.g.toInt().toRadixString(16).padLeft(2, '0')}'
-        '${color.b.toInt().toRadixString(16).padLeft(2, '0')}';
+    final r = (color.r * 255.0).round().clamp(0, 255);
+    final g = (color.g * 255.0).round().clamp(0, 255);
+    final b = (color.b * 255.0).round().clamp(0, 255);
+    return '#${r.toRadixString(16).padLeft(2, '0')}'
+        '${g.toRadixString(16).padLeft(2, '0')}'
+        '${b.toRadixString(16).padLeft(2, '0')}';
   }
 
   String _bookmarkMarkerColor(RestaurantModel restaurant) {
@@ -421,6 +488,20 @@ class KakaoMapViewState extends State<KakaoMapView> {
       fallbackColorKey: restaurant.bookmarkColorKey,
     );
     return BookmarkColors.markerHex(colorKey);
+  }
+
+  String _bookmarkMarkerBackgroundColor(RestaurantModel restaurant) {
+    final colorKey = BookmarkTopics.colorKeyForTopicIds(
+      restaurant.bookmarkTopicIds,
+      fallbackColorKey: restaurant.bookmarkColorKey,
+    );
+    final color = BookmarkColors.byKey(colorKey).background;
+    final r = (color.r * 255.0).round().clamp(0, 255);
+    final g = (color.g * 255.0).round().clamp(0, 255);
+    final b = (color.b * 255.0).round().clamp(0, 255);
+    return '#${r.toRadixString(16).padLeft(2, '0')}'
+        '${g.toRadixString(16).padLeft(2, '0')}'
+        '${b.toRadixString(16).padLeft(2, '0')}';
   }
 
   @override

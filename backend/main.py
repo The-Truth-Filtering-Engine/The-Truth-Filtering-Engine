@@ -9,13 +9,15 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import search, places, ai_recommend, users, search_preview
-from services.electra_service import load_model
+from services.electra_service import load_model as load_electra_model
+from services.ner_service import load_model as load_ner_model
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 서버 시작 시 ELECTRA 모델 1회 로드
-    load_model()
+    load_electra_model()
+    load_ner_model()
     yield
     # 서버 종료 시 필요한 정리 작업이 있으면 여기에 추가
 

@@ -378,7 +378,7 @@ async def clear_my_recent_visits(
 
 @router.delete("/user/me/activity-history/{activity_type}/{activity_id}")
 async def delete_my_activity_history_item(
-    activity_type: Literal["review_opened"],
+    activity_type: Literal["review_opened", "analysis_viewed"],
     activity_id: str,
     authorization: str | None = Header(default=None),
 ):

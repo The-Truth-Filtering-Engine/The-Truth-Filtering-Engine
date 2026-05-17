@@ -33,11 +33,26 @@ class _LikedReviewsSettingsScreenState
   }
 }
 
-class _LikedReviewsSettingsList extends ConsumerWidget {
+class _LikedReviewsSettingsList extends ConsumerStatefulWidget {
   const _LikedReviewsSettingsList();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LikedReviewsSettingsList> createState() =>
+      _LikedReviewsSettingsListState();
+}
+
+class _LikedReviewsSettingsListState
+    extends ConsumerState<_LikedReviewsSettingsList> {
+  final Map<String, LikedReview> _pendingRemovalReviews = {};
+
+  @override
+  void dispose() {
+    _flushPendingRemovals();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final likedReviews = ref.watch(likedReviewsProvider);
 
     return likedReviews.when(
@@ -65,9 +80,12 @@ class _LikedReviewsSettingsList extends ConsumerWidget {
           separatorBuilder: (_, __) => const Divider(height: 0),
           itemBuilder: (context, index) {
             final review = reviews[index];
+            final isPendingRemoval =
+                _pendingRemovalReviews.containsKey(review.id);
 
             return _LikedReviewSettingsTile(
               review: review,
+              isPendingRemoval: isPendingRemoval,
               onTap: () => _recordRecentReviewAndOpen(
                 context,
                 ref,
@@ -77,46 +95,58 @@ class _LikedReviewsSettingsList extends ConsumerWidget {
                 reviewTitle: review.title,
                 reviewDescription: review.description,
               ),
-              onRemove: () async {
-                final userId = ref.read(currentUserIdProvider);
-                try {
-                  await ref.read(likedReviewsProvider.notifier).remove(
-                        review.id,
-                      );
-                  if (userId != null) {
-                    ref
-                        .read(
-                          reviewLikeProvider(
-                            ReviewLikeProviderKey(
-                              reviewId: review.id,
-                              userId: userId,
-                            ),
-                          ).notifier,
-                        )
-                        .markUnliked();
-                  }
-                } catch (_) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('내 하트를 해제하지 못했습니다.')),
-                  );
-                }
-              },
+              onRemove: () => _togglePendingRemoval(review),
             );
           },
         );
       },
     );
   }
+
+  void _togglePendingRemoval(LikedReview review) {
+    setState(() {
+      if (_pendingRemovalReviews.containsKey(review.id)) {
+        _pendingRemovalReviews.remove(review.id);
+      } else {
+        _pendingRemovalReviews[review.id] = review;
+      }
+    });
+  }
+
+  void _flushPendingRemovals() {
+    if (_pendingRemovalReviews.isEmpty) return;
+    final reviews = List<LikedReview>.of(_pendingRemovalReviews.values);
+    _pendingRemovalReviews.clear();
+
+    final userId = ref.read(currentUserIdProvider);
+    final likedReviewsNotifier = ref.read(likedReviewsProvider.notifier);
+    for (final review in reviews) {
+      if (userId != null) {
+        ref
+            .read(
+              reviewLikeProvider(
+                ReviewLikeProviderKey(
+                  reviewId: review.id,
+                  userId: userId,
+                ),
+              ).notifier,
+            )
+            .markUnliked();
+      }
+      unawaited(likedReviewsNotifier.remove(review.id));
+    }
+  }
 }
 
 class _LikedReviewSettingsTile extends StatelessWidget {
   final LikedReview review;
+  final bool isPendingRemoval;
   final VoidCallback? onTap;
   final VoidCallback onRemove;
 
   const _LikedReviewSettingsTile({
     required this.review,
+    required this.isPendingRemoval,
     required this.onTap,
     required this.onRemove,
   });
@@ -127,8 +157,13 @@ class _LikedReviewSettingsTile extends StatelessWidget {
 
     return ListTile(
       leading: IconButton(
-        tooltip: '내 하트 해제',
-        icon: const Icon(Icons.favorite, color: Color(0xFFE85C5C)),
+        tooltip: isPendingRemoval ? '해제 예정 취소' : '내 하트 해제',
+        icon: Icon(
+          Icons.favorite,
+          color: isPendingRemoval
+              ? const Color(0xFFE85C5C).withValues(alpha: 0.3)
+              : const Color(0xFFE85C5C),
+        ),
         onPressed: onRemove,
       ),
       title: Text(

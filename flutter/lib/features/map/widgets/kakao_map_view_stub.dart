@@ -28,7 +28,11 @@ class KakaoMapView extends StatefulWidget {
 }
 
 class KakaoMapViewState extends State<KakaoMapView> {
-  void moveTo(MapPoint point, {int? level}) {}
+  void moveTo(
+    MapPoint point, {
+    int? level,
+    Offset screenOffset = Offset.zero,
+  }) {}
 
   void zoomIn() {}
 

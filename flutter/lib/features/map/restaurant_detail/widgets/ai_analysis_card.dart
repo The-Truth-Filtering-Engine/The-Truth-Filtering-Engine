@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 
 class AiAnalysisCard extends StatelessWidget {
   final int truthScore;
+  final String subtitle;
 
-  const AiAnalysisCard({super.key, required this.truthScore});
+  const AiAnalysisCard({
+    super.key,
+    required this.truthScore,
+    this.subtitle = '실제 방문자 리뷰 기반의 신뢰도',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +38,9 @@ class AiAnalysisCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            '실제 방문자 리뷰 기반의 신뢰도',
-            style: TextStyle(fontSize: 11, color: Color(0xFF9090A8)),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF9090A8)),
           ),
           const SizedBox(height: 24),
 

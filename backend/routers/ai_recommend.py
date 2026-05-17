@@ -1,9 +1,12 @@
+import html
 import os
+import re
 from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Query
 
+from services.ner_service import empty_entities, extract_entities
 from services.supabase_service import get_ai_recommendation_reviews
 
 router = APIRouter(tags=["ai-recommendations"])
@@ -15,6 +18,14 @@ KAKAO_COORD_TO_REGION_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncod
 KAKAO_PLACE_CATEGORY_CODES = ("FD6", "CE7")
 AI_RECOMMEND_SCAN_PAGE_LIMIT = 8
 AI_RECOMMEND_REGION_QUERY_PAGE_SIZE = 50
+FOREIGN_TRAVEL_CONTEXT_TERMS = (
+    "다낭",
+    "베트남",
+    "미케비치",
+    "호이안",
+    "나트랑",
+    "푸꾸옥",
+)
 
 RegionScope = Literal["dong", "gu", "si"]
 FoodFeature = Literal[
@@ -93,35 +104,17 @@ async def ai_recommendations(
         transport_mode=transport_mode,
     )
 
-    if region or has_recommendation_filters:
-        items, has_next = await _load_filtered_items(
-            threshold=threshold,
-            page=page,
-            page_size=page_size,
-            region=region,
-            region_scope=region_scope,
-            food_feature=food_feature,
-            price_range=price_range,
-            party_size=party_size,
-            transport_mode=transport_mode,
-        )
-    else:
-        result = await get_ai_recommendation_reviews(
-            threshold=threshold,
-            page=page,
-            page_size=page_size,
-        )
-        reviews = result.get("items", [])
-        places_by_name = await _find_places_by_names([review.get("name") for review in reviews])
-
-        items = [
-            _build_response_item(
-                review,
-                places_by_name.get((review.get("name") or "").strip()),
-            )
-            for review in reviews
-        ]
-        has_next = result.get("has_next", False)
+    items, has_next = await _load_filtered_items(
+        threshold=threshold,
+        page=page,
+        page_size=page_size,
+        region=region,
+        region_scope=region_scope,
+        food_feature=food_feature,
+        price_range=price_range,
+        party_size=party_size,
+        transport_mode=transport_mode,
+    )
 
     region_label = _format_region_label(region, region_scope) if region else ""
 
@@ -158,6 +151,7 @@ async def _load_filtered_items(
 ) -> tuple[list[dict], bool]:
     target_count = page * page_size + 1
     filtered_items: list[dict] = []
+    seen_place_keys: set[str] = set()
     source_has_next = True
     scan_page = 1
     address_terms = _address_search_terms(region, region_scope) if region else None
@@ -192,7 +186,16 @@ async def _load_filtered_items(
             ):
                 continue
 
-            filtered_items.append(_build_response_item(review, place))
+            item = _build_response_item(review, place)
+            if _should_skip_recommendation_item(review, item):
+                continue
+
+            place_key = _recommendation_place_key(item)
+            if place_key in seen_place_keys:
+                continue
+
+            seen_place_keys.add(place_key)
+            filtered_items.append(item)
             if len(filtered_items) >= target_count:
                 break
 
@@ -260,6 +263,38 @@ def _recommendation_filter_text(review: dict, place: dict | None) -> str:
     return _normalize_filter_text(" ".join(parts))
 
 
+def _extract_recommendation_entities(review: dict, place: dict | None) -> dict:
+    parts = [
+        review.get("name") or "",
+        review.get("review_title") or "",
+        review.get("review_description") or "",
+        review.get("category_name") or "",
+        review.get("category_group_name") or "",
+        review.get("address_name") or "",
+        review.get("road_address_name") or "",
+    ]
+    if place:
+        parts.extend(
+            [
+                place.get("place_name") or "",
+                place.get("category_name") or "",
+                place.get("address_name") or "",
+                place.get("road_address_name") or "",
+            ]
+        )
+
+    text = _clean_entity_text(" ".join(str(part or "") for part in parts))
+    if not text:
+        return empty_entities()
+
+    return extract_entities(text)
+
+
+def _clean_entity_text(value: str) -> str:
+    without_tags = re.sub(r"<[^>]+>", " ", value)
+    return re.sub(r"\s+", " ", html.unescape(without_tags)).strip()
+
+
 def _matches_filter_terms(text: str, terms: list[str]) -> bool:
     if not terms:
         return True
@@ -270,9 +305,50 @@ def _normalize_filter_text(value: str) -> str:
     return value.replace(" ", "").casefold().strip()
 
 
+def _recommendation_place_key(item: dict) -> str:
+    place_id = str(item.get("placeId") or "").strip()
+    if place_id:
+        return f"id:{place_id}"
+
+    name = _normalize_filter_text(str(item.get("placeName") or item.get("name") or ""))
+    address = _normalize_filter_text(str(item.get("address") or ""))
+    if name or address:
+        return f"text:{name}:{address}"
+
+    return f"review:{item.get('id') or ''}"
+
+
+def _should_skip_recommendation_item(review: dict, item: dict) -> bool:
+    review_text = _normalize_filter_text(
+        _clean_entity_text(
+            " ".join(
+                [
+                    str(review.get("review_title") or ""),
+                    str(review.get("review_description") or ""),
+                ]
+            )
+        )
+    )
+    if not review_text:
+        return False
+
+    if _looks_like_foreign_travel_context(review_text):
+        return True
+
+    return False
+
+
+def _looks_like_foreign_travel_context(review_text: str) -> bool:
+    return any(
+        _normalize_filter_text(term) in review_text
+        for term in FOREIGN_TRAVEL_CONTEXT_TERMS
+    )
+
+
 def _build_response_item(review: dict, place: dict | None) -> dict:
     review_address = review.get("road_address_name") or review.get("address_name") or ""
     review_place_url = review.get("place_url") or ""
+    entities = _extract_recommendation_entities(review, place)
     item = {
         "id": review.get("id"),
         "name": review.get("name") or "",
@@ -294,6 +370,7 @@ def _build_response_item(review: dict, place: dict | None) -> dict:
         "lng": None,
         "placeUrl": review_place_url,
         "phone": review.get("phone") or "",
+        "entities": entities,
     }
 
     if not place:

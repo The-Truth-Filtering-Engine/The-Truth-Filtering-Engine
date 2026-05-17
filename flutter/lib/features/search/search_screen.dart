@@ -4,8 +4,8 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/design_system/app_tokens.dart';
 import '../../core/design_system/widgets/widgets.dart';
-import '../../core/theme/app_colors.dart';
 import '../../models/search_history_models.dart';
 import '../../models/search_preview_models.dart';
 import '../../screens/restaurant_list_screen.dart';
@@ -23,6 +23,7 @@ class SearchScreen extends ConsumerStatefulWidget {
     double? initialLongitude,
     ValueChanged<RestaurantModel>? onRestaurantSelected,
     ValueChanged<RestaurantModel>? onViewPlace,
+    this.onSearchSubmitted,
     this.onSelectTab,
   })  : initialLatitude = initialLatitude ?? initialLat,
         initialLongitude = initialLongitude ?? initialLng,
@@ -35,6 +36,7 @@ class SearchScreen extends ConsumerStatefulWidget {
   final double? initialLatitude;
   final double? initialLongitude;
   final ValueChanged<RestaurantModel>? onViewPlace;
+  final ValueChanged<String>? onSearchSubmitted;
   final ValueChanged<int>? onSelectTab;
 
   @override
@@ -85,7 +87,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         initialLatitude: widget.initialLatitude,
         initialLongitude: widget.initialLongitude,
         onRestaurantSelected: widget.onViewPlace!,
-        onTrendingRankSelected: _saveTrendingRankHistory,
       );
     }
 
@@ -173,7 +174,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           initialLatitude: widget.initialLatitude,
           initialLongitude: widget.initialLongitude,
           onRestaurantSelected: widget.onViewPlace!,
-          onTrendingRankSelected: _saveTrendingRankHistory,
         );
     }
   }
@@ -206,29 +206,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
   }
 
-  void _applyQuery(String query) {
-    final trimmed = query.trim();
-    _textController.text = trimmed;
-    _textController.selection = TextSelection.collapsed(
-      offset: _textController.text.length,
-    );
-    _onQueryChanged(trimmed);
-    _focusNode.requestFocus();
-  }
-
   void _selectTrendingCategory(SearchTrendingChip chip) {
-    _submitSearch(_trendingSearchQuery(chip.label), saveToRecent: false);
-  }
-
-  String _trendingSearchQuery(String label) {
-    if (label.contains('지금 뜨는')) return '지금 뜨는 맛집';
-    if (label.contains('많이 찾는')) return '많이 찾는 맛집';
-    if (label.contains('신상')) return '신상 맛집';
-    if (label.contains('추억')) return '추억의 맛집';
-    return label
-        .replaceAll(RegExp(r'[^0-9A-Za-z가-힣\s]'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    setState(() => _selectedTrendingLabel = chip.label);
+    _focusNode.unfocus();
   }
 
   void _openTrendingRestaurant(_TrendingRankItem item) {
@@ -248,7 +228,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _applyRecentQuery(String query) {
-    _applyQuery(query);
+    _submitSearch(query, saveToRecent: false);
   }
 
   void _clearQuery() {
@@ -270,7 +250,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       lat: widget.initialLatitude,
       lng: widget.initialLongitude,
     );
-    controller.onSubmit();
     if (saveToRecent) {
       unawaited(
         controller.onResultSelected(
@@ -283,6 +262,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
     _focusNode.unfocus();
+
+    final onSearchSubmitted = widget.onSearchSubmitted;
+    if (onSearchSubmitted != null) {
+      onSearchSubmitted(trimmed);
+      Navigator.of(context).maybePop();
+      return;
+    }
+
+    controller.onSubmit();
   }
 
   void _selectRelatedSearch(String query) {
@@ -831,7 +819,7 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
     _page = _middlePage(widget.rankings.length);
     _controller = PageController(
       initialPage: _page,
-      viewportFraction: 0.44,
+      viewportFraction: 0.58,
     );
     _startTimer();
   }
@@ -896,7 +884,7 @@ class _TrendingRankCarouselState extends State<_TrendingRankCarousel> {
     if (widget.rankings.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: 34,
+      height: 58,
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(
           dragDevices: {
@@ -940,57 +928,99 @@ class _TrendingRankCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trendColor =
+        item.trendUp ? AppColors.success700 : AppColors.warning700;
+
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 7),
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: AppColors.border, width: 0.5),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                height: 20,
-                constraints: const BoxConstraints(minWidth: 26),
-                padding: const EdgeInsets.symmetric(horizontal: 5),
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF4F7EC),
-                  borderRadius: BorderRadius.circular(999),
+                  color: _trendingRankBg(item.rank),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  '${item.rank}위',
-                  style: const TextStyle(
+                  '${item.rank}',
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF5F8E2F),
+                    color: _trendingRankFg(item.rank),
+                    height: 1,
                   ),
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          item.trendUp
+                              ? Icons.trending_up_rounded
+                              : Icons.remove_rounded,
+                          size: 13,
+                          color: trendColor,
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            item.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: trendColor,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: Color(0xFF8DAF54),
+              const SizedBox(width: 4),
+              const SizedBox(
+                height: 30,
+                child: Center(
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: Color(0xFF8DAF54),
+                  ),
+                ),
               ),
             ],
           ),
@@ -1127,30 +1157,15 @@ class _SubmittedBody extends StatelessWidget {
     required this.initialLatitude,
     required this.initialLongitude,
     required this.onRestaurantSelected,
-    required this.onTrendingRankSelected,
   });
 
   final String query;
   final double? initialLatitude;
   final double? initialLongitude;
   final ValueChanged<RestaurantModel> onRestaurantSelected;
-  final void Function(_TrendingRankItem item, RestaurantModel restaurant)
-      onTrendingRankSelected;
 
   @override
   Widget build(BuildContext context) {
-    final rankings = _rankingsForSubmittedQuery(query);
-    if (rankings.isNotEmpty) {
-      return _TrendingSubmittedResultsBody(
-        query: query,
-        rankings: rankings,
-        initialLatitude: initialLatitude,
-        initialLongitude: initialLongitude,
-        onRestaurantSelected: onRestaurantSelected,
-        onTrendingRankSelected: onTrendingRankSelected,
-      );
-    }
-
     return RestaurantListScreen(
       query: query,
       initialLatitude: initialLatitude,
@@ -1160,436 +1175,9 @@ class _SubmittedBody extends StatelessWidget {
   }
 }
 
-class _TrendingSubmittedResultsBody extends StatefulWidget {
-  const _TrendingSubmittedResultsBody({
-    required this.query,
-    required this.rankings,
-    required this.initialLatitude,
-    required this.initialLongitude,
-    required this.onRestaurantSelected,
-    required this.onTrendingRankSelected,
-  });
+Color _trendingRankBg(int rank) => const Color(0xFFF4F7EC);
 
-  final String query;
-  final List<_TrendingRankItem> rankings;
-  final double? initialLatitude;
-  final double? initialLongitude;
-  final ValueChanged<RestaurantModel> onRestaurantSelected;
-  final void Function(_TrendingRankItem item, RestaurantModel restaurant)
-      onTrendingRankSelected;
-
-  @override
-  State<_TrendingSubmittedResultsBody> createState() =>
-      _TrendingSubmittedResultsBodyState();
-}
-
-class _TrendingSubmittedResultsBodyState
-    extends State<_TrendingSubmittedResultsBody> {
-  late final TextEditingController _queryController;
-
-  @override
-  void initState() {
-    super.initState();
-    _queryController = TextEditingController(text: widget.query);
-  }
-
-  @override
-  void didUpdateWidget(covariant _TrendingSubmittedResultsBody oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.query != widget.query &&
-        _queryController.text != widget.query) {
-      _queryController.text = widget.query;
-      _queryController.selection = TextSelection.collapsed(
-        offset: _queryController.text.length,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _queryController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 18,
-            color: AppColors.textSecondary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: _TrendingSubmittedSearchField(
-          controller: _queryController,
-          onSubmitted: _submitSearch,
-          onSearchTap: () => _submitSearch(_queryController.text),
-          onClear: () {
-            _queryController.clear();
-          },
-        ),
-        titleSpacing: 0,
-        actions: const [
-          SizedBox(width: 12),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(0.5),
-          child: Divider(thickness: 0.5, height: 0.5, color: AppColors.border),
-        ),
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
-        itemCount: widget.rankings.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 5),
-        itemBuilder: (context, index) {
-          final item = widget.rankings[index];
-          return _TrendingSubmittedRankTile(
-            item: item,
-            onTap: () => _openRestaurant(context, item),
-          );
-        },
-      ),
-    );
-  }
-
-  void _submitSearch(String query) {
-    final trimmed = query.trim();
-    if (trimmed.length < 2) return;
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => _SubmittedBody(
-          query: trimmed,
-          initialLatitude: widget.initialLatitude,
-          initialLongitude: widget.initialLongitude,
-          onRestaurantSelected: widget.onRestaurantSelected,
-          onTrendingRankSelected: widget.onTrendingRankSelected,
-        ),
-      ),
-    );
-  }
-
-  void _openRestaurant(BuildContext context, _TrendingRankItem item) {
-    final restaurant = _restaurantForTrendingRankItem(
-      item,
-      initialLatitude: widget.initialLatitude,
-      initialLongitude: widget.initialLongitude,
-    );
-    widget.onTrendingRankSelected(item, restaurant);
-    widget.onRestaurantSelected(restaurant);
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RestaurantDetailScreen(restaurant: restaurant),
-      ),
-    );
-  }
-}
-
-class _TrendingSubmittedSearchField extends StatelessWidget {
-  const _TrendingSubmittedSearchField({
-    required this.controller,
-    required this.onSubmitted,
-    required this.onSearchTap,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onSubmitted;
-  final VoidCallback onSearchTap;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.only(left: 12, right: 4),
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border, width: 0.5),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search_rounded, size: 16, color: AppColors.textHint),
-          const SizedBox(width: 6),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textInputAction: TextInputAction.search,
-              onSubmitted: onSubmitted,
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                hintText: '음식점 또는 메뉴를 검색',
-                hintStyle: TextStyle(color: AppColors.textHint),
-              ),
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, value, __) {
-              if (value.text.isEmpty) return const SizedBox(width: 2);
-              return IconButton(
-                icon: const Icon(
-                  Icons.cancel_rounded,
-                  size: 16,
-                  color: AppColors.textHint,
-                ),
-                onPressed: onClear,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: '지우기',
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.search_rounded,
-              size: 16,
-              color: AppColors.primary500,
-            ),
-            onPressed: onSearchTap,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            tooltip: '검색',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrendingSubmittedRankTile extends StatelessWidget {
-  const _TrendingSubmittedRankTile({
-    required this.item,
-    required this.onTap,
-  });
-
-  final _TrendingRankItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isTopThree = item.rank <= 3;
-    final badgeColor =
-        isTopThree ? const Color(0xFFFFF4E6) : const Color(0xFFF4F7EC);
-    final badgeTextColor =
-        isTopThree ? const Color(0xFFB45C00) : const Color(0xFF5F8E2F);
-
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 58),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Container(
-                height: 24,
-                constraints: const BoxConstraints(minWidth: 36),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '${item.rank}위',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
-                    color: badgeTextColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        _InlineMetaPill(label: item.category),
-                        const SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            item.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    _RecommendedMenuStrip(item: item),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: AppColors.textHint,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineMetaPill extends StatelessWidget {
-  const _InlineMetaPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 72),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4FBEA),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFD8F1AA), width: 0.7),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF315F00),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendedMenuStrip extends StatelessWidget {
-  const _RecommendedMenuStrip({required this.item});
-
-  final _TrendingRankItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final menus = item.recommendedMenus;
-
-    return SizedBox(
-      height: 24,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final chipWidth = (constraints.maxWidth - 18) / 4;
-          final visibleChipWidth = chipWidth.clamp(54.0, 120.0).toDouble();
-
-          return ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(
-              dragDevices: {
-                PointerDeviceKind.touch,
-                PointerDeviceKind.mouse,
-                PointerDeviceKind.stylus,
-                PointerDeviceKind.invertedStylus,
-              },
-            ),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              itemCount: menus.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (context, index) {
-                return SizedBox(
-                  width: visibleChipWidth,
-                  child: _RecommendedMenuChip(menu: menus[index]),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _RecommendedMenuChip extends StatelessWidget {
-  const _RecommendedMenuChip({required this.menu});
-
-  final _RecommendedMenuItem menu;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F8),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '${menu.label} ${menu.priceLabel}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendedMenuItem {
-  const _RecommendedMenuItem({
-    required this.label,
-    required this.priceLabel,
-  });
-
-  final String label;
-  final String priceLabel;
-}
+Color _trendingRankFg(int rank) => const Color(0xFF5F8E2F);
 
 class _RecentChipData {
   const _RecentChipData({
@@ -1609,20 +1197,6 @@ List<_TrendingRankItem> _rankingsForTrendingLabel(String? label) {
   if (label.contains('신상')) return _newPlaceRanks;
   if (label.contains('추억')) return _nostalgicPlaceRanks;
   return _hotPlaceRanks;
-}
-
-List<_TrendingRankItem> _rankingsForSubmittedQuery(String query) {
-  final normalized = query
-      .replaceAll(RegExp(r'[^0-9A-Za-z가-힣]'), '')
-      .replaceAll(RegExp(r'\s+'), '');
-
-  if (normalized.contains('많이찾는맛집')) return _mostSearchedRanks;
-  if (normalized.contains('신상맛집')) return _newPlaceRanks;
-  if (normalized.contains('추억의맛집')) return _nostalgicPlaceRanks;
-  if (normalized.contains('지금뜨는맛집') || normalized.contains('실시간검색맛집')) {
-    return _hotPlaceRanks;
-  }
-  return const [];
 }
 
 RestaurantModel _restaurantForTrendingRankItem(
@@ -1653,6 +1227,12 @@ class _TrendingRankItem {
   final int rank;
   final String title;
   final String subtitle;
+
+  bool get trendUp {
+    return subtitle.contains('상승') ||
+        subtitle.contains('증가') ||
+        subtitle.contains('방문');
+  }
 
   String get region {
     if (title.contains('수원') || title.contains('남문') || title.contains('팔달문')) {
@@ -1714,124 +1294,6 @@ class _TrendingRankItem {
       return '한식';
     }
     return '음식점';
-  }
-
-  String get representativeKeyword {
-    if (title.contains('스타벅스')) return '돌체라떼';
-    if (title.contains('커피빈')) return '아메리카노';
-    if (title.contains('블루보틀')) return '콜드브루';
-    if (title.contains('폴바셋')) return '라떼';
-    if (title.contains('투썸')) return '케이크';
-    if (title.contains('돌체')) return '돌체 케이크';
-    if (title.contains('뉴올리언스')) return '브런치';
-    if (title.contains('온기정')) return '텐동';
-    if (title.contains('정돈')) return '돈카츠';
-    if (title.contains('다운타우너') || title.contains('쉐이크쉑')) return '버거';
-    if (title.contains('카페거리')) return '호수공원 카페';
-    if (title.contains('스시') || title.contains('오마카세')) return '오마카세';
-    if (title.contains('갈비')) return '갈비';
-    if (title.contains('마라')) return '마라탕';
-    if (title.contains('홍콩반점') || title.contains('손짜장')) return '짜장면';
-    if (title.contains('분식') || title.contains('떡볶이')) return '떡볶이';
-    if (title.contains('국밥')) return '국밥';
-    if (title.contains('통닭')) return '통닭';
-    if (title.contains('냉면')) return '냉면';
-    if (title.contains('빵집') || title.contains('르빵')) return '소금빵';
-    if (title.contains('포케')) return '포케';
-    if (title.contains('다방')) return '쌍화차';
-    if (title.contains('기사식당')) return '제육백반';
-    if (title.contains('바')) return '칵테일';
-    return category;
-  }
-
-  String get representativePriceLabel {
-    final menu = representativeKeyword;
-    return switch (menu) {
-      '돌체라떼' => '5,900원',
-      '아메리카노' => '4,500원',
-      '콜드브루' => '5,800원',
-      '라떼' => '5,500원',
-      '케이크' => '6,800원',
-      '돌체 케이크' => '7,200원',
-      '브런치' => '15,000원',
-      '텐동' => '12,000원',
-      '돈카츠' => '14,000원',
-      '버거' => '9,800원',
-      '호수공원 카페' => '6,000원',
-      '오마카세' => '변동가',
-      '갈비' => '19,000원',
-      '마라탕' => '11,000원',
-      '짜장면' => '7,000원',
-      '떡볶이' => '5,500원',
-      '국밥' => '9,000원',
-      '통닭' => '18,000원',
-      '냉면' => '10,000원',
-      '소금빵' => '3,800원',
-      '포케' => '12,500원',
-      '쌍화차' => '7,000원',
-      '제육백반' => '9,000원',
-      '칵테일' => '14,000원',
-      _ => '가격 문의',
-    };
-  }
-
-  List<_RecommendedMenuItem> get recommendedMenus {
-    final categoryLabel = category;
-    return <_RecommendedMenuItem>[
-      _RecommendedMenuItem(
-        label: representativeKeyword,
-        priceLabel: _normalizedPriceLabel(representativePriceLabel),
-      ),
-      _RecommendedMenuItem(label: '$categoryLabel 시그니처', priceLabel: '가격 문의'),
-      _RecommendedMenuItem(label: '$categoryLabel 세트', priceLabel: '가격 문의'),
-      _RecommendedMenuItem(label: '$categoryLabel 사이드', priceLabel: '가격 문의'),
-    ];
-  }
-
-  String _normalizedPriceLabel(String priceLabel) {
-    final trimmed = priceLabel.trim();
-    if (trimmed.isEmpty) return '가격 문의';
-    if (trimmed.contains('문의') ||
-        trimmed.contains('가게') ||
-        trimmed.contains('변동') ||
-        trimmed.contains('臾몄쓽') ||
-        trimmed.contains('蹂')) {
-      return '가격 문의';
-    }
-    return trimmed;
-  }
-
-  IconData get representativeIcon {
-    final menu = representativeKeyword;
-    if (category == '카페' || menu.contains('라떼') || menu.contains('커피')) {
-      return Icons.local_cafe_rounded;
-    }
-    if (category == '베이커리' || menu.contains('케이크') || menu.contains('빵')) {
-      return Icons.bakery_dining_rounded;
-    }
-    if (menu.contains('버거')) return Icons.lunch_dining_rounded;
-    if (menu.contains('갈비') || menu.contains('통닭')) {
-      return Icons.outdoor_grill_rounded;
-    }
-    if (menu.contains('칵테일')) return Icons.local_bar_rounded;
-    if (menu.contains('포케')) return Icons.eco_rounded;
-    if (category == '일식') return Icons.ramen_dining_rounded;
-    return Icons.restaurant_rounded;
-  }
-
-  Color get representativeImageColor {
-    return switch (category) {
-      '카페' => const Color(0xFF8B6A4F),
-      '베이커리' => const Color(0xFFD28A4C),
-      '일식' => const Color(0xFF5577AA),
-      '중식' => const Color(0xFFC65B4A),
-      '양식' => const Color(0xFF6B8E5A),
-      '분식' => const Color(0xFFE07A91),
-      '건강식' => const Color(0xFF55A878),
-      '바' => const Color(0xFF6750A4),
-      '한식' => const Color(0xFFB87931),
-      _ => const Color(0xFF8890A6),
-    };
   }
 
   RestaurantModel toRestaurantModel({

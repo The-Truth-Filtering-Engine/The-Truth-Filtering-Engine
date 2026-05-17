@@ -42,6 +42,30 @@ class RecentAnalysesNotifier extends StateNotifier<AsyncValue<RecentAnalyses>> {
       state = AsyncValue.error(error, stackTrace);
     }
   }
+
+  Future<void> remove(RecentAnalysisItem item) async {
+    final token = _accessToken;
+    if (token == null) return;
+
+    final previous = state.asData?.value;
+    if (previous != null) {
+      state = AsyncValue.data(previous.withoutStoreId(item.storeId));
+    }
+
+    try {
+      await UserActivityHistoryClient.removeAnalysisViewed(
+        accessToken: token,
+        storeId: item.storeId,
+      );
+    } catch (error, stackTrace) {
+      if (previous != null) {
+        state = AsyncValue.data(previous);
+      } else {
+        state = AsyncValue.error(error, stackTrace);
+      }
+      rethrow;
+    }
+  }
 }
 
 class RecentAnalyses {
@@ -62,6 +86,15 @@ class RecentAnalyses {
   final List<RecentAnalysisItem> expiredItems;
 
   bool get isEmpty => freeItems.isEmpty && expiredItems.isEmpty;
+
+  RecentAnalyses withoutStoreId(String storeId) {
+    return RecentAnalyses(
+      today: today,
+      freeItems: freeItems.where((item) => item.storeId != storeId).toList(),
+      expiredItems:
+          expiredItems.where((item) => item.storeId != storeId).toList(),
+    );
+  }
 
   factory RecentAnalyses.fromJson(Map<String, dynamic> json) {
     return RecentAnalyses(

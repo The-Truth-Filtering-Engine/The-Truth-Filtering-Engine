@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
@@ -61,6 +62,8 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(mainTabIndexProvider);
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.surface,
@@ -80,7 +83,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
       ),
       body: IndexedStack(
-        index: ref.watch(mainTabIndexProvider),
+        index: currentIndex,
         children: [
           MapScreen(
             onSelectTab: (index) {
@@ -90,8 +93,14 @@ class _MainShellState extends ConsumerState<MainShell> {
               ref.read(mainTabIndexProvider.notifier).state = 4;
             },
           ),
-          BookmarkScreen(onViewPlace: _showRestaurantOnMap),
-          RecentAnalysisScreen(onViewPlace: _showRestaurantOnMap),
+          BookmarkScreen(
+            isActive: currentIndex == 1,
+            onViewPlace: _showRestaurantOnMap,
+          ),
+          RecentAnalysisScreen(
+            isActive: currentIndex == 2,
+            onViewPlace: _showRestaurantOnMap,
+          ),
           AiRecommendScreen(
             onViewPlace: _showRestaurantOnMap,
             onSelectTab: (index) {
@@ -105,47 +114,50 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
-        ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          currentIndex: ref.watch(mainTabIndexProvider),
-          onTap: (index) =>
-              ref.read(mainTabIndexProvider.notifier).state = index,
-          selectedLabelStyle: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
+      bottomNavigationBar: PointerInterceptor(
+        child: Container(
+          decoration: const BoxDecoration(
+            border:
+                Border(top: BorderSide(color: AppColors.border, width: 0.5)),
           ),
-          unselectedLabelStyle: const TextStyle(fontSize: 10),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.map_outlined),
-              activeIcon: Icon(Icons.map_rounded),
-              label: '탐색',
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            currentIndex: currentIndex,
+            onTap: (index) =>
+                ref.read(mainTabIndexProvider.notifier).state = index,
+            selectedLabelStyle: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.star_border_rounded),
-              activeIcon: Icon(Icons.star_rounded),
-              label: '즐겨찾기',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              activeIcon: Icon(Icons.history_toggle_off_rounded),
-              label: '최근 분석',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.assignment_outlined),
-              activeIcon: Icon(Icons.assignment_rounded),
-              label: 'AI 추천',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings_rounded),
-              label: '설정',
-            ),
-          ],
+            unselectedLabelStyle: const TextStyle(fontSize: 10),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.map_outlined),
+                activeIcon: Icon(Icons.map_rounded),
+                label: '탐색',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.star_border_rounded),
+                activeIcon: Icon(Icons.star_rounded),
+                label: '즐겨찾기',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_rounded),
+                activeIcon: Icon(Icons.history_toggle_off_rounded),
+                label: '최근 분석',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.assignment_outlined),
+                activeIcon: Icon(Icons.assignment_rounded),
+                label: 'AI 추천',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.settings_outlined),
+                activeIcon: Icon(Icons.settings_rounded),
+                label: '설정',
+              ),
+            ],
+          ),
         ),
       ),
     );

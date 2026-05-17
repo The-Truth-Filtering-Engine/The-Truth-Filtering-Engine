@@ -18,6 +18,7 @@ SUPABASE_KEY = (
 USER_PROFILE_SELECT = "id,email,premium,coin,freecount,premiumcount,store,bookmark"
 ANALYSIS_COIN_COST = 100
 MAX_RECENT_VISITS = 30
+RECENT_ANALYSIS_RETENTION_DAYS = 14
 ACTIVITY_REVIEW_OPENED = "review_opened"
 ACTIVITY_ANALYSIS_VIEWED = "analysis_viewed"
 ANALYSIS_USAGE_REQUIRED_MESSAGE = "추가분석을 위해 코인을 충전해 주세요"
@@ -569,8 +570,11 @@ async def get_user_recent_analyses(email: str) -> dict:
                 "storeId": store_id,
                 "analyzedDate": date_text,
                 "daysElapsed": days_elapsed,
-                "remainingFreeDays": 1
-                if days_elapsed is not None and days_elapsed < 2
+                "remainingFreeDays": max(
+                    0,
+                    RECENT_ANALYSIS_RETENTION_DAYS - days_elapsed,
+                )
+                if days_elapsed is not None
                 else 0,
                 "restaurant": None,
             }
@@ -602,13 +606,14 @@ async def get_user_recent_analyses(email: str) -> dict:
     free_items = [
         item
         for item in recent_entries
-        if isinstance(item.get("daysElapsed"), int) and item["daysElapsed"] < 2
+        if isinstance(item.get("daysElapsed"), int)
+        and item["daysElapsed"] < RECENT_ANALYSIS_RETENTION_DAYS
     ]
     expired_items = [
         item
         for item in recent_entries
         if not isinstance(item.get("daysElapsed"), int)
-        or item.get("daysElapsed", 0) >= 2
+        or item.get("daysElapsed", 0) >= RECENT_ANALYSIS_RETENTION_DAYS
     ]
 
     return {
@@ -1018,8 +1023,25 @@ async def remove_user_activity(
     normalized_type = _text_or_none(activity_type)
     if normalized_type == ACTIVITY_REVIEW_OPENED:
         return await remove_user_recent_visit(email, activity_id)
+    if normalized_type == ACTIVITY_ANALYSIS_VIEWED:
+        return await remove_user_recent_analysis(email, activity_id)
 
     raise ValueError(f"Unsupported activity type: {activity_type}")
+
+
+async def remove_user_recent_analysis(email: str, store_id: str) -> dict:
+    normalized_email = _text_or_none(email)
+    normalized_store_id = _text_or_none(store_id)
+    if not normalized_email:
+        raise RuntimeError("User email is required")
+    if not normalized_store_id:
+        raise RuntimeError("storeId is required")
+
+    profile = await ensure_user_profile(normalized_email)
+    store_date_map = _normalize_store_date_map(profile.get("store"))
+    store_date_map.pop(normalized_store_id, None)
+    await _patch_user_profile(normalized_email, {"store": store_date_map})
+    return await get_user_recent_analyses(normalized_email)
 
 
 async def clear_user_recent_visits(email: str) -> dict:

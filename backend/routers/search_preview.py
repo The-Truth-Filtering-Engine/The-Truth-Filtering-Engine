@@ -58,6 +58,35 @@ _HISTORY_LIMIT = 20
 _CACHE_TTL_DAYS = 14
 _MIN_QUERY_LENGTH = 2
 _VALID_CLICKED_TYPES = {"menu", "restaurant", "issue", "quick_preview"}
+_QUERY_SPLIT_SUFFIXES = (
+    "볶음밥",
+    "비빔밥",
+    "덮밥",
+    "국밥",
+    "김밥",
+    "떡볶이",
+    "라면",
+    "냉면",
+    "칼국수",
+    "파스타",
+    "피자",
+    "치킨",
+    "돈까스",
+    "돈가스",
+    "짜장면",
+    "짬뽕",
+    "마라탕",
+    "샤브샤브",
+    "햄버거",
+    "버거",
+    "샐러드",
+    "베이커리",
+    "카페",
+    "커피",
+    "라떼",
+    "케이크",
+    "맛집",
+)
 
 _DEFAULT_TRENDING_CHIPS = [
     {"id": "realtime", "label": "지금 뜨는 맛집"},
@@ -179,6 +208,14 @@ def _require_supabase() -> None:
         raise HTTPException(status_code=503, detail="Supabase 설정이 없습니다")
 
 
+async def _safe_preview_call(label: str, fallback: Any, coro):
+    try:
+        return await coro
+    except Exception as exc:
+        print(f"search preview fallback: {label}: {exc}")
+        return fallback
+
+
 def _normalize(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).casefold().strip()
     return re.sub(r"\s+", " ", normalized)
@@ -186,6 +223,38 @@ def _normalize(text: str) -> str:
 
 def _match_key(text: str) -> str:
     return re.sub(r"\s+", "", _normalize(text))
+
+
+def _query_variants(text: str) -> list[str]:
+    normalized = _normalize(text)
+    compact = _match_key(normalized)
+    variants: list[str] = []
+
+    def add(value: str) -> None:
+        value = value.strip()
+        if value and value not in variants:
+            variants.append(value)
+
+    add(normalized)
+    add(compact)
+
+    for suffix in _QUERY_SPLIT_SUFFIXES:
+        suffix_norm = _normalize(suffix)
+        if compact.endswith(suffix_norm) and len(compact) > len(suffix_norm):
+            prefix = compact[: -len(suffix_norm)]
+            add(f"{prefix} {suffix_norm}")
+
+            for prefix_suffix in _QUERY_SPLIT_SUFFIXES:
+                prefix_suffix_norm = _normalize(prefix_suffix)
+                if prefix.endswith(prefix_suffix_norm) and len(prefix) > len(prefix_suffix_norm):
+                    stem = prefix[: -len(prefix_suffix_norm)]
+                    add(f"{stem} {prefix_suffix_norm} {suffix_norm}")
+
+    return variants
+
+
+def _flatten(groups: list[list[dict]]) -> list[dict]:
+    return [item for group in groups for item in group]
 
 
 def _match_score(
@@ -622,10 +691,11 @@ async def _fetch_kakao_places(
 
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
     has_location = lat is not None and lng is not None
+    queries = _query_variants(query)
 
-    async def fetch_category(category_code: str) -> list[dict]:
+    async def fetch_category(query_text: str, category_code: str) -> list[dict]:
         params: dict[str, Any] = {
-            "query": query,
+            "query": query_text,
             "category_group_code": category_code,
             "size": KAKAO_PAGE_SIZE,
             "sort": "distance" if has_location else "accuracy",
@@ -647,7 +717,11 @@ async def _fetch_kakao_places(
             return []
 
     results = await asyncio.gather(
-        *(fetch_category(code) for code in KAKAO_CATEGORY_CODES)
+        *(
+            fetch_category(query_text, code)
+            for query_text in queries
+            for code in KAKAO_CATEGORY_CODES
+        )
     )
 
     seen: set[str] = set()
@@ -1230,6 +1304,7 @@ async def get_search_preview(
 
     query_norm = _normalize(query)
     query_key = _match_key(query)
+    query_variants = _query_variants(query)
 
     if len(query_key) < _MIN_QUERY_LENGTH:
         return {
@@ -1243,21 +1318,57 @@ async def get_search_preview(
     async with httpx.AsyncClient() as client:
         (
             issue_keywords,
-            menus,
-            restaurants,
-            restaurant_name_menus,
+            menu_groups,
+            restaurant_groups,
+            restaurant_name_menu_groups,
             keyword_stats,
             trending,
             related_keyword_rows,
         ) = await asyncio.gather(
-            _fetch_active_issue_keywords(client),
-            _fetch_menus_by_query(client, query_norm),
-            _fetch_restaurants_by_query(client, query_norm),
-            _fetch_menus_by_restaurant_name_query(client, query_norm),
-            _fetch_keyword_stats(client, query_key),
-            _fetch_trending_chips(client),
-            _fetch_related_keyword_rows(client),
+            _safe_preview_call(
+                "active_issue_keywords",
+                [],
+                _fetch_active_issue_keywords(client),
+            ),
+            _safe_preview_call(
+                "menus_by_query",
+                [],
+                asyncio.gather(
+                    *(_fetch_menus_by_query(client, variant) for variant in query_variants)
+                ),
+            ),
+            _safe_preview_call(
+                "restaurants_by_query",
+                [],
+                asyncio.gather(
+                    *(
+                        _fetch_restaurants_by_query(client, variant)
+                        for variant in query_variants
+                    )
+                ),
+            ),
+            _safe_preview_call(
+                "menus_by_restaurant_name",
+                [],
+                asyncio.gather(
+                    *(
+                        _fetch_menus_by_restaurant_name_query(client, variant)
+                        for variant in query_variants
+                    )
+                ),
+            ),
+            _safe_preview_call("keyword_stats", [], _fetch_keyword_stats(client, query_key)),
+            _safe_preview_call("trending_chips", [], _fetch_trending_chips(client)),
+            _safe_preview_call(
+                "related_keyword_rows",
+                [],
+                _fetch_related_keyword_rows(client),
+            ),
         )
+
+        menus = _dedupe_menus(_flatten(menu_groups))
+        restaurants = _dedupe_restaurants(_flatten(restaurant_groups))
+        restaurant_name_menus = _dedupe_menus(_flatten(restaurant_name_menu_groups))
 
         related_categories = _build_related_categories(
             query_norm,
@@ -1274,12 +1385,20 @@ async def get_search_preview(
             )
             if not issue_chips and not related_categories:
                 issue_chips = _chips_from_trending(trending)
-            await _upsert_keyword_stats(client, query_key, matched_ids)
+            await _safe_preview_call(
+                "upsert_keyword_stats",
+                None,
+                _upsert_keyword_stats(client, query_key, matched_ids),
+            )
 
         preview_restaurants = restaurants
         fallback_restaurant_scores: dict[str, int] = {}
         if cafe_intent:
-            cafe_restaurants = await _fetch_cafe_restaurants(client, lat, lng)
+            cafe_restaurants = await _safe_preview_call(
+                "cafe_restaurants",
+                [],
+                _fetch_cafe_restaurants(client, lat, lng),
+            )
             preview_restaurants = _dedupe_restaurants(restaurants + cafe_restaurants)
             fallback_restaurant_scores = {
                 str(restaurant.get("id", "")): max(55, 75 - index)
@@ -1292,10 +1411,14 @@ async def get_search_preview(
             for restaurant in preview_restaurants
             if restaurant.get("id")
         ]
-        restaurant_menus = await _fetch_menus_by_restaurant_ids(
-            client,
-            restaurant_ids_for_preview,
-            limit=max(30, _PREVIEW_LIMIT * 10),
+        restaurant_menus = await _safe_preview_call(
+            "menus_by_restaurant_ids",
+            [],
+            _fetch_menus_by_restaurant_ids(
+                client,
+                restaurant_ids_for_preview,
+                limit=max(30, _PREVIEW_LIMIT * 10),
+            ),
         )
         preview_menus = _attach_restaurant_names(
             _dedupe_menus(menus + restaurant_name_menus + restaurant_menus),
@@ -1314,10 +1437,14 @@ async def get_search_preview(
             for keyword in issue_keywords
             if keyword.get("id")
         ]
-        stats_rows = await _fetch_review_keyword_stats(
-            client,
-            restaurant_ids,
-            issue_ids,
+        stats_rows = await _safe_preview_call(
+            "review_keyword_stats",
+            [],
+            _fetch_review_keyword_stats(
+                client,
+                restaurant_ids,
+                issue_ids,
+            ),
         )
 
     restaurant_scores = _restaurant_score_map(query_norm, restaurants)
@@ -1356,14 +1483,23 @@ async def get_search_results(
 
     query_norm = _normalize(query)
     query_key = _match_key(query)
+    query_variants = _query_variants(query)
 
     if len(query_key) < _MIN_QUERY_LENGTH:
         return {"query": query, "results": [], "source": "ignored"}
 
     async with httpx.AsyncClient() as client:
-        internal_restaurants, cache_hit = await asyncio.gather(
-            _fetch_restaurants_by_query(client, query_norm, limit=30),
+        internal_restaurant_groups, cache_hit = await asyncio.gather(
+            asyncio.gather(
+                *(
+                    _fetch_restaurants_by_query(client, variant, limit=30)
+                    for variant in query_variants
+                )
+            ),
             _fetch_search_cache(client, query_key),
+        )
+        internal_restaurants = _dedupe_restaurants(
+            _flatten(internal_restaurant_groups)
         )
 
         if cache_hit:

@@ -163,6 +163,7 @@ class SearchController extends StateNotifier<SearchState> {
   Future<void> onResultSelected(SearchRecentHistoryRequest request) async {
     try {
       await _repository.saveRecentHistory(request);
+      if (!mounted) return;
       await _loadRecentHistory();
     } catch (_) {
       // Search history should not block navigation after the user taps a result.

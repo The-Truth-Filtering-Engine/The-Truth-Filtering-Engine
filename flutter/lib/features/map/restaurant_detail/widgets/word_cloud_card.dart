@@ -206,7 +206,9 @@ class BubbleWordCloudPainter extends CustomPainter {
     if (old.words.length != words.length) return true;
     for (int i = 0; i < words.length; i++) {
       if (old.words[i].word != words[i].word ||
-          old.words[i].freq != words[i].freq) return true;
+          old.words[i].freq != words[i].freq) {
+        return true;
+      }
     }
     return false;
   }

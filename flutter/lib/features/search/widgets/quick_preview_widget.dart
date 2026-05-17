@@ -179,7 +179,7 @@ class _RelatedSearchSection extends StatelessWidget {
           label: '연관 검색어',
         ),
         SizedBox(
-          height: 38,
+          height: 32,
           child: ScrollConfiguration(
             behavior: ScrollConfiguration.of(context).copyWith(
               dragDevices: {
@@ -196,7 +196,7 @@ class _RelatedSearchSection extends StatelessWidget {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _relatedSearchSuggestions.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
               itemBuilder: (context, index) {
                 final label = _relatedSearchSuggestions[index];
                 return _RelatedSearchChip(
@@ -224,18 +224,18 @@ class _RelatedSearchChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFF4FBEA),
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          height: 36,
-          constraints: const BoxConstraints(minWidth: 92),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 30,
+          constraints: const BoxConstraints(minWidth: 86),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFD8F1AA), width: 0.7),
+            border: Border.all(color: AppColors.border, width: 0.7),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -243,9 +243,9 @@ class _RelatedSearchChip extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF315F00),
+              color: AppColors.textSecondary,
             ),
           ),
         ),

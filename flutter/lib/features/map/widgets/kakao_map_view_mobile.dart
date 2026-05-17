@@ -37,6 +37,10 @@ class KakaoMapView extends StatefulWidget {
 }
 
 class KakaoMapViewState extends State<KakaoMapView> {
+  static const String _definedKakaoJsKey = String.fromEnvironment(
+    'KAKAO_JS_KEY',
+  );
+
   late final WebViewController _controller;
   bool _mapReady = false;
   bool _roadmapType = true;
@@ -143,6 +147,9 @@ class KakaoMapViewState extends State<KakaoMapView> {
   }
 
   Future<String> _fetchKakaoJsKey() async {
+    final definedKey = _definedKakaoJsKey.trim();
+    if (definedKey.isNotEmpty) return definedKey;
+
     try {
       final response = await http
           .get(BackendConfig.uri('/config'))
@@ -217,7 +224,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
             });
         });
 
-        function moveTo(lat, lng, level) {
+        function moveTo(lat, lng, level, offsetX, offsetY) {
             var loc = new kakao.maps.LatLng(lat, lng);
             if (level !== null && level !== undefined) {
                 map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
@@ -225,6 +232,22 @@ class KakaoMapViewState extends State<KakaoMapView> {
                 applyLevelBounds();
                 var targetLevel = Math.min(Math.max(level, 1), MAX_MAP_LEVEL);
                 map.setLevel(targetLevel);
+            }
+
+            offsetX = offsetX || 0;
+            offsetY = offsetY || 0;
+            if (offsetX !== 0 || offsetY !== 0) {
+                try {
+                    map.setCenter(loc);
+                    var projection = map.getProjection();
+                    var point = projection.containerPointFromCoords(loc);
+                    var centerPoint = new kakao.maps.Point(
+                        point.x - offsetX,
+                        point.y - offsetY
+                    );
+                    map.panTo(projection.coordsFromContainerPoint(centerPoint));
+                    return;
+                } catch (e) {}
             }
             map.panTo(loc);
         }
@@ -241,15 +264,28 @@ class KakaoMapViewState extends State<KakaoMapView> {
                 content.style.borderRadius = '50%';
                 content.style.border = r.border || '1.5px solid white';
                 content.style.backgroundColor = r.color;
+                content.style.boxSizing = 'border-box';
                 content.style.boxShadow = '0 2px 6px rgba(0,0,0,.18)';
                 content.style.display = 'flex';
                 content.style.alignItems = 'center';
                 content.style.justifyContent = 'center';
-                content.style.fontSize = '16px';
+                content.style.fontFamily = 'Arial, sans-serif';
+                content.style.fontSize = r.isFavorite ? '19px' : '16px';
                 content.style.fontWeight = r.fontWeight || '400';
+                content.style.lineHeight = '1';
                 content.style.color = r.textColor || '';
                 content.style.cursor = 'pointer';
-                content.innerText = r.emoji;
+
+                var icon = document.createElement('span');
+                icon.innerText = r.emoji;
+                icon.style.display = 'block';
+                icon.style.lineHeight = '1';
+                icon.style.pointerEvents = 'none';
+                icon.style.color = r.textColor || '';
+                icon.style.fontSize = r.isFavorite ? '19px' : '16px';
+                icon.style.fontWeight = r.fontWeight || '400';
+                content.appendChild(icon);
+
                 content.onclick = function() {
                     FlutterChannel.postMessage(JSON.stringify({
                         type: 'markerTap',
@@ -358,6 +394,7 @@ class KakaoMapViewState extends State<KakaoMapView> {
           'textColor': _markerTextColor(r),
           'border': _markerBorder(r),
           'fontWeight': _isFavoriteMarker(r) ? '800' : '400',
+          'isFavorite': _isFavoriteMarker(r),
         };
       }).toList(),
     );
@@ -376,10 +413,14 @@ class KakaoMapViewState extends State<KakaoMapView> {
     }
   }
 
-  void moveTo(MapPoint point, {int? level}) {
+  void moveTo(
+    MapPoint point, {
+    int? level,
+    Offset screenOffset = Offset.zero,
+  }) {
     if (!_mapReady) return;
     _controller.runJavaScript(
-      'moveTo(${point.latitude}, ${point.longitude}, ${level ?? 'null'})',
+      'moveTo(${point.latitude}, ${point.longitude}, ${level ?? 'null'}, ${screenOffset.dx}, ${screenOffset.dy})',
     );
   }
 
@@ -424,16 +465,21 @@ class KakaoMapViewState extends State<KakaoMapView> {
   }
 
   String _markerTextColor(RestaurantModel restaurant) {
-    return _isFavoriteMarker(restaurant) ? '#FFFFFF' : '';
+    return _isFavoriteMarker(restaurant)
+        ? _bookmarkMarkerColor(restaurant)
+        : '';
   }
 
   String _markerBorder(RestaurantModel restaurant) {
+    if (_isFavoriteMarker(restaurant)) {
+      return '1.5px solid ${_bookmarkMarkerColor(restaurant)}';
+    }
     return '1.5px solid #FFFFFF';
   }
 
   String _markerColor(RestaurantModel restaurant) {
     if (_isFavoriteMarker(restaurant)) {
-      return _bookmarkMarkerColor(restaurant);
+      return _bookmarkMarkerBackgroundColor(restaurant);
     }
 
     Color color;
@@ -454,6 +500,17 @@ class KakaoMapViewState extends State<KakaoMapView> {
       fallbackColorKey: restaurant.bookmarkColorKey,
     );
     return BookmarkColors.markerHex(colorKey);
+  }
+
+  String _bookmarkMarkerBackgroundColor(RestaurantModel restaurant) {
+    final colorKey = BookmarkTopics.colorKeyForTopicIds(
+      restaurant.bookmarkTopicIds,
+      fallbackColorKey: restaurant.bookmarkColorKey,
+    );
+    final color = BookmarkColors.byKey(colorKey).background;
+    return '#${color.r.toInt().toRadixString(16).padLeft(2, '0')}'
+        '${color.g.toInt().toRadixString(16).padLeft(2, '0')}'
+        '${color.b.toInt().toRadixString(16).padLeft(2, '0')}';
   }
 
   @override
