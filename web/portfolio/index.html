@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Review Trust Filtering Engine Portfolio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-[#dcebe2] p-6 font-sans text-[#10231c] max-[1200px]:p-0 print:min-h-[297mm] print:w-[420mm] print:bg-white print:p-0">
+  <main class="relative mx-auto grid min-h-[297mm] w-[420mm] grid-cols-[1.05fr_1.25fr_1fr] grid-rows-[auto_auto_auto_1fr_auto] gap-[10mm] overflow-hidden bg-gradient-to-br from-[#f7fff9] to-[#e8f5ed] p-[14mm] shadow-[0_30px_80px_rgba(8,47,35,0.22)] max-[1200px]:min-h-0 max-[1200px]:w-full max-[1200px]:grid-cols-1 max-[1200px]:p-5 print:min-h-[297mm] print:w-[420mm] print:grid-cols-[1.05fr_1.25fr_1fr] print:grid-rows-[auto_auto_auto_1fr_auto] print:gap-[10mm] print:p-[14mm] print:shadow-none">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(16,51,34,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(16,51,34,0.04)_1px,transparent_1px)] bg-[length:22px_22px]"></div>
+
+    <section class="relative z-10 col-span-3 min-h-[180px] break-inside-avoid rounded-lg border border-white/20 bg-gradient-to-br from-[#0b3d2e] via-[#0f8f5f] to-[#0f766e] px-8 py-7 text-white shadow-[0_16px_40px_rgba(10,73,50,0.12)] max-[1200px]:col-span-1 print:col-span-3">
+      <div class="mb-2 text-xs font-extrabold uppercase text-white/70">Portfolio · NLP Service Integration</div>
+      <div class="grid grid-cols-[1.55fr_1fr] items-stretch gap-6 max-[1200px]:grid-cols-1 print:grid-cols-[1.55fr_1fr]">
+        <div>
+          <h1 class="max-w-[780px] text-[54px] font-extrabold leading-[0.94] max-[1200px]:text-[42px] print:text-[54px]">Review Trust<br />Filtering<br />Engine</h1>
+          <p class="mt-4 max-w-[960px] text-lg leading-[1.55] text-white/85 [word-break:keep-all]">
+            지도 기반 광고성 리뷰 필터링 NLP 서비스
+          </p>
+          <p class="mt-2 max-w-[980px] text-[15px] leading-[1.6] text-white/75 [word-break:keep-all]">
+            음식점·카페 리뷰에서 광고성 가능성이 높은 리뷰를 분류해 사용자가 신뢰 가능한 리뷰를 먼저 확인하도록 돕는 서비스입니다.
+          </p>
+        </div>
+        <div class="flex flex-col justify-center rounded-lg border border-white/20 bg-white/10 p-5 backdrop-blur">
+          <span class="inline-flex self-start rounded-full bg-white/15 px-3 py-1 text-xs font-extrabold text-white/80">지원 포지셔닝</span>
+          <strong class="mt-3 text-2xl leading-snug">AI 모델을 사용자 서비스 흐름에 연결한 경험</strong>
+          <p class="mt-2 leading-[1.55] text-white/80">
+            Transformer Encoder 계열 모델의 문맥 이해 특성을 광고성 리뷰 분류 문제에 적용하고, 그 결과를 FastAPI와 앱·웹 화면에 연결했습니다.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <span class="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-[#0b3d2e]">ELECTRA</span>
+            <span class="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-[#0b3d2e]">FastAPI</span>
+            <span class="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-[#0b3d2e]">Flutter</span>
+            <span class="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-[#0b3d2e]">React</span>
+            <span class="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-[#0b3d2e]">Kakao Map</span>
+            <span class="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-[#0b3d2e]">Supabase</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="relative z-10 break-inside-avoid rounded-lg border border-slate-200/90 bg-white/95 p-[22px] shadow-[0_16px_40px_rgba(10,73,50,0.12)]">
+      <div class="mb-3 flex items-center gap-2.5">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0b3d2e] text-[13px] font-black text-white">01</span>
+        <h2 class="text-[22px] font-bold">Problem</h2>
+      </div>
+      <p class="text-[13.5px] leading-[1.52] text-[#5f7568] [word-break:keep-all]">
+        사용자는 지도 앱에서 장소를 고른 뒤 리뷰를 확인하지만, 협찬·광고성 리뷰가 섞여 있어 신뢰도 판단에 시간이 듭니다.
+      </p>
+      <blockquote class="mt-4 rounded-lg border-l-[5px] border-[#0f8f5f] bg-[#e8f8ef] px-4 py-3 text-[13.5px] font-bold leading-[1.52] text-[#1f5c42]">
+        리뷰를 읽기 전에 광고 가능성을 먼저 확인할 수 있는 흐름이 필요했습니다.
+      </blockquote>
+    </section>
+
+    <section class="relative z-10 col-span-2 break-inside-avoid rounded-lg border border-slate-200/90 bg-white/95 p-[22px] shadow-[0_16px_40px_rgba(10,73,50,0.12)] max-[1200px]:col-span-1 print:col-span-2">
+      <div class="mb-3 flex items-center gap-2.5">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0b3d2e] text-[13px] font-black text-white">02</span>
+        <h2 class="text-[22px] font-bold">Solution</h2>
+      </div>
+      <div class="grid grid-cols-3 gap-2.5 max-[1200px]:grid-cols-1 print:grid-cols-3">
+        <div class="min-h-[86px] rounded-lg border border-[#cfe4d8] bg-gradient-to-b from-white to-[#f7fff9] p-3.5"><b class="mb-1.5 block text-sm text-[#10231c]">지도에서 장소 선택</b><p class="text-[13.5px] leading-[1.52] text-[#5f7568]">음식점·카페 탐색 흐름을 지도 UI 안에 유지</p></div>
+        <div class="min-h-[86px] rounded-lg border border-[#cfe4d8] bg-gradient-to-b from-white to-[#f7fff9] p-3.5"><b class="mb-1.5 block text-sm text-[#10231c]">리뷰 수집·조회</b><p class="text-[13.5px] leading-[1.52] text-[#5f7568]">장소 관련 블로그 리뷰를 조회하고 저장</p></div>
+        <div class="min-h-[86px] rounded-lg border border-[#cfe4d8] bg-gradient-to-b from-white to-[#f7fff9] p-3.5"><b class="mb-1.5 block text-sm text-[#10231c]">문맥 기반 분류</b><p class="text-[13.5px] leading-[1.52] text-[#5f7568]">BERT/ELECTRA 계열을 비교해 광고 가능성 추론</p></div>
+        <div class="min-h-[86px] rounded-lg border border-[#cfe4d8] bg-gradient-to-b from-white to-[#f7fff9] p-3.5"><b class="mb-1.5 block text-sm text-[#10231c]">결과 표시</b><p class="text-[13.5px] leading-[1.52] text-[#5f7568]">광고 가능성 점수와 리뷰 목록을 화면에 표시</p></div>
+        <div class="min-h-[86px] rounded-lg border border-[#cfe4d8] bg-gradient-to-b from-white to-[#f7fff9] p-3.5"><b class="mb-1.5 block text-sm text-[#10231c]">앱·웹 동일 흐름</b><p class="text-[13.5px] leading-[1.52] text-[#5f7568]">Flutter 앱과 React 웹에서 같은 분석 흐름 제공</p></div>
+        <div class="min-h-[86px] rounded-lg border border-[#cfe4d8] bg-gradient-to-b from-white to-[#f7fff9] p-3.5"><b class="mb-1.5 block text-sm text-[#10231c]">서비스화 경험</b><p class="text-[13.5px] leading-[1.52] text-[#5f7568]">모델 결과를 실제 사용자 화면과 API로 연결</p></div>
+      </div>
+    </section>
+
+    <section class="relative z-10 col-span-3 break-inside-avoid rounded-lg border border-slate-200/90 bg-white/95 p-[22px] shadow-[0_16px_40px_rgba(10,73,50,0.12)] max-[1200px]:col-span-1 print:col-span-3">
+      <div class="mb-3 flex items-center gap-2.5">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0b3d2e] text-[13px] font-black text-white">03</span>
+        <h2 class="text-[22px] font-bold">System Flow</h2>
+      </div>
+      <div class="rounded-lg border border-[#cfe4d8] bg-[#f8fbff] p-5">
+        <div class="flex items-start justify-between gap-4 max-[1200px]:flex-col">
+          <div>
+            <p class="text-xs font-black uppercase text-[#0f8f5f]">Review Analysis Pipeline</p>
+            <h3 class="mt-1 text-lg font-black text-[#0b3d2e]">장소 선택부터 분석 결과 표시까지 이어지는 흐름</h3>
+          </div>
+          <div class="flex flex-wrap gap-2 text-[11px] font-black">
+            <code class="rounded-full border border-emerald-200 bg-white px-3 py-1 text-emerald-800">Flutter / React</code>
+            <code class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">FastAPI</code>
+            <code class="rounded-full border border-emerald-200 bg-white px-3 py-1 text-emerald-800">Supabase</code>
+            <code class="rounded-full border border-amber-200 bg-white px-3 py-1 text-amber-800">ELECTRA</code>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-lg border border-[#cfe4d8] bg-white p-5">
+          <div class="mx-auto max-w-[820px]">
+            <article class="rounded-lg border border-slate-200 bg-[#f8fbff] p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#0b3d2e] text-xs font-black text-white">1</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">지도에서 장소 선택</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">사용자가 Flutter 앱 또는 React 웹에서 음식점·카페를 검색하거나 마커를 선택합니다.</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-emerald-200 bg-[#e8f8ef] p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#0f8f5f] text-xs font-black text-white">2</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">클라이언트가 분석 요청 구성</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">장소명, store_id, 카테고리, 좌표, 주소, 사용자 상태를 FastAPI로 보냅니다.</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-emerald-200 bg-white p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#0f8f5f] text-xs font-black text-white">3</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">FastAPI가 Supabase 캐시 확인</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">이미 분석된 리뷰가 있으면 8번 응답 단계로 바로 이동합니다.</p>
+                </div>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-2 max-[1200px]:grid-cols-1">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <b class="text-[12px] text-emerald-800">Cache Hit</b>
+                  <p class="mt-1 text-[11px] font-bold text-[#5f7568]">저장된 분석 결과 재사용</p>
+                </div>
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <b class="text-[12px] text-amber-800">Cache Miss</b>
+                  <p class="mt-1 text-[11px] font-bold text-[#5f7568]">아래 4~7번 신규 분석 계속</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f6a400] text-xs font-black text-white">4</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">Kakao / Naver 외부 데이터 조회</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">Kakao로 장소 정보를 보강하고 Naver Blog API로 리뷰 후보를 수집합니다.</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-amber-200 bg-white p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f6a400] text-xs font-black text-white">5</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">리뷰 텍스트 전처리</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">HTML 제거, 해시태그 정리, 가게명 마스킹 후 제목과 본문을 결합합니다.</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-amber-200 bg-white p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f6a400] text-xs font-black text-white">6</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">ELECTRA 광고성 리뷰 분류</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">Transformer Encoder 기반 모델이 리뷰별 광고 가능성 점수를 계산합니다.</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#20a36a] text-xs font-black text-white">7</span>
+                <div>
+                  <b class="block text-[14px] text-[#0b3d2e]">결과 저장과 사용량 처리</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-[#5f7568]">리뷰, 장소 메타데이터, 광고 가능성 점수를 Supabase에 저장하고 분석 횟수·코인 차감을 처리합니다.</p>
+                </div>
+              </div>
+            </article>
+            <div class="grid place-items-center py-1 text-2xl font-black text-[#0f8f5f]">&darr;</div>
+
+            <article class="rounded-lg border border-[#0f8f5f]/30 bg-gradient-to-br from-[#0f8f5f] to-[#12b981] p-4 text-white">
+              <div class="flex items-center gap-3">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-xs font-black text-[#0f8f5f]">8</span>
+                <div>
+                  <b class="block text-[14px]">앱·웹 화면에 결과 표시</b>
+                  <p class="mt-1 text-[12px] font-bold leading-snug text-white/80">광고 가능성 점수, 리뷰 목록, 원문 링크를 상세 화면·추천·최근 분석 화면에 반영합니다.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="relative z-10 col-span-3 break-inside-avoid rounded-lg border border-slate-200/90 bg-white/95 p-[22px] shadow-[0_16px_40px_rgba(10,73,50,0.12)] max-[1200px]:col-span-1 print:col-span-3">
+      <div class="mb-3 flex items-center gap-2.5">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0b3d2e] text-[13px] font-black text-white">04</span>
+        <h2 class="text-[22px] font-bold">AI/NLP · Tech Stack</h2>
+      </div>
+      <div class="grid grid-cols-[1fr_1fr_1fr] gap-3 max-[1200px]:grid-cols-1 print:grid-cols-[1fr_1fr_1fr]">
+        <div class="min-h-[210px] rounded-lg border border-[#c8dfd1] bg-white p-5">
+          <b class="block text-[15px] text-[#0b3d2e]">Transformer Encoder 기반 광고성 리뷰 분류</b>
+          <p class="mt-2 text-[13.5px] leading-[1.55] text-[#5f7568] [word-break:keep-all]">
+            광고성 리뷰는 특정 단어 하나보다 문체, 표현 방식, 문맥 흐름의 차이가 크다고 판단했습니다.
+          </p>
+          <p class="mt-2 text-[12.5px] leading-[1.5] text-[#5f7568] [word-break:keep-all]">
+            TF-IDF는 단어 빈도, Word2Vec은 단어 의미, BERT/ELECTRA는 문장 문맥 이해에 강점이 있어 한국어 블로그 리뷰 분류에 적합한 모델을 검토했습니다.
+          </p>
+        </div>
+        <div class="min-h-[210px] rounded-lg border border-[#c8dfd1] bg-white p-5">
+          <b class="block text-[15px] text-[#0b3d2e]">BERT/ELECTRA 모델 비교와 실험 기반 선정</b>
+          <p class="mt-2 text-[13.5px] leading-[1.55] text-[#5f7568] [word-break:keep-all]">
+            KcBERT와 KcELECTRA를 비교하고, 블로그처럼 구어체·신조어·비정형 표현이 많은 한국어 리뷰 데이터에 맞는 사전학습 모델을 검토했습니다.
+          </p>
+          <p class="mt-2 text-[12.5px] leading-[1.5] text-[#5f7568] [word-break:keep-all]">
+            모델, 데이터셋 방식, 하이퍼파라미터를 바꿔 Accuracy, Precision, Recall, F1-score, AUC, Latency, Model Size를 함께 비교했습니다.
+          </p>
+        </div>
+        <div class="min-h-[210px] rounded-lg border border-[#c8dfd1] bg-white p-5">
+          <b class="block text-[15px] text-[#0b3d2e]">모델 개선과 서비스 적용 기준</b>
+          <p class="mt-2 text-[13.5px] leading-[1.55] text-[#5f7568] [word-break:keep-all]">
+            광고 리뷰를 놓치지 않는 것이 중요해 Recall을 중요 기준으로 보고, 불균형 데이터 특성상 F1-score도 함께 확인했습니다.
+          </p>
+          <p class="mt-2 text-[12.5px] leading-[1.5] text-[#5f7568] [word-break:keep-all]">
+            2차 개선에서는 데이터 편중과 가게명 노이즈를 진단하고, 데이터 재구성·가게명 마스킹·제목+본문 병합·임계값 최적화·SHAP 분석으로 개선 방향을 도출했습니다.
+          </p>
+        </div>
+      </div>
+      <div class="mt-3 grid grid-cols-[1.2fr_1fr] gap-3 max-[1200px]:grid-cols-1">
+        <div class="rounded-lg border border-[#cfe4d8] bg-[#f8fbff] p-4 text-[13px] font-bold leading-[1.55] text-[#5f7568] [word-break:keep-all]">
+          서비스 적용 관점에서는 OpenVINO INT8 양자화로 모델 크기와 추론 효율을 함께 고려했습니다. 모델 크기를 약 416MB에서 106MB 수준으로 줄이면서 정확도 손실은 거의 없었습니다.
+        </div>
+        <div class="rounded-lg border border-[#cfe4d8] bg-[#f8fbff] p-4 text-[13px] font-bold leading-[1.55] text-[#5f7568] [word-break:keep-all]">
+          Frontend: Flutter, React · Backend: FastAPI · DB/Auth: Supabase · Map/LBS: Kakao Map · External Review: Naver Blog API · Deployment: Vercel 설정 확인
+        </div>
+      </div>
+    </section>
+
+    <div class="relative z-10 col-span-3 grid break-inside-avoid grid-cols-2 items-stretch gap-[10mm] max-[1200px]:col-span-1 max-[1200px]:grid-cols-1 print:col-span-3 print:grid-cols-2">
+      <section class="rounded-lg border border-slate-200/90 bg-white/95 p-[22px] shadow-[0_16px_40px_rgba(10,73,50,0.12)]">
+        <div class="mb-3 flex items-center gap-2.5">
+          <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0b3d2e] text-[13px] font-black text-white">05</span>
+          <h2 class="text-[22px] font-bold">My Role</h2>
+        </div>
+        <ul class="grid gap-2.5">
+          <li class="relative rounded-lg border border-[#cfe4d8] bg-white py-2.5 pl-8 pr-3 text-[13.5px] leading-[1.52] text-[#5f7568] before:absolute before:left-3 before:top-3 before:grid before:h-4 before:w-4 before:place-items-center before:rounded-full before:bg-[#20a36a] before:text-[10px] before:font-black before:text-white before:content-['✓']"><b class="mb-1.5 block text-sm text-[#10231c]">Project Manager</b>Jira 기반 업무 관리, PR 흐름 관리, 기능 통합 조율</li>
+          <li class="relative rounded-lg border border-[#cfe4d8] bg-white py-2.5 pl-8 pr-3 text-[13.5px] leading-[1.52] text-[#5f7568] before:absolute before:left-3 before:top-3 before:grid before:h-4 before:w-4 before:place-items-center before:rounded-full before:bg-[#20a36a] before:text-[10px] before:font-black before:text-white before:content-['✓']"><b class="mb-1.5 block text-sm text-[#10231c]">지도/LBS 사용자 흐름</b>지도에서 장소 선택 후 리뷰 분석으로 이어지는 UX 구성</li>
+          <li class="relative rounded-lg border border-[#cfe4d8] bg-white py-2.5 pl-8 pr-3 text-[13.5px] leading-[1.52] text-[#5f7568] before:absolute before:left-3 before:top-3 before:grid before:h-4 before:w-4 before:place-items-center before:rounded-full before:bg-[#20a36a] before:text-[10px] before:font-black before:text-white before:content-['✓']"><b class="mb-1.5 block text-sm text-[#10231c]">React 웹 추가 개발</b>앱 중심 기획을 웹 접근성까지 확장</li>
+          <li class="relative rounded-lg border border-[#cfe4d8] bg-white py-2.5 pl-8 pr-3 text-[13.5px] leading-[1.52] text-[#5f7568] before:absolute before:left-3 before:top-3 before:grid before:h-4 before:w-4 before:place-items-center before:rounded-full before:bg-[#20a36a] before:text-[10px] before:font-black before:text-white before:content-['✓']"><b class="mb-1.5 block text-sm text-[#10231c]">앱·웹 정합성 관리</b>북마크, 최근 기록, 상세 분석 흐름이 양쪽에서 비슷하게 동작하도록 조율</li>
+          <li class="relative rounded-lg border border-[#cfe4d8] bg-white py-2.5 pl-8 pr-3 text-[13.5px] leading-[1.52] text-[#5f7568] before:absolute before:left-3 before:top-3 before:grid before:h-4 before:w-4 before:place-items-center before:rounded-full before:bg-[#20a36a] before:text-[10px] before:font-black before:text-white before:content-['✓']"><b class="mb-1.5 block text-sm text-[#10231c]">백엔드 API 연동</b>장소, 리뷰, 분석 결과, 사용자 상태 API를 화면 흐름에 연결</li>
+          <li class="relative rounded-lg border border-[#cfe4d8] bg-white py-2.5 pl-8 pr-3 text-[13.5px] leading-[1.52] text-[#5f7568] before:absolute before:left-3 before:top-3 before:grid before:h-4 before:w-4 before:place-items-center before:rounded-full before:bg-[#20a36a] before:text-[10px] before:font-black before:text-white before:content-['✓']"><b class="mb-1.5 block text-sm text-[#10231c]">모델 결과 해석</b>ML 전담이 아니라, 실험 결과와 서비스 적용 기준을 이해하고 화면/API 적용 관점에서 정리</li>
+        </ul>
+      </section>
+
+      <section class="flex flex-col rounded-lg border border-slate-200/90 bg-white/95 p-[22px] shadow-[0_16px_40px_rgba(10,73,50,0.12)]">
+        <div class="mb-3 flex items-center gap-2.5">
+          <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0b3d2e] text-[13px] font-black text-white">06</span>
+          <h2 class="text-[22px] font-bold">Key Contribution</h2>
+        </div>
+        <div class="grid flex-1 auto-rows-fr gap-2">
+          <div class="grid grid-cols-[132px_1fr] items-center gap-2.5 rounded-lg border border-[#cfe4d8] bg-white p-3"><b class="text-[13.5px] text-[#10231c]">서비스 확장</b><span class="text-[12.8px] leading-[1.52] text-[#5f7568]">앱 중심 기획에서 React 웹 접근성까지 확장</span></div>
+          <div class="grid grid-cols-[132px_1fr] items-center gap-2.5 rounded-lg border border-[#cfe4d8] bg-white p-3"><b class="text-[13.5px] text-[#10231c]">지도 UX</b><span class="text-[12.8px] leading-[1.52] text-[#5f7568]">지도 기반 리뷰 탐색과 상세 분석 흐름 구성</span></div>
+          <div class="grid grid-cols-[132px_1fr] items-center gap-2.5 rounded-lg border border-[#cfe4d8] bg-white p-3"><b class="text-[13.5px] text-[#10231c]">모델 연결</b><span class="text-[12.8px] leading-[1.52] text-[#5f7568]">Transformer Encoder 기반 분류 결과를 실제 화면과 API 응답에 연결</span></div>
+          <div class="grid grid-cols-[132px_1fr] items-center gap-2.5 rounded-lg border border-[#cfe4d8] bg-white p-3"><b class="text-[13.5px] text-[#10231c]">지표 해석</b><span class="text-[12.8px] leading-[1.52] text-[#5f7568]">Recall, F1-score, AUC, Latency, Model Size를 서비스 적용 기준으로 이해</span></div>
+          <div class="grid grid-cols-[132px_1fr] items-center gap-2.5 rounded-lg border border-[#cfe4d8] bg-white p-3"><b class="text-[13.5px] text-[#10231c]">팀 운영</b><span class="text-[12.8px] leading-[1.52] text-[#5f7568]">기능 통합, 일정 흐름, PR 흐름을 관리</span></div>
+          <div class="grid grid-cols-[132px_1fr] items-center gap-2.5 rounded-lg border border-[#cfe4d8] bg-white p-3"><b class="text-[13.5px] text-[#10231c]">현실적 포지셔닝</b><span class="text-[12.8px] leading-[1.52] text-[#5f7568]">모델 전담 개발보다 NLP 모델의 서비스 통합 경험으로 설명</span></div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="relative z-10 col-span-3 flex break-inside-avoid items-center justify-between px-1 pt-0.5 text-xs font-bold text-[#5f7568] max-[1200px]:col-span-1 max-[1200px]:flex-col max-[1200px]:items-start max-[1200px]:gap-1.5 print:col-span-3 print:flex-row print:items-center">
+      <span>Review Trust Filtering Engine</span>
+      <span>ELECTRA · FastAPI · Flutter · React · Kakao Map · Supabase</span>
+    </footer>
+  </main>
+</body>
+</html>
