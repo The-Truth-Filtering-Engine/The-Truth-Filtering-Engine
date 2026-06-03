@@ -87,6 +87,15 @@ export function LoginPanel({
         >
           테스트 계정으로 계속하기
         </button>
+
+        <a
+          className="login-portfolio-link"
+          href="/portfolio/index.html"
+          target="_blank"
+          rel="noreferrer"
+        >
+          포트폴리오 HTML 보기
+        </a>
       </section>
     </aside>
   )
