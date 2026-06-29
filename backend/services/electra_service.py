@@ -4,6 +4,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 MODEL_DIR = Path(__file__).resolve().parents[1] / "models"
 
 _tokenizer = None
@@ -23,10 +25,10 @@ def load_model() -> None:
         from transformers import AutoTokenizer, AutoModelForSequenceClassification
         _tokenizer = AutoTokenizer.from_pretrained(str(GPU_MODEL_DIR))
         _model = AutoModelForSequenceClassification.from_pretrained(str(GPU_MODEL_DIR))
-        _model.to("cuda")
+        _model.to(DEVICE)
         _model.eval()
         _model_available = True
-        logger.info("[MODEL_service] 모델 로드 완료 (CUDA)")
+        logger.info(f"[MODEL_service] 모델 로드 완료 ({DEVICE})")
     except Exception as e:
         logger.warning(f"[MODEL_service] 모델 로드 실패: {e}")
         _model_available = False
@@ -64,7 +66,7 @@ def score_is_ad(review_description: str) -> float:
         return 0.0
     
     encoded = _tokenizer(text, truncation=True, padding=True, max_length=512, return_tensors="pt")
-    encoded = {k: v.to("cuda") for k, v in encoded.items()}
+    encoded = {k: v.to(DEVICE) for k, v in encoded.items()}
     with torch.no_grad():
         logits = _model(**encoded).logits
     probs = logits.softmax(dim=-1).cpu()
@@ -96,7 +98,7 @@ def predict_and_score_batch(texts: list[str]) -> tuple[list[int], list[float]]:
         max_length=256,
         return_tensors="pt",
     )
-    encoded = {k: v.to("cuda") for k, v in encoded.items()}    # ← GPU로 이동
+    encoded = {k: v.to(DEVICE) for k, v in encoded.items()}    # ← 설정된 Device로 이동
     with torch.no_grad():                                      # ← 추론 시 메모리 절약
         logits = _model(**encoded).logits
     probs = logits.softmax(dim=-1).cpu()                       # ← 결과는 CPU로

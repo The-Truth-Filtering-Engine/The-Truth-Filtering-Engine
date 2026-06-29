@@ -31,7 +31,15 @@ if "%SUPABASE_ANON_KEY%"=="" (
 
 cd /d "%SCRIPT_DIR%"
 
+set "BACKEND_URL=%~1"
+if "%BACKEND_URL%"=="" (
+  set "BACKEND_URL=http://localhost:8000"
+)
+
+echo Connecting to Backend: %BACKEND_URL%
+
 flutter run -d chrome --web-port 8080 ^
+  --dart-define=BACKEND_BASE_URL="%BACKEND_URL%" ^
   --dart-define=SUPABASE_URL="%SUPABASE_URL%" ^
   --dart-define=SUPABASE_ANON_KEY="%SUPABASE_ANON_KEY%"
 
