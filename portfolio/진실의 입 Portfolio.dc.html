@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>진실의 입 — 최현석 AI 엔지니어 포트폴리오 | 리뷰 광고성 판별 서비스</title>
+<meta name="description" content="채용·면접관이 빠르게 이해할 수 있도록 정리한 최현석의 단일 프로젝트 포트폴리오. 네이버 블로그 리뷰의 광고성을 ELECTRA 계열 한국어 분류 모델로 판별하고, React·Flutter·FastAPI 서비스 흐름에 통합한 지도 기반 리뷰 신뢰도 서비스입니다.">
+<meta name="author" content="최현석">
+<meta name="keywords" content="AI 엔지니어, 포트폴리오, ELECTRA, 광고 리뷰 판별, NLP, React, Flutter, FastAPI, 최현석, 진실의 입, The Truth Filtering Engine">
+<meta name="theme-color" content="#08080a">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="진실의 입 — 최현석 포트폴리오">
+<meta property="og:title" content="진실의 입 · 최현석 — AI 엔지니어 포트폴리오">
+<meta property="og:description" content="광고성 블로그 리뷰를 걸러 신뢰할 수 있는 리뷰를 먼저 보여주는 지도 서비스. 최현석의 팀 리드, 프론트엔드, AI 결과 서비스 통합 기여를 1분 안에 파악할 수 있게 정리했습니다.">
+<meta property="og:image" content="assets/logo.png">
+<meta property="og:url" content="https://truth-filtering-engine-web.vercel.app">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="진실의 입 · 최현석 — AI 엔지니어 포트폴리오">
+<meta name="twitter:description" content="ELECTRA 모델로 광고성 리뷰를 걸러내는 지도 서비스. 최현석의 프론트엔드·AI 통합·팀 리드 기여를 중심으로 정리한 포트폴리오.">
+<meta name="twitter:image" content="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #08080a; }
+  nav, header, section, footer { width: 100%; }
+  img { max-width: 100%; }
+  a:focus-visible { outline: 2px solid var(--acc, #5b8cff); outline-offset: 4px; border-radius: 8px; }
+  ::selection { background: rgba(91,140,255,0.35); color: #fff; }
+  @keyframes tfe-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
+  .tfe-nav-links { display: flex; align-items: center; gap: 22px; overflow-x: auto; scrollbar-width: none; }
+  .tfe-nav-links::-webkit-scrollbar { display: none; }
+  .tfe-hero { display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(360px, .98fr); align-items: center; gap: 44px; }
+  .tfe-hero-visual { min-width: 0; }
+  .tfe-browser-frame { border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 28px 80px rgba(0,0,0,0.52); background: #16161a; }
+  .tfe-browser-bar { display: flex; align-items: center; gap: 7px; padding: 12px 15px; background: #1c1c22; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .tfe-browser-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .tfe-glance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 36px; }
+  .tfe-stack-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 34px; }
+  .tfe-flow-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 34px 0 44px; }
+  .tfe-flow-card { min-height: 116px; padding: 18px 16px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+  .tfe-flow-num { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 8px; background: rgba(91,140,255,0.14); color: #aec3ff; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; margin-bottom: 12px; }
+  .tfe-term { color: #d8e2ff; font-weight: 700; }
+  .tfe-nowrap { white-space: nowrap; }
+  @media (max-width: 820px) {
+    .tfe-nav-links { flex: 1 1 auto; order: 3; width: 100%; gap: 16px !important; padding-top: 10px; font-size: 12.5px !important; }
+    .tfe-nav-brand-sub { display: none !important; }
+    .tfe-hero { grid-template-columns: 1fr; gap: 30px; }
+    .tfe-hero-h1 { font-size: 44px !important; }
+    .tfe-glance { grid-template-columns: 1fr !important; }
+    .tfe-stack-grid { grid-template-columns: 1fr 1fr !important; }
+    .tfe-flow-grid { grid-template-columns: 1fr !important; }
+    .tfe-metrics { grid-template-columns: 1fr !important; }
+    .tfe-2col { grid-template-columns: 1fr !important; }
+    .tfe-arch { flex-direction: column !important; }
+    .tfe-arch .tfe-arrow { transform: rotate(90deg); }
+  }
+  @media (max-width: 560px) {
+    .tfe-stack-grid { grid-template-columns: 1fr !important; }
+    .tfe-hero-insights { grid-template-columns: 1fr !important; }
+  }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="--acc: #5b8cff; background: #08080a; color: #e9e9ec; font-family: 'Pretendard', system-ui, sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-x: hidden; display: flex; flex-direction: column;">
+
+  <!-- ░░ NAV ░░ -->
+  <nav aria-label="포트폴리오 주요 섹션" style="order: 0; position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px); background: rgba(8,8,10,0.72); border-bottom: 1px solid rgba(255,255,255,0.07);">
+    <div style="max-width: 1120px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+      <a href="#top" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #f4f4f6;">
+        <span style="width: 30px; height: 30px; border-radius: 8px; background: #F8F4E7; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;"><img src="assets/logo.png" alt="진실의 입 로고" decoding="async" style="height: 22px; width: auto; display: block;"></span>
+        <span style="font-weight: 700; font-size: 15px; letter-spacing: 0;">진실의 입</span>
+        <span class="tfe-nav-brand-sub" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b6b76; letter-spacing: 0.02em;">Truth&nbsp;Filtering&nbsp;Engine</span>
+      </a>
+      <div class="tfe-nav-links" style="display: flex; align-items: center; gap: 26px; font-size: 13.5px; color: #a0a0aa; font-weight: 500;">
+        <a href="#problem" style="color: inherit; text-decoration: none;">문제</a>
+        <a href="#solution" style="color: inherit; text-decoration: none;">해결 흐름</a>
+        <a href="#mine" style="color: inherit; text-decoration: none;">내 기여</a>
+        <a href="#ml" style="color: inherit; text-decoration: none;">모델 근거</a>
+        <a href="#arch" style="color: inherit; text-decoration: none;">구조</a>
+        <a href="#retro" style="color: inherit; text-decoration: none;">회고</a>
+      </div>
+      <a href="https://truth-filtering-engine-web.vercel.app" target="_blank" rel="noopener" style="font-size: 13px; font-weight: 600; color: #08080a; background: #e9e9ec; padding: 8px 15px; border-radius: 8px; text-decoration: none; white-space: nowrap;">라이브 데모</a>
+    </div>
+  </nav>
+
+  <!-- ░░ HERO ░░ -->
+  <header id="top" class="tfe-hero" style="order: 1; max-width: 1120px; margin: 0 auto; padding: 86px 28px 64px;">
+    <div style="min-width: 0;">
+      <div data-reveal style="display: inline-flex; align-items: center; gap: 9px; padding: 6px 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; font-size: 12.5px; color: #b6b6c0; margin-bottom: 28px;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,0.18);"></span>
+        채용 포트폴리오 · AI 리뷰 신뢰도 서비스 · 4인 팀 / 4주
+      </div>
+
+      <h1 data-reveal class="tfe-hero-h1" style="font-size: 68px; line-height: 1.04; letter-spacing: 0; font-weight: 800; margin: 0 0 8px; color: #fbfbfd;">진실의 입</h1>
+      <p data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--acc, #5b8cff); margin: 0 0 24px; letter-spacing: 0.01em;">The Truth Filtering Engine</p>
+
+      <p data-reveal style="font-size: 21px; line-height: 1.55; color: #c4c4ce; max-width: 720px; margin: 0 0 28px; font-weight: 400;">네이버 블로그 리뷰의 <strong style="color: #fff; font-weight: 600;">광고 가능성</strong>을 분석해, 사용자가 지도에서 <strong style="color: #fff; font-weight: 600;">믿을 만한 리뷰를 먼저 확인</strong>하도록 돕는 서비스입니다.</p>
+
+      <div data-reveal style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
+        <span style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; background: rgba(91,140,255,0.12); border: 1px solid rgba(91,140,255,0.3); color: #aec3ff; font-size: 13px; font-weight: 600;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--acc, #5b8cff);"></span>
+          최현석 — 팀 리드 · React/Flutter 프론트엔드 · AI 결과의 서비스 통합
+        </span>
+      </div>
+
+      <div data-reveal style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 26px;">
+        <a href="https://truth-filtering-engine-web.vercel.app" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 10px; background: var(--acc, #5b8cff); color: #08080a; font-weight: 700; font-size: 14.5px; text-decoration: none;">라이브 데모 열기</a>
+        <a href="https://github.com/The-Truth-Filtering-Engine/The-Truth-Filtering-Engine" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.14); color: #e9e9ec; font-weight: 600; font-size: 14.5px; text-decoration: none;">GitHub 저장소</a>
+      </div>
+
+      <div data-reveal class="tfe-stack-grid">
+        <div style="padding: 16px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 12px; color: #8b8b95; font-weight: 700; margin-bottom: 9px;">Frontend</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #d4d4dc; line-height: 1.7;">React 19<br>TypeScript<br>Flutter / Riverpod</div>
+        </div>
+        <div style="padding: 16px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 12px; color: #8b8b95; font-weight: 700; margin-bottom: 9px;">Backend</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #d4d4dc; line-height: 1.7;">FastAPI<br>SSE stream<br>Cloudflare Tunnel</div>
+        </div>
+        <div style="padding: 16px; border-radius: 14px; background: rgba(91,140,255,0.08); border: 1px solid rgba(91,140,255,0.22);">
+          <div style="font-size: 12px; color: #aec3ff; font-weight: 700; margin-bottom: 9px;">AI</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #d8e2ff; line-height: 1.7;">ELECTRA<br>PyTorch<br>SHAP</div>
+        </div>
+        <div style="padding: 16px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 12px; color: #8b8b95; font-weight: 700; margin-bottom: 9px;">Data</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #d4d4dc; line-height: 1.7;">Supabase<br>Kakao Maps<br>Naver Blog API</div>
+        </div>
+      </div>
+    </div>
+
+    <aside data-reveal class="tfe-hero-visual" aria-label="진실의 입 웹 상세 분석 화면 미리보기">
+      <div class="tfe-browser-frame">
+        <div class="tfe-browser-bar">
+          <span class="tfe-browser-dot" style="background: #ff5f57;"></span>
+          <span class="tfe-browser-dot" style="background: #febc2e;"></span>
+          <span class="tfe-browser-dot" style="background: #28c840;"></span>
+          <span style="margin-left: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b95;">상세 분석 · 신뢰도순 리뷰</span>
+        </div>
+        <img src="assets/web-detail.png" alt="진실의 입 웹에서 매장 리뷰를 AI로 분석하고 신뢰도순으로 보여주는 화면" width="1920" height="1079" decoding="async" fetchpriority="high" style="display: block; width: 100%; height: auto;">
+      </div>
+      <div class="tfe-hero-insights" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+        <div style="padding: 14px 15px; border-radius: 12px; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.24);">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #86efac; font-weight: 700;">Recall 0.96</div>
+          <div style="font-size: 12.5px; color: #b6b6c0; line-height: 1.5; margin-top: 4px;">광고 리뷰를 놓치지 않는 쪽에 무게</div>
+        </div>
+        <div style="padding: 14px 15px; border-radius: 12px; background: rgba(91,140,255,0.08); border: 1px solid rgba(91,140,255,0.24);">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #aec3ff; font-weight: 700;">SSE 분석</div>
+          <div style="font-size: 12.5px; color: #b6b6c0; line-height: 1.5; margin-top: 4px;">분석 결과를 기다리는 동안 순차 표시</div>
+        </div>
+      </div>
+    </aside>
+
+    <div data-reveal class="tfe-glance" style="grid-column: 1 / -1;">
+      <div style="padding: 20px; border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f0a5a5; margin-bottom: 8px;">Problem</div>
+        <div style="font-size: 14px; color: #d4d4dc; line-height: 1.55;">광고성 블로그 리뷰 때문에 사용자가 직접 진위를 판단해야 했다.</div>
+      </div>
+      <div style="padding: 20px; border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #aec3ff; margin-bottom: 8px;">Solution</div>
+        <div style="font-size: 14px; color: #d4d4dc; line-height: 1.55;">리뷰마다 광고 가능성 점수를 붙이고 신뢰도순으로 정렬했다.</div>
+      </div>
+      <div style="padding: 20px; border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #86efac; margin-bottom: 8px;">Outcome</div>
+        <div style="font-size: 14px; color: #d4d4dc; line-height: 1.55;">의사결정 15-20분을 약 5분 흐름으로 줄이는 것을 목표로 설계했다.</div>
+      </div>
+      <div style="padding: 20px; border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #fbbf24; margin-bottom: 8px;">My Role</div>
+        <div style="font-size: 14px; color: #d4d4dc; line-height: 1.55;">AI 분석 결과를 React·Flutter 화면과 사용량/캐시 흐름에 연결했다.</div>
+      </div>
+    </div>
+
+    <div data-reveal class="tfe-metrics" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3,1fr); gap: 16px;">
+      <div style="padding: 26px 24px; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: #6b6b76; text-transform: uppercase; margin-bottom: 14px;">의사결정 시간</div>
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size: 17px; color: #71717a; text-decoration: line-through; font-family: 'JetBrains Mono', monospace;">15–20분</span>
+          <span style="color: #4ade80; font-size: 15px;">→</span>
+          <span style="font-size: 34px; font-weight: 800; color: #4ade80; font-family: 'JetBrains Mono', monospace; letter-spacing: 0;">5분</span>
+        </div>
+        <div style="font-size: 13px; color: #9b9ba6; margin-bottom: 16px;">광고 여부를 직접 검증하던 시간을 <strong style="color: #4ade80;">약 70% 줄이는 흐름</strong></div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #71717a; flex: 0 0 30px;">기존</span>
+            <span style="flex: 1; height: 9px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden;"><span style="display: block; height: 100%; width: 90%; border-radius: 999px; background: #52525b;"></span></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #86efac; flex: 0 0 30px;">진실의 입</span>
+            <span style="flex: 1; height: 9px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden;"><span style="display: block; height: 100%; width: 25%; border-radius: 999px; background: #4ade80;"></span></span>
+          </div>
+        </div>
+      </div>
+      <div style="padding: 26px 24px; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: #6b6b76; text-transform: uppercase; margin-bottom: 14px;">모델 성능</div>
+        <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <span style="font-size: 34px; font-weight: 800; color: #fbfbfd; font-family: 'JetBrains Mono', monospace; letter-spacing: 0;">0.84</span>
+          <span style="font-size: 16px; color: #9b9ba6; font-family: 'JetBrains Mono', monospace;">AUC</span>
+        </div>
+        <div style="font-size: 13px; color: #9b9ba6;"><span class="tfe-term">AUC</span>는 모델 구분력, <span class="tfe-term">Recall 0.96</span>은 광고를 놓치지 않는 정도</div>
+      </div>
+      <div style="padding: 26px 24px; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: #6b6b76; text-transform: uppercase; margin-bottom: 14px;">출시 범위</div>
+        <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px;">
+          <span style="font-size: 34px; font-weight: 800; color: #fbfbfd; font-family: 'JetBrains Mono', monospace; letter-spacing: 0;">4주</span>
+        </div>
+        <div style="font-size: 13px; color: #9b9ba6;"><strong style="color: #fff;">웹 + 앱 + 모델 + 백엔드</strong>를 하나의 사용자 흐름으로 연결</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ░░ 2. PROBLEM ░░ -->
+  <section id="problem" style="order: 2; scroll-margin-top: 72px; max-width: 1120px; margin: 0 auto; padding: 64px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--acc, #5b8cff); text-transform: uppercase; margin-bottom: 16px;">01 — Problem</div>
+    <h2 data-reveal style="font-size: 38px; line-height: 1.15; letter-spacing: 0; font-weight: 800; margin: 0 0 20px; color: #fbfbfd;">맛집 하나 고르는 데<br>평균 15–20분, 광고가 후기를 오염시킨다</h2>
+    <p data-reveal style="font-size: 17px; line-height: 1.6; color: #b6b6c0; max-width: 680px; margin: 0 0 40px;">블로그 리뷰는 유용하지만 광고성 글과 실제 방문 후기가 섞여 있다. 사용자는 리뷰를 하나하나 열어 진위를 직접 판단해야 한다.</p>
+
+    <div data-reveal class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px;">
+      <div style="padding: 28px; border-radius: 16px; background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.18);">
+        <div style="font-size: 44px; font-weight: 800; color: #f87171; font-family: 'JetBrains Mono', monospace; letter-spacing: 0; margin-bottom: 8px;">22,011건</div>
+        <div style="font-size: 14px; color: #c4c4ce; line-height: 1.5;">공정위 <span style="font-family: 'JetBrains Mono', monospace; color: #f0a5a5;">2024</span> 뒷광고 의심 게시물</div>
+      </div>
+      <div style="padding: 28px; border-radius: 16px; background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.18); display: flex; align-items: center; gap: 22px;">
+        <div style="flex: 0 0 auto; width: 96px; height: 96px; border-radius: 50%; background: conic-gradient(#f87171 0% 61.7%, rgba(255,255,255,0.08) 61.7% 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 66px; height: 66px; border-radius: 50%; background: #120e0f; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 19px; font-weight: 800; color: #f87171;">61.7%</div>
+        </div>
+        <div style="font-size: 14px; color: #c4c4ce; line-height: 1.5;">소비자가 <strong style="color: #fff;">리뷰를 보고도 선택에 실패</strong>한 경험이 있다</div>
+      </div>
+    </div>
+
+    <!-- keyword rule limit -->
+    <div data-reveal style="padding: 26px 28px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 36px;">
+      <div style="font-size: 13.5px; color: #9b9ba6; margin-bottom: 14px; font-weight: 600;">단순 키워드 규칙으로는 잡히지 않는다</div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; padding: 8px 16px; border-radius: 9px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #f4f4f6;">"강력 추천"</span>
+        <span style="font-size: 14px; color: #71717a;">은 진짜 후기에도, 광고에도 똑같이 등장한다 — 표현이 아니라 <strong style="color: #c4c4ce;">문맥</strong>을 읽어야 한다</span>
+      </div>
+    </div>
+
+    <div data-reveal style="display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;" class="tfe-2col">
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f87171; margin-bottom: 10px;">기존 한계 ①</div>
+        <div style="font-size: 14.5px; color: #d4d4dc; font-weight: 600; margin-bottom: 4px;">대가성 고지 은폐</div>
+        <div style="font-size: 13px; color: #8b8b95; line-height: 1.5;">협찬 문구가 드러나지 않는 자연스러운 홍보 글</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f87171; margin-bottom: 10px;">기존 한계 ②</div>
+        <div style="font-size: 14.5px; color: #d4d4dc; font-weight: 600; margin-bottom: 4px;">신뢰도 판단 기능 부재</div>
+        <div style="font-size: 13px; color: #8b8b95; line-height: 1.5;">기존 지도 서비스엔 진위 신호 자체가 없다</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f87171; margin-bottom: 10px;">기존 한계 ③</div>
+        <div style="font-size: 14.5px; color: #d4d4dc; font-weight: 600; margin-bottom: 4px;">반복 홍보 문구 오염</div>
+        <div style="font-size: 13px; color: #8b8b95; line-height: 1.5;">같은 홍보 문구가 검색 결과를 뒤덮는다</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ 3. SOLUTION ░░ -->
+  <section id="solution" style="order: 3; scroll-margin-top: 72px; max-width: 1120px; margin: 0 auto; padding: 64px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--acc, #5b8cff); text-transform: uppercase; margin-bottom: 16px;">02 — Solution</div>
+    <h2 data-reveal style="font-size: 38px; line-height: 1.15; letter-spacing: 0; font-weight: 800; margin: 0 0 16px; color: #fbfbfd;">탐색 흐름을 깨지 않고<br>신뢰할 수 있는 리뷰를 먼저 보여준다</h2>
+    <p data-reveal style="font-size: 16px; line-height: 1.65; color: #b6b6c0; max-width: 720px; margin: 0;">면접관이 서비스 동작을 한 번에 따라갈 수 있도록, 사용자가 실제로 경험하는 순서대로 화면과 AI 분석 흐름을 연결했습니다.</p>
+
+    <!-- user flow -->
+    <div data-reveal class="tfe-flow-grid">
+      <div class="tfe-flow-card">
+        <span class="tfe-flow-num">1</span>
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">검색</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.55;">지도에서 음식점·카페를 찾고 후보를 좁힌다.</div>
+      </div>
+      <div class="tfe-flow-card">
+        <span class="tfe-flow-num">2</span>
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">매장 선택</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.55;">좌표와 매장 정보를 기준으로 관련 리뷰를 모은다.</div>
+      </div>
+      <div class="tfe-flow-card" style="background: rgba(91,140,255,0.08); border-color: rgba(91,140,255,0.24);">
+        <span class="tfe-flow-num">3</span>
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">AI 분석</div>
+        <div style="font-size: 13px; color: #b6c7ff; line-height: 1.55;"><span class="tfe-term">캐시</span>는 재분석을 줄이고, <span class="tfe-term">SSE</span>는 결과를 순차 표시한다.</div>
+      </div>
+      <div class="tfe-flow-card">
+        <span class="tfe-flow-num">4</span>
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">신뢰도순 확인</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.55;">광고 가능성이 낮은 리뷰를 먼저 읽게 한다.</div>
+      </div>
+      <div class="tfe-flow-card" style="background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.24);">
+        <span class="tfe-flow-num" style="background: rgba(74,222,128,0.14); color: #86efac;">5</span>
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">의사결정</div>
+        <div style="font-size: 13px; color: #a7f3d0; line-height: 1.55;">리뷰 검증 부담을 줄이고 빠르게 선택한다.</div>
+      </div>
+    </div>
+
+    <!-- core features -->
+    <div data-reveal class="tfe-2col" style="display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 48px;">
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">AI 광고 탐지</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.5;">리뷰별 광고 가능성 점수·등급</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">신뢰도순 정렬</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.5;">진성 리뷰를 목록 상단으로</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">AI 맛집 추천</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.5;">광고 가능성 낮은 리뷰 기반</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 6px;">워드클라우드</div>
+        <div style="font-size: 13px; color: #9b9ba6; line-height: 1.5;">리뷰 핵심 키워드 요약</div>
+      </div>
+    </div>
+
+    <!-- screenshots -->
+    <div data-reveal style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start;">
+      <!-- web browser frame -->
+      <div style="flex: 1 1 560px; min-width: 0;">
+        <div style="border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 24px 60px rgba(0,0,0,0.5); background: #16161a;">
+          <div style="display: flex; align-items: center; gap: 7px; padding: 11px 14px; background: #1c1c22; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #ff5f57;"></span>
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #febc2e;"></span>
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #28c840;"></span>
+            <span style="margin-left: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b6b76;">truth-filtering-engine-web.vercel.app</span>
+          </div>
+          <img src="assets/web-detail.png" alt="웹에서 매장 리뷰를 지도와 상세 분석 패널로 함께 확인하는 화면" width="1920" height="1079" loading="lazy" decoding="async" style="display: block; width: 100%; height: auto;">
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b6b76; margin-top: 12px;">React 웹 — 지도 + 상세 분석 패널 / 진성순 정렬</div>
+      </div>
+      <!-- phone frame -->
+      <div style="flex: 0 1 268px; max-width: 100%; margin: 0 auto;">
+        <div style="width: min(268px, 100%); border-radius: 34px; padding: 10px; background: #1a1a1f; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 24px 60px rgba(0,0,0,0.5);">
+          <div style="position: relative; border-radius: 26px; overflow: hidden; background: #fff;">
+            <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 86px; height: 19px; border-radius: 999px; background: #0a0a0c; z-index: 2;"></div>
+            <img src="assets/app-detail-crop.png" alt="Flutter 앱에서 리뷰 광고 가능성 분석 카드를 보여주는 화면" width="502" height="918" loading="lazy" decoding="async" style="display: block; width: 100%; height: auto;">
+          </div>
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b6b76; margin-top: 12px; text-align: center;">Flutter 앱 — AI 진실 분석 카드</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ 4. MODEL EVIDENCE (TEAM) ░░ -->
+  <section id="ml" style="order: 5; scroll-margin-top: 72px; max-width: 1120px; margin: 0 auto; padding: 64px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div data-reveal style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--acc, #5b8cff); text-transform: uppercase;">04 — Model Evidence</span>
+      <span data-ownership style="display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: rgba(148,148,160,0.1); border: 1px solid rgba(148,148,160,0.28); font-size: 12px; font-weight: 600; color: #b6b6c0;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #94949f;"></span>
+        팀 성과 · 내가 이해·조율한 부분
+      </span>
+    </div>
+    <h2 data-reveal style="font-size: 38px; line-height: 1.15; letter-spacing: 0; font-weight: 800; margin: 0 0 14px; color: #fbfbfd;">모델이 왜 필요한지<br>지표와 실패 사례로 설명한다</h2>
+    <p data-reveal style="font-size: 15px; line-height: 1.6; color: #9b9ba6; max-width: 700px; margin: 0 0 40px;">아래 ML 딥다이브는 <strong style="color: #c4c4ce;">팀의 성과</strong>입니다. 모델 학습은 팀이 주도했고, 저는 문제 진단·실험 결과·임계값 정책을 함께 이해하고 그 결과를 서비스에 연결하는 작업을 담당했습니다. <span class="tfe-term">AUC</span>는 광고/비광고를 구분하는 힘, <span class="tfe-term">Recall</span>은 광고 리뷰를 놓치지 않는 정도로 읽으면 됩니다.</p>
+
+    <!-- collapse story -->
+    <div data-reveal class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+      <div style="padding: 28px; border-radius: 16px; background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.18);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f87171; margin-bottom: 14px; letter-spacing: 0.04em;">문제 발견 — 성능 붕괴</div>
+        <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
+          <div>
+            <div style="font-size: 12px; color: #8b8b95; margin-bottom: 2px;">검증 F1</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 800; color: #d4d4dc;">0.97</div>
+          </div>
+          <span style="font-size: 22px; color: #f87171;">↓</span>
+          <div>
+            <div style="font-size: 12px; color: #8b8b95; margin-bottom: 2px;">신규 테스트 AUC</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 800; color: #f87171;">0.58</div>
+          </div>
+        </div>
+        <div style="font-size: 13px; color: #9b9ba6; margin-top: 14px; line-height: 1.5;">신규 데이터에서 거의 <strong style="color: #f0a5a5;">랜덤 수준</strong>까지 하락 — 운영 환경 일반화 실패 신호</div>
+      </div>
+      <div style="padding: 28px; border-radius: 16px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #fbbf24; margin-bottom: 14px; letter-spacing: 0.04em;">원인 진단 — 상호명 편향</div>
+        <div style="font-size: 14px; color: #d4d4dc; line-height: 1.6; margin-bottom: 14px;">학습 데이터 편중 + <strong style="color: #fff;">상호명(가게명) 편향</strong>. 모델이 문맥이 아니라 가게 이름에 반응한다는 가설.</div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 8px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.28);">
+          <span style="font-size: 12px; color: #86efac;">마스킹 실험 입증 — 새 가게 AUC</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #4ade80;">+0.0469</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUC journey chart -->
+    <div data-reveal style="padding: 28px; border-radius: 16px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--acc, #5b8cff); letter-spacing: 0.04em;">AUC 추이 — 붕괴에서 회복까지</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b6b76;">y축 = AUC (0–1)</div>
+      </div>
+      <div style="position: relative; display: flex; align-items: flex-end; justify-content: space-around; gap: 24px; height: 196px; padding-bottom: 0;">
+        <!-- random baseline -->
+        <div style="position: absolute; left: 0; right: 0; bottom: 90px; border-top: 1px dashed rgba(248,113,113,0.45); pointer-events: none;">
+          <span style="position: absolute; right: 0; top: -8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #c97a7a; background: #100f12; padding: 0 6px;">랜덤 0.50</span>
+        </div>
+        <!-- bar: 검증 -->
+        <div style="flex: 1; max-width: 150px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800; color: #d4d4dc; margin-bottom: 6px;">0.95</span>
+          <div style="width: 100%; height: 171px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #6b7280, #4b5563);"></div>
+        </div>
+        <!-- bar: 신규 (붕괴) -->
+        <div style="flex: 1; max-width: 150px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800; color: #f87171; margin-bottom: 6px;">0.58</span>
+          <div style="width: 100%; height: 104px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #f87171, #c0392b);"></div>
+        </div>
+        <!-- bar: 최종 (회복) -->
+        <div style="flex: 1; max-width: 150px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800; color: #4ade80; margin-bottom: 6px;">0.84</span>
+          <div style="width: 100%; height: 151px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #4ade80, #1a7a4a);"></div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-around; gap: 24px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 12px;">
+        <div style="flex: 1; max-width: 150px; text-align: center;"><div style="font-size: 13px; color: #d4d4dc; font-weight: 600;">초기 검증</div><div style="font-size: 11.5px; color: #71717a;">기존 데이터</div></div>
+        <div style="flex: 1; max-width: 150px; text-align: center;"><div style="font-size: 13px; color: #f0a5a5; font-weight: 600;">신규 테스트</div><div style="font-size: 11.5px; color: #71717a;">붕괴 발견</div></div>
+        <div style="flex: 1; max-width: 150px; text-align: center;"><div style="font-size: 13px; color: #86efac; font-weight: 600;">재학습 후</div><div style="font-size: 11.5px; color: #71717a;">마스킹+데이터 확장</div></div>
+      </div>
+    </div>
+
+    <!-- solution metrics -->
+    <div data-reveal style="padding: 28px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--acc, #5b8cff); margin-bottom: 18px; letter-spacing: 0.04em;">해결 — 마스킹 + 데이터 확장 + 입력 재설계</div>
+      <div class="tfe-metrics" style="display: grid; grid-template-columns: repeat(3,1fr); gap: 20px;">
+        <div>
+          <div style="font-size: 13px; color: #8b8b95; margin-bottom: 8px;">가게 수 <span style="font-family: 'JetBrains Mono', monospace; color: #4ade80;">+259%</span></div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: #e9e9ec; margin-bottom: 12px;">34 <span style="color: var(--acc, #5b8cff);">→</span> 122</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #71717a; flex: 0 0 30px;">전</span><span style="flex: 1; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden;"><span style="display: block; height: 100%; width: 28%; background: #52525b;"></span></span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #aec3ff; flex: 0 0 30px;">후</span><span style="flex: 1; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden;"><span style="display: block; height: 100%; width: 100%; background: var(--acc, #5b8cff);"></span></span></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 13px; color: #8b8b95; margin-bottom: 8px;">데이터 건수 <span style="font-family: 'JetBrains Mono', monospace; color: #4ade80;">+58%</span></div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: #e9e9ec; margin-bottom: 12px;">1,360 <span style="color: var(--acc, #5b8cff);">→</span> 2,142</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #71717a; flex: 0 0 30px;">전</span><span style="flex: 1; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden;"><span style="display: block; height: 100%; width: 63%; background: #52525b;"></span></span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #aec3ff; flex: 0 0 30px;">후</span><span style="flex: 1; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden;"><span style="display: block; height: 100%; width: 100%; background: var(--acc, #5b8cff);"></span></span></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 13px; color: #8b8b95; margin-bottom: 8px;">입력 결합</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: #e9e9ec; margin-bottom: 12px;">제목 <span style="color: var(--acc, #5b8cff);">[SEP]</span> 본문</div>
+          <div style="font-size: 12px; color: #71717a; line-height: 1.5;">짧은 제목과 본문 preview를 함께 입력</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- final results -->
+    <div data-reveal class="tfe-metrics" style="display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 36px;">
+      <div style="padding: 22px; border-radius: 14px; background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.2); display: flex; flex-direction: column; align-items: center;">
+        <div style="width: 104px; height: 104px; border-radius: 50%; background: conic-gradient(#4ade80 0% 84%, rgba(255,255,255,0.07) 84% 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 76px; height: 76px; border-radius: 50%; background: #0c130e; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 800; color: #4ade80;">.8397</div>
+        </div>
+        <div style="font-size: 12.5px; color: #c4c4ce; margin-top: 12px; font-weight: 600;">최종 AUC</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center;">
+        <div style="width: 104px; height: 104px; border-radius: 50%; background: conic-gradient(#e9e9ec 0% 78%, rgba(255,255,255,0.07) 78% 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 76px; height: 76px; border-radius: 50%; background: #0e0e10; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 800; color: #e9e9ec;">.7788</div>
+        </div>
+        <div style="font-size: 12.5px; color: #c4c4ce; margin-top: 12px; font-weight: 600;">F1</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center;">
+        <div style="width: 104px; height: 104px; border-radius: 50%; background: conic-gradient(#aec3ff 0% 96%, rgba(255,255,255,0.07) 96% 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 76px; height: 76px; border-radius: 50%; background: #0c0e14; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 19px; font-weight: 800; color: #aec3ff;">.96</div>
+        </div>
+        <div style="font-size: 12.5px; color: #c4c4ce; margin-top: 12px; font-weight: 600;">Recall</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 800; color: #e9e9ec;">INT8</div>
+        <div style="font-size: 12.5px; color: #c4c4ce; margin-top: 8px; font-weight: 600;">양자화에도 성능 유지</div>
+        <div style="font-size: 11.5px; color: #71717a; margin-top: 4px;">경량 추론 적용</div>
+      </div>
+    </div>
+
+    <div data-reveal class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <!-- threshold -->
+      <div style="padding: 24px; border-radius: 14px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);">
+        <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px;">임계값 최적화</div>
+        <div style="font-size: 13.5px; color: #9b9ba6; line-height: 1.6; margin-bottom: 18px;">Youden's J 기준으로 분류 임계값 <span style="font-family: 'JetBrains Mono', monospace; color: #aec3ff;">0.778</span> 선정 — precision·recall 균형점.</div>
+        <div style="position: relative; height: 10px; border-radius: 999px; background: linear-gradient(90deg, #4ade80, #fbbf24, #f87171); margin-bottom: 22px;">
+          <div style="position: absolute; left: 77.8%; top: -5px; bottom: -5px; width: 3px; border-radius: 2px; background: #fff; box-shadow: 0 0 0 3px rgba(0,0,0,0.4);"></div>
+          <span style="position: absolute; left: 77.8%; top: 16px; transform: translateX(-50%); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #e9e9ec; white-space: nowrap;">0.778</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6b6b76;"><span>0 · 비광고</span><span>광고 · 1</span></div>
+      </div>
+      <!-- SHAP -->
+      <div style="padding: 24px; border-radius: 14px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);">
+        <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px;">해석가능성 (SHAP)</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 10px; align-items: baseline;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f87171; flex: 0 0 56px;">광고</span>
+            <span style="font-size: 13px; color: #c4c4ce;">격식체 · 홍보성 표현 · 업주 시점</span>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: baseline;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #4ade80; flex: 0 0 56px;">비광고</span>
+            <span style="font-size: 13px; color: #c4c4ce;">1인칭 · 역접 · 구어체</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ 3. MY CONTRIBUTION (MINE) ░░ -->
+  <section id="mine" style="order: 4; scroll-margin-top: 72px; max-width: 1120px; margin: 0 auto; padding: 64px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div data-reveal style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--acc, #5b8cff); text-transform: uppercase;">03 — My Contribution</span>
+      <span data-ownership style="display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: rgba(91,140,255,0.14); border: 1px solid rgba(91,140,255,0.34); font-size: 12px; font-weight: 700; color: #aec3ff;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--acc, #5b8cff);"></span>
+        내가 직접 한 일
+      </span>
+    </div>
+    <h2 data-reveal style="font-size: 38px; line-height: 1.15; letter-spacing: 0; font-weight: 800; margin: 0 0 14px; color: #fbfbfd;">AI 분석 결과를<br>작동하는 서비스로 연결했다</h2>
+    <p data-reveal style="font-size: 15px; line-height: 1.6; color: #9b9ba6; max-width: 700px; margin: 0 0 44px;">팀 4인 프로젝트에서 제가 직접 책임진 영역을 명확히 구분해 정리했습니다. 핵심 기여는 <strong style="color: #c4c4ce;">AI 분석 결과를 웹·앱 서비스에 통합한 영역, 프론트엔드 구현, 그리고 팀 리드</strong>입니다.</p>
+
+    <!-- A -->
+    <div data-reveal style="margin-bottom: 16px; padding: 30px; border-radius: 16px; background: linear-gradient(180deg, rgba(91,140,255,0.07), rgba(91,140,255,0.02)); border: 1px solid rgba(91,140,255,0.2);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <span style="width: 30px; height: 30px; border-radius: 8px; background: var(--acc, #5b8cff); color: #08080a; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center;">A</span>
+        <span style="font-size: 18px; font-weight: 700; color: #fff;">AI 결과의 서비스 통합</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b6b76;">AIEngineer.md §10</span>
+      </div>
+      <!-- integration flow -->
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">
+        <span style="padding: 7px 12px; border-radius: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">캐시 우선 조회</span>
+        <span style="color: var(--acc, #5b8cff);">→</span>
+        <span style="padding: 7px 12px; border-radius: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">없으면 SSE 스트림 요청</span>
+        <span style="color: var(--acc, #5b8cff);">→</span>
+        <span style="padding: 7px 12px; border-radius: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">배치 도착마다 목록 병합</span>
+        <span style="color: var(--acc, #5b8cff);">→</span>
+        <span style="padding: 7px 12px; border-radius: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">사용량 반영</span>
+      </div>
+      <p style="font-size: 14px; color: #c4c4ce; line-height: 1.6; margin: 0;">광고 점수를 <strong style="color: #fff;">절대 판정이 아닌 "참고 점수·등급"</strong>으로 설계해, 신뢰도순 정렬과 AI 추천에 연결했다.</p>
+    </div>
+
+    <!-- B -->
+    <div data-reveal style="margin-bottom: 16px; padding: 30px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+        <span style="width: 30px; height: 30px; border-radius: 8px; background: #e9e9ec; color: #08080a; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center;">B</span>
+        <span style="font-size: 18px; font-weight: 700; color: #fff;">프론트엔드 구현</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b6b76;">Frontend.md</span>
+      </div>
+      <div class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div style="font-size: 14px; color: #c4c4ce; line-height: 1.6;"><strong style="color: #fff;">React 19 + TS 웹 초기 구축</strong> — App.tsx에서 전체 화면 흐름 조율, hook 단위로 상태 분리.</div>
+        <div style="font-size: 14px; color: #c4c4ce; line-height: 1.6;"><strong style="color: #fff;">웹·앱 기능 정합성 유지</strong> — tokens.json 기반 웹 CSS와 Flutter 디자인 시스템 통일.</div>
+        <div style="font-size: 14px; color: #c4c4ce; line-height: 1.6;"><strong style="color: #fff;">낙관적 업데이트 북마크</strong> — 서버 실패 시 토스트로 롤백 피드백.</div>
+        <div style="font-size: 14px; color: #c4c4ce; line-height: 1.6;"><strong style="color: #fff;">사용량 기반 CTA 계산</strong> — 무료·프리미엄·코인 상태에 따라 버튼 라벨 결정.</div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px;">
+        <span style="padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); color: #9b9ba6;">useMap</span>
+        <span style="padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); color: #9b9ba6;">useDetail</span>
+        <span style="padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); color: #9b9ba6;">useBookmarks</span>
+        <span style="padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); color: #9b9ba6;">useReviewActivity</span>
+      </div>
+    </div>
+
+    <!-- C: troubleshooting cards -->
+    <div data-reveal style="margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+        <span style="width: 30px; height: 30px; border-radius: 8px; background: #e9e9ec; color: #08080a; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center;">C</span>
+        <span style="font-size: 18px; font-weight: 700; color: #fff;">트러블슈팅</span>
+        <span style="font-size: 12px; color: #8b8b95;">실제 내가 처리한 상태 꼬임</span>
+      </div>
+      <div class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);">
+          <div style="font-size: 14.5px; font-weight: 700; color: #f0a5a5; margin-bottom: 8px;">지도 idle 이벤트 API 과호출</div>
+          <div style="font-size: 13.5px; color: #b6b6c0; line-height: 1.55;"><span style="font-family: 'JetBrains Mono', monospace; color: #aec3ff;">useMap</span>에서 검색 모드를 분리해 viewport 자동 검색이 선택 결과를 덮지 않도록 제어.</div>
+        </div>
+        <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);">
+          <div style="font-size: 14.5px; font-weight: 700; color: #f0a5a5; margin-bottom: 8px;">상세 분석 요청 경쟁 상태</div>
+          <div style="font-size: 13.5px; color: #b6b6c0; line-height: 1.55;"><span style="font-family: 'JetBrains Mono', monospace; color: #aec3ff;">AbortController</span> + <span style="font-family: 'JetBrains Mono', monospace; color: #aec3ff;">requestId</span>로 늦게 도착한 오래된 응답을 무시.</div>
+        </div>
+        <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);">
+          <div style="font-size: 14.5px; font-weight: 700; color: #f0a5a5; margin-bottom: 8px;">캐시·스트리밍 병합 중복 리뷰</div>
+          <div style="font-size: 13.5px; color: #b6b6c0; line-height: 1.55;">URL/ID 기준 <span style="font-family: 'JetBrains Mono', monospace; color: #aec3ff;">dedupe</span> 후 정렬·페이지를 병합 목록 기준으로 재계산.</div>
+        </div>
+        <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);">
+          <div style="font-size: 14.5px; font-weight: 700; color: #f0a5a5; margin-bottom: 8px;">웹/앱 기능 정합성</div>
+          <div style="font-size: 13.5px; color: #b6b6c0; line-height: 1.55;">공통 API 응답 모델을 기준으로 hook/provider를 분리해 플랫폼별 UI만 다르게.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D -->
+    <div data-reveal style="padding: 24px 30px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09); display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <span style="width: 30px; height: 30px; border-radius: 8px; background: #e9e9ec; color: #08080a; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;">D</span>
+      <span style="font-size: 18px; font-weight: 700; color: #fff;">팀 리드</span>
+      <span style="font-size: 14px; color: #b6b6c0;">문제 정의 · 스코핑 · 역할 조율</span>
+    </div>
+
+    <!-- supporting screenshots -->
+    <div data-reveal style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 36px;">
+      <div style="flex: 1 1 560px; min-width: 0;">
+        <div style="border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 24px 60px rgba(0,0,0,0.5); background: #16161a;">
+          <div style="display: flex; align-items: center; gap: 7px; padding: 11px 14px; background: #1c1c22; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #ff5f57;"></span>
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #febc2e;"></span>
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #28c840;"></span>
+            <span style="margin-left: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b6b76;">AI 추천 — 광고 가능성 낮은 리뷰 기반</span>
+          </div>
+          <img src="assets/web-recommend.png" alt="웹에서 광고 가능성이 낮은 리뷰 기반 AI 추천을 보여주는 화면" width="1920" height="1079" loading="lazy" decoding="async" style="display: block; width: 100%; height: auto;">
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b6b76; margin-top: 12px;">참고 점수를 추천·정렬에 연결한 결과 화면</div>
+      </div>
+      <div style="flex: 0 1 268px; max-width: 100%; margin: 0 auto;">
+        <div style="width: min(268px, 100%); border-radius: 34px; padding: 10px; background: #1a1a1f; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 24px 60px rgba(0,0,0,0.5);">
+          <div style="position: relative; border-radius: 26px; overflow: hidden; background: #fff;">
+            <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 86px; height: 19px; border-radius: 999px; background: #0a0a0c; z-index: 2;"></div>
+            <img src="assets/app-detail2-crop.png" alt="Flutter 앱에서 추천순, 신뢰순, 최신순 리뷰 정렬을 보여주는 화면" width="502" height="918" loading="lazy" decoding="async" style="display: block; width: 100%; height: auto;">
+          </div>
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b6b76; margin-top: 12px; text-align: center;">추천순·신뢰순·최신순 정렬 (앱)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ 6. ARCHITECTURE ░░ -->
+  <section id="arch" style="order: 6; scroll-margin-top: 72px; max-width: 1120px; margin: 0 auto; padding: 64px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--acc, #5b8cff); text-transform: uppercase; margin-bottom: 16px;">05 — Architecture</div>
+    <h2 data-reveal style="font-size: 38px; line-height: 1.15; letter-spacing: 0; font-weight: 800; margin: 0 0 14px; color: #fbfbfd;">아키텍처 &amp; 기술 선택 이유</h2>
+    <p data-reveal style="font-size: 15px; line-height: 1.65; color: #9b9ba6; max-width: 720px; margin: 0 0 36px;">핵심은 지도 탐색 화면을 유지하면서 리뷰 수집, 모델 추론, 캐시 저장, 화면 갱신을 끊기지 않게 연결하는 것이었습니다.</p>
+
+    <!-- system diagram -->
+    <div data-reveal style="padding: 32px 28px; border-radius: 16px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; overflow-x: auto;">
+      <div class="tfe-arch" style="display: flex; align-items: stretch; gap: 16px; min-width: 720px;">
+        <!-- clients -->
+        <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center; flex: 0 0 auto;">
+          <div style="padding: 14px 18px; border-radius: 11px; background: rgba(91,140,255,0.1); border: 1px solid rgba(91,140,255,0.3); text-align: center;">
+            <div style="font-size: 14px; font-weight: 700; color: #fff;">웹</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #aec3ff;">React 19</div>
+          </div>
+          <div style="padding: 14px 18px; border-radius: 11px; background: rgba(91,140,255,0.1); border: 1px solid rgba(91,140,255,0.3); text-align: center;">
+            <div style="font-size: 14px; font-weight: 700; color: #fff;">앱</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #aec3ff;">Flutter</div>
+          </div>
+        </div>
+        <div class="tfe-arrow" style="display: flex; align-items: center; color: #6b6b76; font-size: 22px;">→</div>
+        <!-- tunnel -->
+        <div style="display: flex; align-items: center; flex: 0 0 auto;">
+          <div style="padding: 16px 20px; border-radius: 11px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); text-align: center;">
+            <div style="font-size: 14px; font-weight: 700; color: #e9e9ec;">Cloudflare</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b95;">Tunnel</div>
+          </div>
+        </div>
+        <div class="tfe-arrow" style="display: flex; align-items: center; color: #6b6b76; font-size: 22px;">→</div>
+        <!-- fastapi -->
+        <div style="display: flex; align-items: center; flex: 0 0 auto;">
+          <div style="padding: 16px 20px; border-radius: 11px; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.28); text-align: center;">
+            <div style="font-size: 14px; font-weight: 700; color: #fff;">FastAPI</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #86efac;">추론 API</div>
+          </div>
+        </div>
+        <div class="tfe-arrow" style="display: flex; align-items: center; color: #6b6b76; font-size: 22px;">→</div>
+        <!-- services -->
+        <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center; flex: 1 1 auto;">
+          <div style="padding: 12px 16px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);"><span style="font-size: 13.5px; color: #e9e9ec; font-weight: 600;">ELECTRA 추론</span> <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b95;">PyTorch / HF</span></div>
+          <div style="padding: 12px 16px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);"><span style="font-size: 13.5px; color: #e9e9ec; font-weight: 600;">Naver Blog API</span> <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b95;">리뷰 수집</span></div>
+          <div style="padding: 12px 16px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);"><span style="font-size: 13.5px; color: #e9e9ec; font-weight: 600;">Supabase</span> <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b95;">캐시 · 점수 저장</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- inference pipeline -->
+    <div data-reveal style="padding: 26px 28px; border-radius: 16px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 36px;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--acc, #5b8cff); margin-bottom: 16px; letter-spacing: 0.04em;">추론 파이프라인 · 리뷰 텍스트가 점수가 되는 과정</div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">
+        <span style="padding: 8px 13px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">전처리</span>
+        <span style="color: #6b6b76;">→</span>
+        <span style="padding: 8px 13px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">토큰화</span>
+        <span style="color: #6b6b76;">→</span>
+        <span style="padding: 8px 13px; border-radius: 8px; background: rgba(91,140,255,0.12); border: 1px solid rgba(91,140,255,0.3); color: #aec3ff;">ELECTRA</span>
+        <span style="color: #6b6b76;">→</span>
+        <span style="padding: 8px 13px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e9e9ec;">확률 변환</span>
+        <span style="color: #6b6b76;">→</span>
+        <span style="padding: 8px 13px; border-radius: 8px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.28); color: #86efac;">광고 점수 저장</span>
+      </div>
+      <div style="font-size: 12.5px; color: #8b8b95; margin-top: 12px; line-height: 1.5;"><span style="color: #b6b6c0;">전처리</span> = HTML 제거 · 상호명/브랜드명 마스킹 · 제목 [SEP] 본문 결합. 최종 점수는 절대 판정이 아니라 리뷰 정렬과 추천에 쓰는 참고 신호입니다.</div>
+    </div>
+
+    <!-- tech choices -->
+    <div data-reveal class="tfe-metrics" style="display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-bottom: 16px;">
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #fff; font-weight: 700; margin-bottom: 6px;">React</div>
+        <div style="font-size: 13.5px; color: #9b9ba6; line-height: 1.55;">웹 유입·공유 링크 대응이 쉬운 표준 웹 클라이언트.</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #fff; font-weight: 700; margin-bottom: 6px;">Flutter</div>
+        <div style="font-size: 13.5px; color: #9b9ba6; line-height: 1.55;">직접 렌더링으로 지도·리스트 스크롤 성능 확보.</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #fff; font-weight: 700; margin-bottom: 6px;">SSE</div>
+        <div style="font-size: 13.5px; color: #9b9ba6; line-height: 1.55;">최대 20초 분석 지연을 배치 단위로 끊어 체감 대기 시간 단축.</div>
+      </div>
+      <div style="padding: 22px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #fff; font-weight: 700; margin-bottom: 6px;">추론 최적화</div>
+        <div style="font-size: 13.5px; color: #9b9ba6; line-height: 1.55;">모델 1회 로딩 · 배치 추론 · Supabase 캐싱으로 반복 추론 제거.</div>
+      </div>
+    </div>
+
+    <!-- honest limits -->
+    <div data-reveal style="padding: 24px 28px; border-radius: 16px; background: rgba(245,158,11,0.05); border: 1px solid rgba(245,158,11,0.18);">
+      <div style="font-size: 13px; font-weight: 700; color: #fbbf24; margin-bottom: 14px;">솔직한 한계</div>
+      <div class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="font-size: 13.5px; color: #c4c4ce; line-height: 1.6;">Cloudflare <strong style="color: #fff;">Quick Tunnel은 SSE 미지원</strong> → 정식 Tunnel / Workers 전환 예정.</div>
+        <div style="font-size: 13.5px; color: #c4c4ce; line-height: 1.6;">모델 파일 부재 시 점수 <span style="font-family: 'JetBrains Mono', monospace; color: #f0c987;">0.0</span> fallback으로 탐색 기능은 유지.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ 7. RETROSPECTIVE ░░ -->
+  <section id="retro" style="order: 7; scroll-margin-top: 72px; max-width: 1120px; margin: 0 auto; padding: 64px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--acc, #5b8cff); text-transform: uppercase; margin-bottom: 16px;">06 — Retrospective</div>
+    <h2 data-reveal style="font-size: 38px; line-height: 1.15; letter-spacing: 0; font-weight: 800; margin: 0 0 36px; color: #fbfbfd;">회고 &amp; 향후 개선</h2>
+
+    <div data-reveal class="tfe-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div style="padding: 28px; border-radius: 16px; background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.18);">
+        <div style="font-size: 14px; font-weight: 700; color: #86efac; margin-bottom: 16px;">배운 점</div>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px;">
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">외부 API(Naver·Kakao)를 실제 제품 흐름에 안정적으로 묶는 법</li>
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">React·Flutter 크로스플랫폼 UX를 토큰 기준으로 통일하는 법</li>
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">AI 결과를 절대 판정이 아닌 참고 신호로 제품에 통합하는 설계</li>
+        </ul>
+      </div>
+      <div style="padding: 28px; border-radius: 16px; background: rgba(91,140,255,0.05); border: 1px solid rgba(91,140,255,0.18);">
+        <div style="font-size: 14px; font-weight: 700; color: #aec3ff; margin-bottom: 16px;">향후 개선</div>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px;">
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">클라우드 서버 이전 · Supabase RLS 강화 · 결제 페이지</li>
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">React Query 캐시 도입으로 상태 정리</li>
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">판단 근거(키워드 하이라이트) 설명 UI</li>
+          <li style="font-size: 14px; color: #c4c4ce; line-height: 1.55;">오탐/미탐 수집 기반 재학습 모니터링 루프</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ FOOTER ░░ -->
+  <footer style="order: 8; max-width: 1120px; margin: 0 auto; padding: 48px 28px 80px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px;">
+      <div>
+        <div style="font-size: 16px; font-weight: 700; color: #f4f4f6;">최현석 — AI 엔지니어</div>
+        <div style="font-size: 13.5px; color: #8b8b95; margin-top: 4px;">AI를 실제 서비스로 작동하게 만드는 개발자</div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <a href="https://truth-filtering-engine-web.vercel.app" target="_blank" rel="noopener" style="font-size: 13px; font-weight: 600; color: #08080a; background: var(--acc, #5b8cff); padding: 10px 18px; border-radius: 9px; text-decoration: none;">라이브 데모 ↗</a>
+        <a href="https://github.com/The-Truth-Filtering-Engine/The-Truth-Filtering-Engine" target="_blank" rel="noopener" style="font-size: 13px; font-weight: 600; color: #e9e9ec; border: 1px solid rgba(255,255,255,0.14); padding: 10px 18px; border-radius: 9px; text-decoration: none;">GitHub</a>
+      </div>
+    </div>
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #4b4b54; margin-top: 28px;">진실의 입 · The Truth Filtering Engine — 4인 팀 / 4주</div>
+  </footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;accent&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#5b8cff&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;options&quot;: [&quot;#5b8cff&quot;, &quot;#4ade80&quot;, &quot;#f59e0b&quot;, &quot;#a78bfa&quot;] },
+  &quot;showOwnership&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
+  &quot;reduceMotion&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot; }
+}">
+class Component extends DCLogic {
+  rootRef = React.createRef();
+
+  applyAccent() {
+    const acc = this.props.accent || '#5b8cff';
+    if (this.rootRef.current) this.rootRef.current.style.setProperty('--acc', acc);
+  }
+
+  applyOwnership() {
+    const show = this.props.showOwnership !== false;
+    if (!this.rootRef.current) return;
+    this.rootRef.current.querySelectorAll('[data-ownership]').forEach(el => {
+      el.style.display = show ? '' : 'none';
+    });
+  }
+
+  componentDidMount() {
+    this.applyAccent();
+    this.applyOwnership();
+    const reduce = this.props.reduceMotion === true
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const root = this.rootRef.current;
+    if (!root) return;
+    const els = Array.from(root.querySelectorAll('[data-reveal]'));
+    if (reduce || !('IntersectionObserver' in window)) return;
+    els.forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(18px)';
+      el.style.transition = 'opacity .6s cubic-bezier(.22,1,.36,1), transform .6s cubic-bezier(.22,1,.36,1)';
+    });
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.style.opacity = '1';
+          e.target.style.transform = 'none';
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -8% 0px' });
+    els.forEach(el => io.observe(el));
+  }
+
+  componentDidUpdate() {
+    this.applyAccent();
+    this.applyOwnership();
+  }
+
+  renderVals() {
+    return { rootRef: this.rootRef };
+  }
+}
+</script>
+</body>
+</html>
