@@ -396,14 +396,16 @@ function ReviewCard({
         {review.date ? ` · ${review.date}` : ''}
       </small>
       {review.url && (
-        <button
-          type="button"
+        <a
+          href={review.url}
+          target="_blank"
+          rel="noopener noreferrer"
           className="review-open-button"
           onClick={() => onOpenReviewSource(review)}
         >
           <ExternalLink aria-hidden="true" size={14} strokeWidth={2.2} />
           원문 보기
-        </button>
+        </a>
       )}
     </article>
   )

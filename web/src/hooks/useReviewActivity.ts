@@ -740,8 +740,6 @@ export function useReviewActivity(
         return
       }
 
-      window.open(review.url, '_blank', 'noopener,noreferrer')
-
       try {
         await recordRecentReview(review)
       } catch (error) {
