@@ -740,9 +740,10 @@ export function useReviewActivity(
         return
       }
 
+      window.open(review.url, '_blank', 'noopener,noreferrer')
+
       try {
         await recordRecentReview(review)
-        window.open(review.url, '_blank', 'noopener,noreferrer')
       } catch (error) {
         showToast(error instanceof Error ? error.message : '최근 기록에 저장하지 못했습니다')
       }
